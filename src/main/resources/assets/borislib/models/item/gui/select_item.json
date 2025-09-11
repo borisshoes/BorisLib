@@ -1,0 +1,15 @@
+{
+    "parent": "item/generated",
+    "textures": {
+        "layer0": "borislib:item/gui/select_item"
+    },
+	"display": {
+		"gui": {
+			"scale": [
+				1.5,
+				1.5,
+				1.5
+			]
+		}
+	}
+}

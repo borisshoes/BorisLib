@@ -1,0 +1,7 @@
+{
+    "model": {
+        "type": "minecraft:model",
+        "model": "borislib:item/graphical_item"
+    },
+    "hand_animation_on_swap": false
+}
