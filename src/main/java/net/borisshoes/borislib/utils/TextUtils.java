@@ -1,5 +1,6 @@
 package net.borisshoes.borislib.utils;
 
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.*;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Pair;
@@ -7,10 +8,33 @@ import net.minecraft.util.Pair;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class TextUtils {
+   public static void energyBar(ServerPlayerEntity player, double percentage, Text prefix, Text suffix, UnaryOperator<Style> barStyle){
+      TextUtils.energyBar(player, percentage, 10, prefix, suffix, barStyle);
+   }
+   
+   public static void energyBar(ServerPlayerEntity player, double percentage, int numBars, Text prefix, Text suffix, UnaryOperator<Style> barStyle){
+      MutableText text = Text.literal("").append(prefix);
+      int value = (int) (percentage * 100);
+      char[] unicodeChars = {'▁', '▂', '▃', '▅', '▆', '▇', '▌'};
+      for (int i = 0; i < numBars; i++) {
+         int segmentValue = value - (i * numBars);
+         if (segmentValue <= 0) {
+            text.append(Text.literal(String.valueOf(unicodeChars[0])).styled(barStyle));
+         } else if (segmentValue >= numBars) {
+            text.append(Text.literal(String.valueOf(unicodeChars[unicodeChars.length - 1])).styled(barStyle));
+         } else {
+            int charIndex = (int) ((double) segmentValue / numBars * (unicodeChars.length - 1));
+            text.append(Text.literal(String.valueOf(unicodeChars[charIndex])).styled(barStyle));
+         }
+      }
+      text.append(suffix);
+      player.sendMessage(text,true);
+   }
    
    public static String camelToSnake(String str){
       return str.replaceAll("([a-z])([A-Z]+)", "$1_$2").toLowerCase(Locale.ROOT);

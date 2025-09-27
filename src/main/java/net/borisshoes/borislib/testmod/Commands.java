@@ -8,19 +8,28 @@ import net.borisshoes.borislib.gui.GraphicalItem;
 import net.borisshoes.borislib.gui.GuiHelper;
 import net.borisshoes.borislib.timers.GenericTimer;
 import net.borisshoes.borislib.timers.RepeatTimer;
+import net.borisshoes.borislib.utils.MinecraftUtils;
 import net.borisshoes.borislib.utils.ParticleEffectUtils;
+import net.borisshoes.borislib.utils.TextUtils;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.command.CommandRegistryAccess;
+import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.particle.DustParticleEffect;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.GiveCommand;
 import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.text.Style;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.mojang.brigadier.arguments.IntegerArgumentType.getInteger;
 import static com.mojang.brigadier.arguments.IntegerArgumentType.integer;
+import static com.mojang.brigadier.arguments.StringArgumentType.getString;
+import static com.mojang.brigadier.arguments.StringArgumentType.word;
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 import static net.minecraft.command.argument.ItemStackArgumentType.getItemStackArgument;
 import static net.minecraft.command.argument.ItemStackArgumentType.itemStack;
@@ -44,6 +53,14 @@ public class Commands {
                                  .then(argument("delay",integer(0))
                                        .then(argument("slot",integer(-1))
                                              .executes(context -> Commands.returnItem(context, getItemStackArgument(context, "item").createStack(getInteger(context,"count"),true), getInteger(context,"delay"), getInteger(context,"slot"))))))))
+                  .then(literal("returnitem")
+                        .then(argument("item",itemStack(access))
+                              .then(argument("count", integer(1))
+                                    .executes(context -> Commands.returnItem2(context, getItemStackArgument(context, "item").createStack(getInteger(context,"count"),true))))))
+                  .then(literal("energybar")
+                        .then(argument("prefix",word())
+                              .then(argument("suffix",word())
+                                    .executes(context -> Commands.energyBar(context, getString(context,"prefix"), getString(context,"suffix"))))))
             )
       );
    }
@@ -66,6 +83,31 @@ public class Commands {
          BorisLib.addTickTimerCallback(new ItemReturnTimerCallback(stack,context.getSource().getPlayer(),delay,prefSlot));
       }else{
          context.getSource().sendError(Text.translatable("text.borislib.must_be_executed_by_player"));
+         return -1;
+      }
+      return 1;
+   }
+   
+   private static int returnItem2(CommandContext<ServerCommandSource> context, ItemStack stack){
+      if(context.getSource().isExecutedByPlayer()){
+         MinecraftUtils.returnItems(new SimpleInventory(stack),context.getSource().getPlayer());
+      }else{
+         context.getSource().sendError(Text.translatable("text.borislib.must_be_executed_by_player"));
+         return -1;
+      }
+      return 1;
+   }
+   
+   private static int energyBar(CommandContext<ServerCommandSource> ctx, String prefix, String suffix){
+      if(ctx.getSource().isExecutedByPlayer()){
+         for(int i = 0; i <= 100; i++){
+            double finalI = i;
+            BorisLib.addTickTimerCallback(ctx.getSource().getWorld(), new GenericTimer(i*4, () -> {
+               TextUtils.energyBar(ctx.getSource().getPlayer(),finalI / 100.0, Text.literal(prefix).formatted(Formatting.RED), Text.literal(suffix).formatted(Formatting.AQUA), (style -> style.withFormatting(Formatting.YELLOW)));
+            }));
+         }
+      }else{
+         ctx.getSource().sendError(Text.translatable("text.borislib.must_be_executed_by_player"));
          return -1;
       }
       return 1;
