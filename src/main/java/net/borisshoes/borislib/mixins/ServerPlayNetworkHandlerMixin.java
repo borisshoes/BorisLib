@@ -23,7 +23,7 @@ public class ServerPlayNetworkHandlerMixin {
    @Inject(method = "onPlayerMove", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerPlayerEntity;setMovement(ZZLnet/minecraft/util/math/Vec3d;)V"))
    private void borislib$updateVelocityTracker(PlayerMoveC2SPacket packet, CallbackInfo ci, @Local Vec3d velocity){
       if(PLAYER_MOVEMENT_TRACKER.containsKey(player) && !player.isDead()){
-         PlayerMovementEntry newEntry = new PlayerMovementEntry(player, player.getPos(), velocity, System.nanoTime());
+         PlayerMovementEntry newEntry = new PlayerMovementEntry(player, player.getEntityPos(), velocity, System.nanoTime());
          PLAYER_MOVEMENT_TRACKER.put(player,newEntry);
       }else{
          PLAYER_MOVEMENT_TRACKER.put(player,PlayerMovementEntry.blankEntry(player));

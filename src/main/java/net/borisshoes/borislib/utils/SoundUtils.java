@@ -18,15 +18,15 @@ import static net.borisshoes.borislib.BorisLib.LOGGER;
 
 public class SoundUtils {
    public static void playSongToPlayer(ServerPlayerEntity player, RegistryEntry<SoundEvent> event, float vol, float pitch){
-      player.networkHandler.sendPacket(new PlaySoundS2CPacket(event, SoundCategory.PLAYERS, player.getPos().x,player.getPos().y, player.getPos().z, vol, pitch,0));
+      player.networkHandler.sendPacket(new PlaySoundS2CPacket(event, SoundCategory.PLAYERS, player.getEntityPos().x,player.getEntityPos().y, player.getEntityPos().z, vol, pitch,0));
    }
    
    public static void playSongToPlayer(ServerPlayerEntity player, RegistryEntry.Reference<SoundEvent> event, float vol, float pitch){
-      player.networkHandler.sendPacket(new PlaySoundS2CPacket(event, SoundCategory.PLAYERS, player.getPos().x,player.getPos().y, player.getPos().z, vol, pitch,0));
+      player.networkHandler.sendPacket(new PlaySoundS2CPacket(event, SoundCategory.PLAYERS, player.getEntityPos().x,player.getEntityPos().y, player.getEntityPos().z, vol, pitch,0));
    }
    
    public static void playSongToPlayer(ServerPlayerEntity player, SoundEvent event, float vol, float pitch){
-      player.networkHandler.sendPacket(new PlaySoundS2CPacket(Registries.SOUND_EVENT.getEntry(event), SoundCategory.PLAYERS, player.getPos().x,player.getPos().y, player.getPos().z, vol, pitch,0));
+      player.networkHandler.sendPacket(new PlaySoundS2CPacket(Registries.SOUND_EVENT.getEntry(event), SoundCategory.PLAYERS, player.getEntityPos().x,player.getEntityPos().y, player.getEntityPos().z, vol, pitch,0));
    }
    
    public static void playSound(World world, BlockPos pos, RegistryEntry<SoundEvent> event, SoundCategory category, float vol, float pitch){
@@ -65,7 +65,7 @@ public class SoundUtils {
    
    public static void soulSounds(ServerPlayerEntity player, int count, int duration){
       for(int i = 0; i < duration; i++){
-         BorisLib.addTickTimerCallback(player.getWorld(), new GenericTimer(2*(i+1), () -> {
+         BorisLib.addTickTimerCallback(player.getEntityWorld(), new GenericTimer(2*(i+1), () -> {
             for(int j = 0; j < count; j++){
                playSongToPlayer(player, SoundEvents.PARTICLE_SOUL_ESCAPE, 2f, (float)(Math.random()*1.5+.5));
             }

@@ -23,7 +23,7 @@ public class ItemReturnTimerCallback extends TickTimerCallback {
    
    @Override
    public void onTimer(){
-      ServerPlayerEntity player1 = player.getServer().getPlayerManager().getPlayer(player.getUuid());
+      ServerPlayerEntity player1 = player.getEntityWorld().getServer().getPlayerManager().getPlayer(player.getUuid());
       if(player1 == null){
          BorisLib.addLoginCallback(new ItemReturnLoginCallback(player,item,prefSlot));
       }else{

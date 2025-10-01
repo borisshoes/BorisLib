@@ -57,7 +57,7 @@ public class TestGui extends PagedGui<Item> {
       if(!hasRegistered){
          Random random = new CheckedRandom(0L);
          for(ItemGroup itemGroup : Registries.ITEM_GROUP){
-            itemGroup.updateEntries(new ItemGroup.DisplayContext(player.getWorld().getEnabledFeatures(), true, player.getRegistryManager()));
+            itemGroup.updateEntries(new ItemGroup.DisplayContext(player.getEntityWorld().getEnabledFeatures(), true, player.getRegistryManager()));
             if(itemGroup.hasStacks()){
                random.setSeed(itemGroup.hashCode());
                new ItemFilter(itemGroup.getDisplayName().getString(),random.nextInt(0xffffff),item -> itemGroup.contains(item.getDefaultStack()));

@@ -27,10 +27,13 @@ import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.PlayerConfigEntry;
+import net.minecraft.server.network.PrepareSpawnTask;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
+import net.minecraft.storage.NbtReadView;
 import net.minecraft.storage.ReadView;
 import net.minecraft.util.ErrorReporter;
 import net.minecraft.util.Identifier;
@@ -58,9 +61,9 @@ public class MinecraftUtils {
       T closest = null;
       double smallestDist = Double.MAX_VALUE;
       for(T t : list){
-         if(t.getPos().distanceTo(pos) < smallestDist){
+         if(t.getEntityPos().distanceTo(pos) < smallestDist){
             closest = t;
-            smallestDist = t.getPos().distanceTo(pos);
+            smallestDist = t.getEntityPos().distanceTo(pos);
          }
       }
       return closest;
@@ -287,7 +290,7 @@ public class MinecraftUtils {
             blocked = dp < -0.6;
             if(blocked){
                SoundUtils.playSound(world,hitPlayer.getBlockPos(), SoundEvents.ITEM_SHIELD_BLOCK, SoundCategory.PLAYERS,1f,1f);
-               endPoint = startPos.add(direction.normalize().multiply(direction.normalize().dotProduct(hitPlayer.getPos().subtract(startPos)))).subtract(direction.normalize());
+               endPoint = startPos.add(direction.normalize().multiply(direction.normalize().dotProduct(hitPlayer.getEntityPos().subtract(startPos)))).subtract(direction.normalize());
             }
          }
          hits3.add(hit);
@@ -302,11 +305,15 @@ public class MinecraftUtils {
    public record LasercastResult(Vec3d startPos, Vec3d endPos, Vec3d direction, List<Entity> sortedHits){}
    
    public static ServerPlayerEntity getRequestedPlayer(MinecraftServer server, GameProfile requestedProfile){
-      ServerPlayerEntity requestedPlayer = server.getPlayerManager().getPlayer(requestedProfile.getName());
+      ServerPlayerEntity requestedPlayer = server.getPlayerManager().getPlayer(requestedProfile.name());
       
       if (requestedPlayer == null) {
          requestedPlayer = new ServerPlayerEntity(server, server.getOverworld(), requestedProfile, SyncedClientOptions.createDefault());
-         Optional<ReadView> readViewOpt = server.getPlayerManager().loadPlayerData(requestedPlayer, new ErrorReporter.Logging(LogUtils.getLogger()));
+         Optional<ReadView> readViewOpt = server
+               .getPlayerManager()
+               .loadPlayerData(new PlayerConfigEntry(requestedProfile))
+               .map(playerData -> NbtReadView.create(new ErrorReporter.Logging(LogUtils.getLogger()), server.getRegistryManager(), playerData));
+         readViewOpt.ifPresent(requestedPlayer::readData);
          
          if (readViewOpt.isPresent()) {
             ReadView readView = readViewOpt.get();
