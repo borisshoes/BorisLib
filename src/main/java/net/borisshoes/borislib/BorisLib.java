@@ -95,7 +95,7 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
       return item;
    }
    
-   private static LoginCallback registerCallback(LoginCallback callback){
+   public static LoginCallback registerCallback(LoginCallback callback){
       return Registry.register(LOGIN_CALLBACKS,callback.getId(),callback);
    }
    

@@ -19,7 +19,7 @@ public class ItemModDataHandler {
       if(nbtComponent == null) return new NbtCompound();
       NbtCompound data = nbtComponent.copyNbt();
       if(data.contains(modKey)){
-         return data.getCompound(modKey).orElse(new NbtCompound());
+         return data.getCompoundOrEmpty(modKey);
       }
       return new NbtCompound();
    }
@@ -56,12 +56,12 @@ public class ItemModDataHandler {
    
    public NbtList getListProperty(ItemStack stack, String key){
       NbtCompound modTag = getDataTag(stack);
-      return  modTag == null || !modTag.contains(key) ? new NbtList() : modTag.getList(key).orElse(new NbtList());
+      return  modTag == null || !modTag.contains(key) ? new NbtList() : modTag.getListOrEmpty(key);
    }
    
    public NbtCompound getCompoundProperty(ItemStack stack, String key){
       NbtCompound modTag = getDataTag(stack);
-      return  modTag == null || !modTag.contains(key) ? new NbtCompound() : modTag.getCompound(key).orElse(new NbtCompound());
+      return  modTag == null || !modTag.contains(key) ? new NbtCompound() : modTag.getCompoundOrEmpty(key);
    }
    
    public void putProperty(ItemStack stack, String key, int property){

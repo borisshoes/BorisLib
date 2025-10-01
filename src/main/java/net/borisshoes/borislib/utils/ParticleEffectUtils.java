@@ -307,7 +307,9 @@ public class ParticleEffectUtils {
    // Notes about the Dust Particle, size goes from .01 to 4, you can use an int represented rgb value with new Vector3f(Vec3d.unpackRgb(int))
    
    public static void spawnLongParticle(ServerWorld world, ParticleEffect type, double x, double y, double z, double dx, double dy, double dz, double speed, int count){
-      List<ServerPlayerEntity> players = world.getPlayers(player -> player.squaredDistanceTo(new Vec3d(x,y,z)) < 512*512);
+      int viewChunks = world.getServer().getPlayerManager().getViewDistance();
+      int sqBlockDist = (viewChunks*16)*(viewChunks*16);
+      List<ServerPlayerEntity> players = world.getPlayers(player -> player.squaredDistanceTo(new Vec3d(x,y,z)) < sqBlockDist);
       for(ServerPlayerEntity player : players){
          player.networkHandler.sendPacket(new ParticleS2CPacket(type,true,true,x,y,z,(float)dx,(float)dy,(float)dz,(float)speed,count));
       }
