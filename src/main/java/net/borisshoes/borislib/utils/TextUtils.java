@@ -1,9 +1,12 @@
 package net.borisshoes.borislib.utils;
 
+import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.*;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Pair;
+import net.minecraft.world.World;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -13,6 +16,19 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class TextUtils {
+   
+   public static MutableText getFormattedDimName(RegistryKey<World> worldKey){
+      if(worldKey.getValue().toString().equals(ServerWorld.OVERWORLD.getValue().toString())){
+         return Text.literal("Overworld").formatted(Formatting.GREEN);
+      }else if(worldKey.getValue().toString().equals(ServerWorld.NETHER.getValue().toString())){
+         return Text.literal("The Nether").formatted(Formatting.RED);
+      }else if(worldKey.getValue().toString().equals(ServerWorld.END.getValue().toString())){
+         return Text.literal("The End").formatted(Formatting.DARK_PURPLE);
+      }else{
+         return Text.literal(worldKey.getValue().toString()).formatted(Formatting.YELLOW);
+      }
+   }
+   
    public static void energyBar(ServerPlayerEntity player, double percentage, Text prefix, Text suffix, UnaryOperator<Style> barStyle){
       TextUtils.energyBar(player, percentage, 10, prefix, suffix, barStyle);
    }
@@ -40,7 +56,7 @@ public class TextUtils {
       return str.replaceAll("([a-z])([A-Z]+)", "$1_$2").toLowerCase(Locale.ROOT);
    }
    
-   private static final ArrayList<Pair<Formatting,Integer>> COLOR_MAP = new ArrayList<>(Arrays.asList(
+   public static final ArrayList<Pair<Formatting,Integer>> COLOR_MAP = new ArrayList<>(Arrays.asList(
          new Pair<>(Formatting.BLACK,0x000000),
          new Pair<>(Formatting.DARK_BLUE,0x0000AA),
          new Pair<>(Formatting.DARK_GREEN,0x00AA00),

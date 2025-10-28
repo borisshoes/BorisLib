@@ -57,6 +57,58 @@ import static org.apache.logging.log4j.Level.WARN;
 
 public class MinecraftUtils {
    
+   private Vec3d findSafeTeleportSpot(ServerPlayerEntity user, double maxRange, double minRange, double leniencyRange, double distStep, double radialStep, double dropStep, boolean checkFluid){
+      ServerWorld world = user.getEntityWorld();
+      Vec3d direction = user.getRotationVector().normalize();
+      Vec3d origin = user.getEntityPos();
+      double maxDistSq = (maxRange + leniencyRange) * (maxRange + leniencyRange);
+      Vec3d upRef = Math.abs(direction.y) < 0.999 ? new Vec3d(0, 1, 0) : new Vec3d(1, 0, 0);
+      Vec3d right = direction.crossProduct(upRef).normalize();
+      Vec3d up = direction.crossProduct(right).normalize();
+      for(double d = maxRange; d >= minRange; d -= distStep){
+         Vec3d center = origin.add(direction.multiply(d));
+         for(double r = 0.0; r <= leniencyRange + 1e-9; r += radialStep){
+            int slices = r == 0.0 ? 1 : 12;
+            for(int k = 0; k < slices; k++){
+               double a = slices == 1 ? 0.0 : (2.0 * Math.PI * k) / slices;
+               Vec3d lateral = right.multiply(r * Math.cos(a)).add(up.multiply(r * Math.sin(a)));
+               Vec3d base = center.add(lateral);
+               double[] yNudges = new double[]{0.0, 0.5, -0.5, 1.0, -1.0};
+               for(double yOff : yNudges){
+                  Vec3d candidate = new Vec3d(base.x, base.y + yOff, base.z);
+                  if(!isSpaceClearFor(user, world, candidate, checkFluid)) continue;
+                  if(dropStep < 0 || hasGroundSupport(world, user, candidate)){
+                     return candidate;
+                  }
+                  Vec3d down = candidate;
+                  while(origin.squaredDistanceTo(down) <= maxDistSq && down.y > world.getBottomY()){
+                     down = down.add(0.0, -dropStep, 0.0);
+                     if(!isSpaceClearFor(user, world, down, checkFluid)) break;
+                     if(hasGroundSupport(world, user, down)){
+                        return down;
+                     }
+                  }
+               }
+            }
+         }
+      }
+      return null;
+   }
+   
+   public static boolean hasGroundSupport(World world, Entity entity, Vec3d targetPos){
+      Vec3d delta = targetPos.subtract(entity.getEntityPos());
+      Box targetBox = entity.getBoundingBox().offset(delta);
+      double eps = 1.0 / 16.0;
+      Box floorProbe = new Box(targetBox.minX, targetBox.minY - eps, targetBox.minZ, targetBox.maxX, targetBox.minY, targetBox.maxZ);
+      return world.getBlockCollisions(entity, floorProbe).iterator().hasNext();
+   }
+   
+   public static boolean isSpaceClearFor(Entity entity, World world, Vec3d targetPos, boolean checkFluid) {
+      Vec3d delta = targetPos.subtract(entity.getEntityPos());
+      Box targetBox = entity.getBoundingBox().offset(delta);
+      return world.isSpaceEmpty(entity, targetBox, checkFluid);
+   }
+   
    public static <T extends Entity> T getClosestEntity(List<T> list, Vec3d pos){
       T closest = null;
       double smallestDist = Double.MAX_VALUE;
