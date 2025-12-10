@@ -1,6 +1,7 @@
 package net.borisshoes.borislib.utils;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.inventory.StackWithSlot;
 import net.minecraft.item.ItemStack;
@@ -13,12 +14,20 @@ import net.minecraft.util.math.BlockPos;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 public class CodecUtils {
    public static final Codec<List<BlockPos>> BLOCKPOS_LIST = BlockPos.CODEC.listOf();
    public static final Codec<List<NbtCompound>> COMPOUND_LIST = NbtCompound.CODEC.listOf();
    public static final Codec<List<String>> STRING_LIST = Codec.STRING.listOf();
    public static final Codec<String[]> STRING_ARRAY = STRING_LIST.xmap(l -> l.toArray(String[]::new), Arrays::asList);
+   public static final Codec<UUID> UUID_CODEC = Codec.STRING.comapFlatMap(s -> {
+      try {
+         return DataResult.success(UUID.fromString(s));
+      } catch (IllegalArgumentException e) {
+         return DataResult.error(() -> "Invalid UUID: " + s);
+      }
+   }, UUID::toString);
    
    public static final Codec<StackWithSlot> BIG_STACK_CODEC = RecordCodecBuilder.create(
          instance -> instance.group(Codecs.NON_NEGATIVE_INT.fieldOf("Slot").orElse(0).forGetter(StackWithSlot::slot), ItemStack.MAP_CODEC.forGetter(StackWithSlot::stack))

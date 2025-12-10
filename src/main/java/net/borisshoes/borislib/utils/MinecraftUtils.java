@@ -2,9 +2,12 @@ package net.borisshoes.borislib.utils;
 
 import com.google.common.collect.HashMultimap;
 import com.mojang.authlib.GameProfile;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.logging.LogUtils;
 import net.borisshoes.borislib.BorisLib;
 import net.borisshoes.borislib.mixins.EntityAccessor;
+import net.minecraft.command.argument.GameProfileArgumentType;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.ContainerComponent;
 import net.minecraft.component.type.ItemEnchantmentsComponent;
@@ -28,6 +31,7 @@ import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerConfigEntry;
+import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.PrepareSpawnTask;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -356,14 +360,14 @@ public class MinecraftUtils {
    
    public record LasercastResult(Vec3d startPos, Vec3d endPos, Vec3d direction, List<Entity> sortedHits){}
    
-   public static ServerPlayerEntity getRequestedPlayer(MinecraftServer server, GameProfile requestedProfile){
-      ServerPlayerEntity requestedPlayer = server.getPlayerManager().getPlayer(requestedProfile.name());
+   public static ServerPlayerEntity getRequestedPlayer(MinecraftServer server, PlayerConfigEntry playerEntry){
+      ServerPlayerEntity requestedPlayer = server.getPlayerManager().getPlayer(playerEntry.name());
       
       if (requestedPlayer == null) {
-         requestedPlayer = new ServerPlayerEntity(server, server.getOverworld(), requestedProfile, SyncedClientOptions.createDefault());
+         requestedPlayer = new ServerPlayerEntity(server, server.getOverworld(), new GameProfile(playerEntry.id(), playerEntry.name()), SyncedClientOptions.createDefault());
          Optional<ReadView> readViewOpt = server
                .getPlayerManager()
-               .loadPlayerData(new PlayerConfigEntry(requestedProfile))
+               .loadPlayerData(playerEntry)
                .map(playerData -> NbtReadView.create(new ErrorReporter.Logging(LogUtils.getLogger()), server.getRegistryManager(), playerData));
          readViewOpt.ifPresent(requestedPlayer::readData);
          

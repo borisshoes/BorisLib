@@ -24,7 +24,6 @@ public class ItemReturnLoginCallback extends LoginCallback{
    
    public ItemReturnLoginCallback(ServerPlayerEntity player, ItemStack item, int prefSlot){
       this();
-      this.world = player.getEntityWorld().getServer().getWorld(ServerWorld.OVERWORLD);
       this.playerUUID = player.getUuidAsString();
       this.item = item;
       this.prefSlot = prefSlot;

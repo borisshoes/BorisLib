@@ -3,10 +3,14 @@ package net.borisshoes.borislib;
 import com.mojang.serialization.Lifecycle;
 import eu.pb4.polymer.resourcepack.api.PolymerResourcePackUtils;
 import net.borisshoes.borislib.callbacks.*;
+import net.borisshoes.borislib.datastorage.DataAccess;
+import net.borisshoes.borislib.datastorage.DataKey;
+import net.borisshoes.borislib.datastorage.DataRegistry;
 import net.borisshoes.borislib.gui.GraphicalItem;
 import net.borisshoes.borislib.testmod.Commands;
 import net.borisshoes.borislib.timers.TickTimerCallback;
 import net.borisshoes.borislib.tracker.PlayerMovementEntry;
+import net.borisshoes.borislib.utils.AlgoUtils;
 import net.borisshoes.borislib.utils.ItemModDataHandler;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.ModInitializer;
@@ -29,8 +33,8 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.UUID;
 
-import static net.borisshoes.borislib.cca.WorldDataComponentInitializer.LOGIN_CALLBACK_LIST;
 
 public class BorisLib implements ModInitializer, ClientModInitializer {
    
@@ -53,6 +57,8 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
    
    public static final ItemModDataHandler BORISLIB_ITEM_DATA = new ItemModDataHandler(MOD_ID);
    
+   public static final DataKey<LoginCallbackContainer> LOGIN_CALLBACKS_KEY = DataRegistry.register(DataKey.ofPlayer(Identifier.of(MOD_ID,"login_callbacks"),LoginCallbackContainer.CODEC, LoginCallbackContainer::new));
+   
    @Override
    public void onInitialize(){
       PolymerResourcePackUtils.addModAssets(MOD_ID);
@@ -60,7 +66,11 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
       ServerTickEvents.END_WORLD_TICK.register(WorldTickCallback::onWorldTick);
       ServerTickEvents.END_SERVER_TICK.register(ServerTickCallback::onTick);
       ServerPlayConnectionEvents.JOIN.register(PlayerConnectionCallback::onPlayerJoin);
+      ServerPlayConnectionEvents.DISCONNECT.register(PlayerConnectionCallback::onPlayerLeave);
       ServerLifecycleEvents.SERVER_STARTING.register(minecraftServer -> SERVER = minecraftServer);
+      ServerLifecycleEvents.SERVER_STARTED.register(DataAccess::onServerStarted);
+      ServerLifecycleEvents.SERVER_STOPPED.register(DataAccess::onServerStop);
+      ServerLifecycleEvents.AFTER_SAVE.register(DataAccess::onServerSave);
       CommandRegistrationCallback.EVENT.register(Commands::register);
       
       LOGGER.info("BorisLib ready and waiting!");
@@ -73,14 +83,20 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
    
    public static boolean addTickTimerCallback(TickTimerCallback callback){
       return SERVER_TIMER_CALLBACKS.add(callback);
+      // TODO serialize on world stop?
    }
    
    public static boolean addTickTimerCallback(ServerWorld world, TickTimerCallback callback){
       return WORLD_TIMER_CALLBACKS.add(new Pair<>(world,callback));
+      // TODO serialize on world stop?
    }
    
    public static boolean addLoginCallback(LoginCallback callback){
-      return LOGIN_CALLBACK_LIST.get(callback.getWorld()).addCallback(callback);
+      UUID playerId = AlgoUtils.getUUID(callback.getPlayer());
+      LoginCallbackContainer container = DataAccess.getPlayer(playerId,LOGIN_CALLBACKS_KEY);
+      boolean added = container.addCallback(callback);
+      DataAccess.setPlayer(playerId,LOGIN_CALLBACKS_KEY,container);
+      return added;
    }
    
    public static LoginCallback createCallback(Identifier id){

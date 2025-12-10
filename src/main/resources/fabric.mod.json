@@ -18,13 +18,7 @@
     ],
     "main": [
       "net.borisshoes.borislib.BorisLib"
-    ],
-    "cardinal-components-world": [
-      "net.borisshoes.borislib.cca.WorldDataComponentInitializer"
     ]
-  },
-  "custom": {
-    "cardinal-components": ["borislib:login_callbacks"]
   },
   "mixins": [
     "borislib.mixins.json"

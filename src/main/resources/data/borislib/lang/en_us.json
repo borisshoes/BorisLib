@@ -26,5 +26,10 @@
   "gui.borislib.recommended": "Recommended",
   "gui.borislib.alphabetical": "Alphabetical",
   "gui.borislib.rarity": "Rarity",
-  "text.borislib.must_be_executed_by_player": "This must be executed by a player"
+  "text.borislib.must_be_executed_by_player": "This must be executed by a player",
+  "testmod.borislib.timestamp_read": "The stored timestamp is: %s",
+  "testmod.borislib.timestamp_set": "Set the stored timestamp to: %s",
+  "testmod.borislib.marker_set": "Added marker: %s",
+  "testmod.borislib.marker_remove_none": "Found no markers in this world of that name",
+  "testmod.borislib.marker_remove_some": "Removed marker"
 }
