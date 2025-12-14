@@ -19,7 +19,7 @@ import static net.borisshoes.borislib.BorisLib.LOGGER;
 import static net.minecraft.server.command.CommandManager.argument;
 import static net.minecraft.server.command.CommandManager.literal;
 
-@SuppressWarnings({"unchecked","rawtypes"})
+@SuppressWarnings({"unchecked", "rawtypes"})
 public class ConfigManager {
    public Set<ConfigValue> values;
    private final File file;
@@ -37,7 +37,7 @@ public class ConfigManager {
    
    public void read(){
       try(BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(file)))){
-         LOGGER.debug("Reading {} config...",modName);
+         LOGGER.debug("Reading {} config...", modName);
          
          for(ConfigValue value : this.values){
             value.setValue(value.defaultValue);
@@ -68,60 +68,75 @@ public class ConfigManager {
          }
          
       }catch(FileNotFoundException ignored){
-         LOGGER.debug("Initialising {} config...",modName);
+         LOGGER.debug("Initialising {} config...", modName);
          this.values.forEach(value -> value.value = value.defaultValue);
       }catch(IOException e){
-         LOGGER.fatal("Failed to load {} config file!",modName);
+         LOGGER.fatal("Failed to load {} config file!", modName);
          LOGGER.fatal(e);
       }catch(Exception e){
-         LOGGER.fatal("Failed to parse {} config",modName);
+         LOGGER.fatal("Failed to parse {} config", modName);
          LOGGER.fatal(e);
       }
    }
    
    public void save(){
-      LOGGER.debug("Updating {} config...",modName);
+      LOGGER.debug("Updating {} config...", modName);
       try(BufferedWriter output = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))){
-         output.write("# "+modName+" Configuration File" + " | " + new Date());
+         output.write("# " + modName + " Configuration File" + " | " + new Date());
          output.newLine();
          output.newLine();
          
          for(ConfigValue value : this.values){
             if(value.getComment(this.modId) != null){
-               output.write("# "+ Text.translatable(value.getComment(this.modId)).getString());
+               output.write("# " + Text.translatable(value.getComment(this.modId)).getString());
                output.newLine();
             }
             output.write(value.name + " = " + value.getValueString());
             output.newLine();
          }
       }catch(IOException e){
-         LOGGER.fatal("Failed to save {} config file!",modName);
+         LOGGER.fatal("Failed to save {} config file!", modName);
          LOGGER.fatal(e);
       }
    }
    
    public LiteralArgumentBuilder<ServerCommandSource> generateCommand(String prefixA, String prefixB){
-      LiteralArgumentBuilder<ServerCommandSource> out =
-            literal(prefixA).then(literal(prefixB).requires(source -> source.hasPermissionLevel(2))
+      LiteralArgumentBuilder<ServerCommandSource> root;
+      if(!prefixB.isBlank()){
+         root = literal(prefixA).then(literal(prefixB).requires(source -> source.hasPermissionLevel(2))
+               .executes(ctx -> {
+                  values.forEach(value ->
+                        ctx.getSource().sendFeedback(() -> MutableText.of(new TranslatableTextContent(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), false));
+                  return 1;
+               }));
+      }else{
+         root = literal(prefixA).requires(source -> source.hasPermissionLevel(2))
+               .executes(ctx -> {
+                  values.forEach(value ->
+                        ctx.getSource().sendFeedback(() -> MutableText.of(new TranslatableTextContent(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), false));
+                  return 1;
+               });
+      }
+      values.forEach(value -> {
+            LiteralArgumentBuilder<ServerCommandSource> valueArg = literal(value.name)
                   .executes(ctx -> {
-                     values.forEach(value ->
-                           ctx.getSource().sendFeedback(()-> MutableText.of(new TranslatableTextContent(ConfigValue.getTranslation(value.getName(),this.modId,"getter_setter"), null, new String[] {String.valueOf(value.getValueString())})), false));
-                     return 1;
-                  }));
-      values.forEach(value ->
-            out.then(literal(prefixB).then(literal(value.name)
-                  .executes(ctx -> {
-                     ctx.getSource().sendFeedback(()->MutableText.of(new TranslatableTextContent(ConfigValue.getTranslation(value.getName(),this.modId,"getter_setter"), null, new String[] {String.valueOf(value.getValueString())})), false);
+                     ctx.getSource().sendFeedback(() -> MutableText.of(new TranslatableTextContent(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), false);
                      return 1;
                   })
                   .then(argument(value.name, value.getArgumentType()).suggests(value::getSuggestions)
                         .executes(ctx -> {
                            value.value = value.parseArgumentValue(ctx);
-                           ((CommandContext<ServerCommandSource>) ctx).getSource().sendFeedback(()->MutableText.of(new TranslatableTextContent(ConfigValue.getTranslation(value.getName(),this.modId,"getter_setter"), null, new String[] {String.valueOf(value.getValueString())})), true);
+                           ((CommandContext<ServerCommandSource>) ctx).getSource().sendFeedback(() -> MutableText.of(new TranslatableTextContent(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), true);
                            this.save();
                            return 1;
-                        })))));
-      return out;
+                        }));
+         if(!prefixB.isBlank()){
+            root.then(literal(prefixB).then(valueArg));
+         }else{
+            root.then(valueArg);
+         }
+      });
+      return root;
    }
    
    
@@ -131,7 +146,14 @@ public class ConfigManager {
    
    public int getInt(IConfigSetting<?> setting){
       try{
-         return (int) this.getValue(setting.getName());
+         Object value = this.getValue(setting.getName());
+         if(value instanceof Number number){
+            return number.intValue();
+         }
+         if(value instanceof String s){
+            return (int) Double.parseDouble(s);
+         }
+         LOGGER.error("Config {}:{} is not numeric for getInt (type={})", this.modId, setting.getName(), value != null ? value.getClass().getName() : "null");
       }catch(Exception e){
          LOGGER.error("Failed to get Integer config for {}:{}", this.modId, setting.getName());
          LOGGER.error(e.toString());
@@ -151,7 +173,14 @@ public class ConfigManager {
    
    public double getDouble(IConfigSetting<?> setting){
       try{
-         return (double) this.getValue(setting.getName());
+         Object value = this.getValue(setting.getName());
+         if(value instanceof Number number){
+            return number.doubleValue();
+         }
+         if(value instanceof String s){
+            return Double.parseDouble(s);
+         }
+         LOGGER.error("Config {}:{} is not numeric for getDouble (type={})", this.modId, setting.getName(), value != null ? value.getClass().getName() : "null");
       }catch(Exception e){
          LOGGER.error("Failed to get Double config for {}:{}", this.modId, setting.getName());
          LOGGER.error(e.toString());

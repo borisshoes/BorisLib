@@ -2,6 +2,7 @@ package net.borisshoes.borislib.datastorage;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.Dynamic;
+import net.borisshoes.borislib.BorisLib;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.registry.RegistryKey;
@@ -20,13 +21,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 public final class DataAccess {
-   private static volatile MinecraftServer server;
    private static volatile PlayerObjectStore playerStore;
    private static final Set<UUID> DIRTY_PLAYERS = ConcurrentHashMap.newKeySet();
    
    // TODO, load on first access
    public static void onServerStarted(MinecraftServer s){
-      server = s;
       Path root = s.getOverworld().getServer().getSavePath(WorldSavePath.ROOT);
       playerStore = new PlayerObjectStore(root);
    }
@@ -73,12 +72,12 @@ public final class DataAccess {
    }
    
    public static <T> T getGlobal(DataKey<T> key){
-      GlobalState s = GlobalState.get(server.getOverworld());
+      GlobalState s = GlobalState.get(BorisLib.SERVER.getOverworld());
       return s.getLive(key);
    }
    
    public static <T> T getWorld(RegistryKey<World> wk, DataKey<T> key){
-      ServerWorld w = server.getWorld(wk);
+      ServerWorld w = BorisLib.SERVER.getWorld(wk);
       WorldState s = WorldState.get(w);
       return s.getLive(wk, key);
    }
@@ -90,7 +89,7 @@ public final class DataAccess {
    }
    
    public static <T> void setGlobal(DataKey<T> key, T value){
-      GlobalState s = GlobalState.get(server.getOverworld());
+      GlobalState s = GlobalState.get(BorisLib.SERVER.getOverworld());
       s.setLive(key, value);
    }
    
@@ -116,7 +115,7 @@ public final class DataAccess {
       Map<UUID, T> out = new HashMap<>();
       
       // Always include online players (force-decode into live objects)
-      for(ServerPlayerEntity sp : server.getPlayerManager().getPlayerList()){
+      for(ServerPlayerEntity sp : BorisLib.SERVER.getPlayerManager().getPlayerList()){
          out.put(sp.getUuid(), playerStore.getLive(sp.getUuid(), key));
       }
       
