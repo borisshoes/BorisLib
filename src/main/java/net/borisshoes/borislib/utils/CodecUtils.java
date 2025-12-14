@@ -3,14 +3,14 @@ package net.borisshoes.borislib.utils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.inventory.StackWithSlot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.storage.ReadView;
-import net.minecraft.storage.WriteView;
-import net.minecraft.util.collection.DefaultedList;
-import net.minecraft.util.dynamic.Codecs;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.NonNullList;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.ExtraCodecs;
+import net.minecraft.world.ItemStackWithSlot;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 
 import java.util.Arrays;
 import java.util.List;
@@ -18,7 +18,7 @@ import java.util.UUID;
 
 public class CodecUtils {
    public static final Codec<List<BlockPos>> BLOCKPOS_LIST = BlockPos.CODEC.listOf();
-   public static final Codec<List<NbtCompound>> COMPOUND_LIST = NbtCompound.CODEC.listOf();
+   public static final Codec<List<CompoundTag>> COMPOUND_LIST = CompoundTag.CODEC.listOf();
    public static final Codec<List<String>> STRING_LIST = Codec.STRING.listOf();
    public static final Codec<String[]> STRING_ARRAY = STRING_LIST.xmap(l -> l.toArray(String[]::new), Arrays::asList);
    public static final Codec<UUID> UUID_CODEC = Codec.STRING.comapFlatMap(s -> {
@@ -29,31 +29,31 @@ public class CodecUtils {
       }
    }, UUID::toString);
    
-   public static final Codec<StackWithSlot> BIG_STACK_CODEC = RecordCodecBuilder.create(
-         instance -> instance.group(Codecs.NON_NEGATIVE_INT.fieldOf("Slot").orElse(0).forGetter(StackWithSlot::slot), ItemStack.MAP_CODEC.forGetter(StackWithSlot::stack))
-               .apply(instance, StackWithSlot::new)
+   public static final Codec<ItemStackWithSlot> BIG_STACK_CODEC = RecordCodecBuilder.create(
+         instance -> instance.group(ExtraCodecs.NON_NEGATIVE_INT.fieldOf("Slot").orElse(0).forGetter(ItemStackWithSlot::slot), ItemStack.MAP_CODEC.forGetter(ItemStackWithSlot::stack))
+               .apply(instance, ItemStackWithSlot::new)
    );
    
-   public static void readBigInventory(ReadView view, DefaultedList<ItemStack> stacks){
-      for (StackWithSlot stackWithSlot : view.getTypedListView("Items", BIG_STACK_CODEC)) {
-         if (stackWithSlot.isValidSlot(stacks.size())) {
+   public static void readBigInventory(ValueInput view, NonNullList<ItemStack> stacks){
+      for (ItemStackWithSlot stackWithSlot : view.listOrEmpty("Items", BIG_STACK_CODEC)) {
+         if (stackWithSlot.isValidInContainer(stacks.size())) {
             stacks.set(stackWithSlot.slot(), stackWithSlot.stack());
          }
       }
    }
    
-   public static void writeBigInventory(WriteView view, DefaultedList<ItemStack> stacks, boolean setIfEmpty) {
-      WriteView.ListAppender<StackWithSlot> listAppender = view.getListAppender("Items", BIG_STACK_CODEC);
+   public static void writeBigInventory(ValueOutput view, NonNullList<ItemStack> stacks, boolean setIfEmpty) {
+      ValueOutput.TypedOutputList<ItemStackWithSlot> listAppender = view.list("Items", BIG_STACK_CODEC);
       
       for (int i = 0; i < stacks.size(); i++) {
          ItemStack itemStack = stacks.get(i);
          if (!itemStack.isEmpty()) {
-            listAppender.add(new StackWithSlot(i, itemStack));
+            listAppender.add(new ItemStackWithSlot(i, itemStack));
          }
       }
       
       if (listAppender.isEmpty() && !setIfEmpty) {
-         view.remove("Items");
+         view.discard("Items");
       }
    }
 }

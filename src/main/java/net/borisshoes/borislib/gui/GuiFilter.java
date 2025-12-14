@@ -1,7 +1,5 @@
 package net.borisshoes.borislib.gui;
 
-import net.minecraft.util.Formatting;
-
 import java.util.function.Predicate;
 
 public abstract class GuiFilter<A> extends GuiFilterSort<A> {

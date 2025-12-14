@@ -5,7 +5,6 @@ import com.mojang.brigadier.context.CommandContext;
 import net.borisshoes.borislib.BorisLib;
 import net.borisshoes.borislib.callbacks.ItemReturnTimerCallback;
 import net.borisshoes.borislib.datastorage.DataAccess;
-import net.borisshoes.borislib.gui.GraphicalItem;
 import net.borisshoes.borislib.gui.GuiHelper;
 import net.borisshoes.borislib.timers.GenericTimer;
 import net.borisshoes.borislib.timers.RepeatTimer;
@@ -13,37 +12,32 @@ import net.borisshoes.borislib.utils.MinecraftUtils;
 import net.borisshoes.borislib.utils.ParticleEffectUtils;
 import net.borisshoes.borislib.utils.TextUtils;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.command.CommandRegistryAccess;
-import net.minecraft.inventory.SimpleInventory;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.particle.DustParticleEffect;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.GiveCommand;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.DustParticleOptions;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.mojang.brigadier.arguments.IntegerArgumentType.getInteger;
 import static com.mojang.brigadier.arguments.IntegerArgumentType.integer;
 import static com.mojang.brigadier.arguments.StringArgumentType.getString;
 import static com.mojang.brigadier.arguments.StringArgumentType.word;
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
-import static net.minecraft.command.argument.ItemStackArgumentType.getItemStackArgument;
-import static net.minecraft.command.argument.ItemStackArgumentType.itemStack;
-import static net.minecraft.server.command.CommandManager.argument;
-import static net.minecraft.server.command.CommandManager.literal;
+import static net.minecraft.commands.Commands.argument;
+import static net.minecraft.commands.Commands.literal;
+import static net.minecraft.commands.arguments.item.ItemArgument.getItem;
+import static net.minecraft.commands.arguments.item.ItemArgument.item;
 
 public class Commands {
-   public static void register(CommandDispatcher<ServerCommandSource> dispatcher, CommandRegistryAccess access, CommandManager.RegistrationEnvironment env){
+   public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext access, net.minecraft.commands.Commands.CommandSelection env){
       dispatcher.register(literal("borislib").executes(Commands::getVersion)
-            .then(literal("testmod").requires(source -> source.hasPermissionLevel(2))
+            .then(literal("testmod").requires(net.minecraft.commands.Commands.hasPermission(net.minecraft.commands.Commands.LEVEL_ADMINS))
                   .then(literal("worldcallback")
                         .then(argument("ticks", integer(0))
                               .executes(context -> Commands.worldCallback(context, getInteger(context, "ticks")))))
@@ -52,15 +46,15 @@ public class Commands {
                               .executes(context -> Commands.serverCallback(context, getInteger(context, "ticks")))))
                   .then(literal("pagedgui").executes(Commands::pagedGui))
                   .then(literal("returnitem")
-                        .then(argument("item", itemStack(access))
+                        .then(argument("item", item(access))
                               .then(argument("count", integer(1))
                                     .then(argument("delay", integer(0))
                                           .then(argument("slot", integer(-1))
-                                                .executes(context -> Commands.returnItem(context, getItemStackArgument(context, "item").createStack(getInteger(context, "count"), true), getInteger(context, "delay"), getInteger(context, "slot"))))))))
+                                                .executes(context -> Commands.returnItem(context, getItem(context, "item").createItemStack(getInteger(context, "count"), true), getInteger(context, "delay"), getInteger(context, "slot"))))))))
                   .then(literal("returnitem")
-                        .then(argument("item", itemStack(access))
+                        .then(argument("item", item(access))
                               .then(argument("count", integer(1))
-                                    .executes(context -> Commands.returnItem2(context, getItemStackArgument(context, "item").createStack(getInteger(context, "count"), true))))))
+                                    .executes(context -> Commands.returnItem2(context, getItem(context, "item").createItemStack(getInteger(context, "count"), true))))))
                   .then(literal("energybar")
                         .then(argument("prefix", word())
                               .then(argument("suffix", word())
@@ -83,136 +77,136 @@ public class Commands {
       );
    }
    
-   private static int readTimestamp(CommandContext<ServerCommandSource> context){
+   private static int readTimestamp(CommandContext<CommandSourceStack> context){
       GlobalTimestamp timestamp = DataAccess.getGlobal(GlobalTimestamp.KEY);
-      context.getSource().sendFeedback(() -> Text.translatable("testmod.borislib.timestamp_read",timestamp.timestamp), false);
+      context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.timestamp_read",timestamp.timestamp), false);
       return 1;
    }
    
-   private static int setTimestamp(CommandContext<ServerCommandSource> context){
+   private static int setTimestamp(CommandContext<CommandSourceStack> context){
       GlobalTimestamp timestamp = DataAccess.getGlobal(GlobalTimestamp.KEY);
       timestamp.timestamp = System.currentTimeMillis();
-      context.getSource().sendFeedback(() -> Text.translatable("testmod.borislib.timestamp_set",timestamp.timestamp), false);
+      context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.timestamp_set",timestamp.timestamp), false);
       return 1;
    }
    
-   private static int listMarkers(CommandContext<ServerCommandSource> context){
-      for(ServerWorld world : context.getSource().getServer().getWorlds()){
-         List<WorldMarker> markers = DataAccess.getWorld(world.getRegistryKey(),WorldMarker.KEY);
-         context.getSource().sendFeedback(() -> Text.literal(world.getRegistryKey().toString()+": "),false);
+   private static int listMarkers(CommandContext<CommandSourceStack> context){
+      for(ServerLevel world : context.getSource().getServer().getAllLevels()){
+         List<WorldMarker> markers = DataAccess.getWorld(world.dimension(),WorldMarker.KEY);
+         context.getSource().sendSuccess(() -> Component.literal(world.dimension().toString()+": "),false);
          for(WorldMarker marker : markers){
-            context.getSource().sendFeedback(() -> Text.literal(" - "+marker.id+": "+marker.pos.toShortString()),false);
+            context.getSource().sendSuccess(() -> Component.literal(" - "+marker.id+": "+marker.pos.toShortString()),false);
          }
       }
       return 0;
    }
    
-   private static int removeMarker(CommandContext<ServerCommandSource> context, String name){
-      ServerWorld world = context.getSource().getWorld();
-      List<WorldMarker> markers = DataAccess.getWorld(world.getRegistryKey(),WorldMarker.KEY);
+   private static int removeMarker(CommandContext<CommandSourceStack> context, String name){
+      ServerLevel world = context.getSource().getLevel();
+      List<WorldMarker> markers = DataAccess.getWorld(world.dimension(),WorldMarker.KEY);
       List<WorldMarker> newMarkers = markers.stream().filter(m -> !m.id.equals(name)).toList();
       DataAccess.setWorld(world,WorldMarker.KEY,newMarkers);
       boolean removed = newMarkers.size() < markers.size();
       if(removed){
-         context.getSource().sendFeedback(() -> Text.translatable("testmod.borislib.marker_remove_some"), false);
+         context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.marker_remove_some"), false);
          return 1;
       }else{
-         context.getSource().sendFeedback(() -> Text.translatable("testmod.borislib.marker_remove_none"), false);
+         context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.marker_remove_none"), false);
          return 0;
       }
    }
    
-   private static int placeMarker(CommandContext<ServerCommandSource> context, String name){
-      if(context.getSource().isExecutedByPlayer()){
-         ServerWorld world = context.getSource().getWorld();
-         List<WorldMarker> markers = DataAccess.getWorld(world.getRegistryKey(),WorldMarker.KEY);
+   private static int placeMarker(CommandContext<CommandSourceStack> context, String name){
+      if(context.getSource().isPlayer()){
+         ServerLevel world = context.getSource().getLevel();
+         List<WorldMarker> markers = DataAccess.getWorld(world.dimension(),WorldMarker.KEY);
          WorldMarker m = new WorldMarker();
-         m.pos = BlockPos.ofFloored(context.getSource().getPosition());
+         m.pos = BlockPos.containing(context.getSource().getPosition());
          m.id = name;
          markers.add(m);
-         context.getSource().sendFeedback(() -> Text.translatable("testmod.borislib.marker_set",name), false);
+         context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.marker_set",name), false);
       }else{
-         context.getSource().sendError(Text.translatable("text.borislib.must_be_executed_by_player"));
+         context.getSource().sendFailure(Component.translatable("text.borislib.must_be_executed_by_player"));
          return -1;
       }
       return 1;
    }
    
-   private static int pagedGui(CommandContext<ServerCommandSource> context){
-      if(context.getSource().isExecutedByPlayer()){
+   private static int pagedGui(CommandContext<CommandSourceStack> context){
+      if(context.getSource().isPlayer()){
          TestGui testGui = new TestGui(context.getSource().getPlayer());
-         GuiHelper.outlineGUI(testGui, 0x1155dd, Text.literal("Test Border Text"));
+         GuiHelper.outlineGUI(testGui, 0x1155dd, Component.literal("Test Border Text"));
          testGui.buildPage();
          testGui.open();
       }else{
-         context.getSource().sendError(Text.translatable("text.borislib.must_be_executed_by_player"));
+         context.getSource().sendFailure(Component.translatable("text.borislib.must_be_executed_by_player"));
          return -1;
       }
       return 1;
    }
    
-   private static int returnItem(CommandContext<ServerCommandSource> context, ItemStack stack, int delay, int prefSlot){
-      if(context.getSource().isExecutedByPlayer()){
+   private static int returnItem(CommandContext<CommandSourceStack> context, ItemStack stack, int delay, int prefSlot){
+      if(context.getSource().isPlayer()){
          BorisLib.addTickTimerCallback(new ItemReturnTimerCallback(stack, context.getSource().getPlayer(), delay, prefSlot));
       }else{
-         context.getSource().sendError(Text.translatable("text.borislib.must_be_executed_by_player"));
+         context.getSource().sendFailure(Component.translatable("text.borislib.must_be_executed_by_player"));
          return -1;
       }
       return 1;
    }
    
-   private static int returnItem2(CommandContext<ServerCommandSource> context, ItemStack stack){
-      if(context.getSource().isExecutedByPlayer()){
-         MinecraftUtils.returnItems(new SimpleInventory(stack), context.getSource().getPlayer());
+   private static int returnItem2(CommandContext<CommandSourceStack> context, ItemStack stack){
+      if(context.getSource().isPlayer()){
+         MinecraftUtils.returnItems(new SimpleContainer(stack), context.getSource().getPlayer());
       }else{
-         context.getSource().sendError(Text.translatable("text.borislib.must_be_executed_by_player"));
+         context.getSource().sendFailure(Component.translatable("text.borislib.must_be_executed_by_player"));
          return -1;
       }
       return 1;
    }
    
-   private static int energyBar(CommandContext<ServerCommandSource> ctx, String prefix, String suffix){
-      if(ctx.getSource().isExecutedByPlayer()){
+   private static int energyBar(CommandContext<CommandSourceStack> ctx, String prefix, String suffix){
+      if(ctx.getSource().isPlayer()){
          for(int i = 0; i <= 100; i++){
             double finalI = i;
-            BorisLib.addTickTimerCallback(ctx.getSource().getWorld(), new GenericTimer(i * 4, () -> {
-               TextUtils.energyBar(ctx.getSource().getPlayer(), finalI / 100.0, Text.literal(prefix).formatted(Formatting.RED), Text.literal(suffix).formatted(Formatting.AQUA), (style -> style.withFormatting(Formatting.YELLOW)));
+            BorisLib.addTickTimerCallback(ctx.getSource().getLevel(), new GenericTimer(i * 4, () -> {
+               TextUtils.energyBar(ctx.getSource().getPlayer(), finalI / 100.0, Component.literal(prefix).withStyle(ChatFormatting.RED), Component.literal(suffix).withStyle(ChatFormatting.AQUA), (style -> style.applyFormat(ChatFormatting.YELLOW)));
             }));
          }
       }else{
-         ctx.getSource().sendError(Text.translatable("text.borislib.must_be_executed_by_player"));
+         ctx.getSource().sendFailure(Component.translatable("text.borislib.must_be_executed_by_player"));
          return -1;
       }
       return 1;
    }
    
-   private static int getVersion(CommandContext<ServerCommandSource> context){
-      context.getSource().sendFeedback(() -> Text.literal("BorisLib " + FabricLoader.getInstance().getModContainer(MOD_ID).get().getMetadata().getVersion().getFriendlyString()), false);
+   private static int getVersion(CommandContext<CommandSourceStack> context){
+      context.getSource().sendSuccess(() -> Component.literal("BorisLib " + FabricLoader.getInstance().getModContainer(MOD_ID).get().getMetadata().getVersion().getFriendlyString()), false);
       return 1;
    }
    
-   private static int worldCallback(CommandContext<ServerCommandSource> ctx, int ticks){
-      BorisLib.addTickTimerCallback(ctx.getSource().getWorld(), new RepeatTimer(1, ticks, () -> {
-         ctx.getSource().getServer().getPlayerManager().broadcast(Text.translatable("testmod.borislib.worldcallback"), false);
-         double theta = (Math.PI / ticks) * (ctx.getSource().getServer().getTicks() % ticks);
-         ParticleEffectUtils.sphere(ctx.getSource().getWorld(), null, ctx.getSource().getPosition(), new DustParticleEffect(0xff0000, 1), 5, 200, 1, 0, 0, theta);
-      }, ctx.getSource().getWorld()));
-      BorisLib.addTickTimerCallback(ctx.getSource().getWorld(), new GenericTimer(ticks + 1, () -> {
-         ctx.getSource().getServer().getPlayerManager().broadcast(Text.translatable("testmod.borislib.worldcallbackfinish"), false);
-         ParticleEffectUtils.sphere(ctx.getSource().getWorld(), null, ctx.getSource().getPosition(), new DustParticleEffect(0x00ff00, 1), 3, 100, 1, 0, 0, 0);
+   private static int worldCallback(CommandContext<CommandSourceStack> ctx, int ticks){
+      BorisLib.addTickTimerCallback(ctx.getSource().getLevel(), new RepeatTimer(1, ticks, () -> {
+         ctx.getSource().getServer().getPlayerList().broadcastSystemMessage(Component.translatable("testmod.borislib.worldcallback"), false);
+         double theta = (Math.PI / ticks) * (ctx.getSource().getServer().getTickCount() % ticks);
+         ParticleEffectUtils.sphere(ctx.getSource().getLevel(), null, ctx.getSource().getPosition(), new DustParticleOptions(0xff0000, 1), 5, 200, 1, 0, 0, theta);
+      }, ctx.getSource().getLevel()));
+      BorisLib.addTickTimerCallback(ctx.getSource().getLevel(), new GenericTimer(ticks + 1, () -> {
+         ctx.getSource().getServer().getPlayerList().broadcastSystemMessage(Component.translatable("testmod.borislib.worldcallbackfinish"), false);
+         ParticleEffectUtils.sphere(ctx.getSource().getLevel(), null, ctx.getSource().getPosition(), new DustParticleOptions(0x00ff00, 1), 3, 100, 1, 0, 0, 0);
       }));
       return 0;
    }
    
-   private static int serverCallback(CommandContext<ServerCommandSource> ctx, int ticks){
+   private static int serverCallback(CommandContext<CommandSourceStack> ctx, int ticks){
       BorisLib.addTickTimerCallback(new RepeatTimer(1, ticks, () -> {
-         ctx.getSource().getServer().getPlayerManager().broadcast(Text.translatable("testmod.borislib.servercallback"), false);
-         double theta = (Math.PI / ticks) * (ctx.getSource().getServer().getTicks() % ticks);
-         ParticleEffectUtils.sphere(ctx.getSource().getWorld(), null, ctx.getSource().getPosition(), new DustParticleEffect(0xff0000, 1), 5, 200, 1, 0, 0, theta);
+         ctx.getSource().getServer().getPlayerList().broadcastSystemMessage(Component.translatable("testmod.borislib.servercallback"), false);
+         double theta = (Math.PI / ticks) * (ctx.getSource().getServer().getTickCount() % ticks);
+         ParticleEffectUtils.sphere(ctx.getSource().getLevel(), null, ctx.getSource().getPosition(), new DustParticleOptions(0xff0000, 1), 5, 200, 1, 0, 0, theta);
       }, null));
       BorisLib.addTickTimerCallback(new GenericTimer(ticks + 1, () -> {
-         ctx.getSource().getServer().getPlayerManager().broadcast(Text.translatable("testmod.borislib.servercallbackfinish"), false);
-         ParticleEffectUtils.sphere(ctx.getSource().getWorld(), null, ctx.getSource().getPosition(), new DustParticleEffect(0x00ff00, 1), 3, 100, 1, 0, 0, 0);
+         ctx.getSource().getServer().getPlayerList().broadcastSystemMessage(Component.translatable("testmod.borislib.servercallbackfinish"), false);
+         ParticleEffectUtils.sphere(ctx.getSource().getLevel(), null, ctx.getSource().getPosition(), new DustParticleOptions(0x00ff00, 1), 3, 100, 1, 0, 0, 0);
       }));
       return 0;
    }

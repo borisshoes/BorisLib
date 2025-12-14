@@ -1,6 +1,6 @@
 package net.borisshoes.borislib.events;
 
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;

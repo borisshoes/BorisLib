@@ -6,16 +6,16 @@ import net.borisshoes.borislib.gui.GuiFilter;
 import net.borisshoes.borislib.gui.GuiSort;
 import net.borisshoes.borislib.gui.PagedGui;
 import net.borisshoes.borislib.utils.MinecraftUtils;
-import net.minecraft.item.*;
-import net.minecraft.registry.Registries;
-import net.minecraft.resource.featuretoggle.FeatureSet;
-import net.minecraft.screen.ScreenHandlerType;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Pair;
-import net.minecraft.util.math.random.CheckedRandom;
-import net.minecraft.util.math.random.Random;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.levelgen.LegacyRandomSource;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -28,16 +28,16 @@ public class TestGui extends PagedGui<Item> {
    private static boolean hasRegistered = false;
    private final int pageColor = 0xd9c682;
    
-   public TestGui(ServerPlayerEntity player){
-      super(ScreenHandlerType.GENERIC_9X6, player, Registries.ITEM.stream().toList());
-      action1TextColor(Formatting.RED.getColorValue().intValue());
-      action2TextColor(Formatting.GOLD.getColorValue().intValue());
-      action3TextColor(Formatting.YELLOW.getColorValue().intValue());
+   public TestGui(ServerPlayer player){
+      super(MenuType.GENERIC_9x6, player, BuiltInRegistries.ITEM.stream().toList());
+      action1TextColor(ChatFormatting.RED.getColor().intValue());
+      action2TextColor(ChatFormatting.GOLD.getColor().intValue());
+      action3TextColor(ChatFormatting.YELLOW.getColor().intValue());
       
       itemElemBuilder((item) -> {
-         GuiElementBuilder builder = GuiElementBuilder.from(item.getDefaultStack());
-         builder.setName(Text.translatable(item.getTranslationKey()).withColor(0x00ff00));
-         builder.addLoreLine(Text.literal("Hi there!"));
+         GuiElementBuilder builder = GuiElementBuilder.from(item.getDefaultInstance());
+         builder.setName(Component.translatable(item.getDescriptionId()).withColor(0x00ff00));
+         builder.addLoreLine(Component.literal("Hi there!"));
          return builder;
       });
       
@@ -47,7 +47,7 @@ public class TestGui extends PagedGui<Item> {
          if(clickType.isRight){
             MinecraftUtils.removeItems(player,item,1);
          }else{
-            player.giveOrDropStack(new ItemStack(item));
+            player.handleExtraItemsCreatedOnUse(new ItemStack(item));
          }
       });
       
@@ -55,12 +55,12 @@ public class TestGui extends PagedGui<Item> {
       curFilter(ItemFilter.NONE);
       
       if(!hasRegistered){
-         Random random = new CheckedRandom(0L);
-         for(ItemGroup itemGroup : Registries.ITEM_GROUP){
-            itemGroup.updateEntries(new ItemGroup.DisplayContext(player.getEntityWorld().getEnabledFeatures(), true, player.getRegistryManager()));
-            if(itemGroup.hasStacks()){
+         RandomSource random = new LegacyRandomSource(0L);
+         for(CreativeModeTab itemGroup : BuiltInRegistries.CREATIVE_MODE_TAB){
+            itemGroup.buildContents(new CreativeModeTab.ItemDisplayParameters(player.level().enabledFeatures(), true, player.registryAccess()));
+            if(itemGroup.hasAnyItems()){
                random.setSeed(itemGroup.hashCode());
-               new ItemFilter(itemGroup.getDisplayName().getString(),random.nextInt(0xffffff),item -> itemGroup.contains(item.getDefaultStack()));
+               new ItemFilter(itemGroup.getDisplayName().getString(),random.nextInt(0xffffff),item -> itemGroup.contains(item.getDefaultInstance()));
             }
          }
          hasRegistered = true;
@@ -70,7 +70,7 @@ public class TestGui extends PagedGui<Item> {
    private static class ItemFilter extends GuiFilter<Item> {
       public static final List<ItemFilter> FILTERS = new ArrayList<>();
       
-      public static final ItemFilter NONE = new ItemFilter("gui.borislib.none", Formatting.WHITE.getColorValue().intValue(), entry -> true);
+      public static final ItemFilter NONE = new ItemFilter("gui.borislib.none", ChatFormatting.WHITE.getColor().intValue(), entry -> true);
       
       private ItemFilter(String key, int color, Predicate<Item> predicate){
          super(key, color, predicate);
@@ -90,12 +90,12 @@ public class TestGui extends PagedGui<Item> {
    private static class ItemSort extends GuiSort<Item> {
       public static final List<ItemSort> SORTS = new ArrayList<>();
       
-      public static final ItemSort RECOMMENDED = new ItemSort("gui.borislib.recommended", Formatting.LIGHT_PURPLE.getColorValue().intValue(),
-            Comparator.comparingInt(entry -> Registries.ITEM.getIndexedEntries().getRawId(Registries.ITEM.getEntry(entry))));
-      public static final ItemSort ALPHABETICAL = new ItemSort("gui.borislib.alphabetical", Formatting.AQUA.getColorValue().intValue(),
-            Comparator.comparing(Item::getTranslationKey));
-      public static final ItemSort RARITY = new ItemSort("gui.borislib.rarity", Formatting.GREEN.getColorValue().intValue(),
-            Comparator.comparingInt((Item entry) -> entry.getDefaultStack().getRarity().ordinal()).thenComparing(Item::getTranslationKey));
+      public static final ItemSort RECOMMENDED = new ItemSort("gui.borislib.recommended", ChatFormatting.LIGHT_PURPLE.getColor().intValue(),
+            Comparator.comparingInt(entry -> BuiltInRegistries.ITEM.asHolderIdMap().getId(BuiltInRegistries.ITEM.wrapAsHolder(entry))));
+      public static final ItemSort ALPHABETICAL = new ItemSort("gui.borislib.alphabetical", ChatFormatting.AQUA.getColor().intValue(),
+            Comparator.comparing(Item::getDescriptionId));
+      public static final ItemSort RARITY = new ItemSort("gui.borislib.rarity", ChatFormatting.GREEN.getColor().intValue(),
+            Comparator.comparingInt((Item entry) -> entry.getDefaultInstance().getRarity().ordinal()).thenComparing(Item::getDescriptionId));
       
       private ItemSort(String key, int color, Comparator<Item> comparator){
          super(key, color, comparator);

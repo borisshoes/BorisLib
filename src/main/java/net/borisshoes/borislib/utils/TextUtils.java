@@ -1,12 +1,13 @@
 package net.borisshoes.borislib.utils;
 
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.*;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Pair;
-import net.minecraft.world.World;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.*;
+import net.minecraft.network.chat.contents.PlainTextContents;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Tuple;
+import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,76 +18,76 @@ import java.util.regex.Pattern;
 
 public class TextUtils {
    
-   public static MutableText getFormattedDimName(RegistryKey<World> worldKey){
-      if(worldKey.getValue().toString().equals(ServerWorld.OVERWORLD.getValue().toString())){
-         return Text.literal("Overworld").formatted(Formatting.GREEN);
-      }else if(worldKey.getValue().toString().equals(ServerWorld.NETHER.getValue().toString())){
-         return Text.literal("The Nether").formatted(Formatting.RED);
-      }else if(worldKey.getValue().toString().equals(ServerWorld.END.getValue().toString())){
-         return Text.literal("The End").formatted(Formatting.DARK_PURPLE);
+   public static MutableComponent getFormattedDimName(ResourceKey<Level> worldKey){
+      if(worldKey.identifier().toString().equals(ServerLevel.OVERWORLD.identifier().toString())){
+         return Component.literal("Overworld").withStyle(ChatFormatting.GREEN);
+      }else if(worldKey.identifier().toString().equals(ServerLevel.NETHER.identifier().toString())){
+         return Component.literal("The Nether").withStyle(ChatFormatting.RED);
+      }else if(worldKey.identifier().toString().equals(ServerLevel.END.identifier().toString())){
+         return Component.literal("The End").withStyle(ChatFormatting.DARK_PURPLE);
       }else{
-         return Text.literal(worldKey.getValue().toString()).formatted(Formatting.YELLOW);
+         return Component.literal(worldKey.identifier().toString()).withStyle(ChatFormatting.YELLOW);
       }
    }
    
-   public static void energyBar(ServerPlayerEntity player, double percentage, Text prefix, Text suffix, UnaryOperator<Style> barStyle){
+   public static void energyBar(ServerPlayer player, double percentage, Component prefix, Component suffix, UnaryOperator<Style> barStyle){
       TextUtils.energyBar(player, percentage, 10, prefix, suffix, barStyle);
    }
    
-   public static void energyBar(ServerPlayerEntity player, double percentage, int numBars, Text prefix, Text suffix, UnaryOperator<Style> barStyle){
-      MutableText text = Text.literal("").append(prefix);
+   public static void energyBar(ServerPlayer player, double percentage, int numBars, Component prefix, Component suffix, UnaryOperator<Style> barStyle){
+      MutableComponent text = Component.literal("").append(prefix);
       int value = (int) (percentage * 100);
       char[] unicodeChars = {'▁', '▂', '▃', '▅', '▆', '▇', '▌'};
       for (int i = 0; i < numBars; i++) {
          int segmentValue = value - (i * numBars);
          if (segmentValue <= 0) {
-            text.append(Text.literal(String.valueOf(unicodeChars[0])).styled(barStyle));
+            text.append(Component.literal(String.valueOf(unicodeChars[0])).withStyle(barStyle));
          } else if (segmentValue >= numBars) {
-            text.append(Text.literal(String.valueOf(unicodeChars[unicodeChars.length - 1])).styled(barStyle));
+            text.append(Component.literal(String.valueOf(unicodeChars[unicodeChars.length - 1])).withStyle(barStyle));
          } else {
             int charIndex = (int) ((double) segmentValue / numBars * (unicodeChars.length - 1));
-            text.append(Text.literal(String.valueOf(unicodeChars[charIndex])).styled(barStyle));
+            text.append(Component.literal(String.valueOf(unicodeChars[charIndex])).withStyle(barStyle));
          }
       }
       text.append(suffix);
-      player.sendMessage(text,true);
+      player.displayClientMessage(text,true);
    }
    
    public static String camelToSnake(String str){
       return str.replaceAll("([a-z])([A-Z]+)", "$1_$2").toLowerCase(Locale.ROOT);
    }
    
-   public static final ArrayList<Pair<Formatting,Integer>> COLOR_MAP = new ArrayList<>(Arrays.asList(
-         new Pair<>(Formatting.BLACK,0x000000),
-         new Pair<>(Formatting.DARK_BLUE,0x0000AA),
-         new Pair<>(Formatting.DARK_GREEN,0x00AA00),
-         new Pair<>(Formatting.DARK_AQUA,0x00AAAA),
-         new Pair<>(Formatting.DARK_RED,0xAA0000),
-         new Pair<>(Formatting.DARK_PURPLE,0xAA00AA),
-         new Pair<>(Formatting.GOLD,0xFFAA00),
-         new Pair<>(Formatting.GRAY,0xAAAAAA),
-         new Pair<>(Formatting.DARK_GRAY,0x555555),
-         new Pair<>(Formatting.BLUE,0x5555FF),
-         new Pair<>(Formatting.GREEN,0x55FF55),
-         new Pair<>(Formatting.AQUA,0x55FFFF),
-         new Pair<>(Formatting.RED,0xFF5555),
-         new Pair<>(Formatting.LIGHT_PURPLE,0xFF55FF),
-         new Pair<>(Formatting.YELLOW,0xFFFF55),
-         new Pair<>(Formatting.WHITE,0xFFFFFF)
+   public static final ArrayList<Tuple<ChatFormatting,Integer>> COLOR_MAP = new ArrayList<>(Arrays.asList(
+         new Tuple<>(ChatFormatting.BLACK,0x000000),
+         new Tuple<>(ChatFormatting.DARK_BLUE,0x0000AA),
+         new Tuple<>(ChatFormatting.DARK_GREEN,0x00AA00),
+         new Tuple<>(ChatFormatting.DARK_AQUA,0x00AAAA),
+         new Tuple<>(ChatFormatting.DARK_RED,0xAA0000),
+         new Tuple<>(ChatFormatting.DARK_PURPLE,0xAA00AA),
+         new Tuple<>(ChatFormatting.GOLD,0xFFAA00),
+         new Tuple<>(ChatFormatting.GRAY,0xAAAAAA),
+         new Tuple<>(ChatFormatting.DARK_GRAY,0x555555),
+         new Tuple<>(ChatFormatting.BLUE,0x5555FF),
+         new Tuple<>(ChatFormatting.GREEN,0x55FF55),
+         new Tuple<>(ChatFormatting.AQUA,0x55FFFF),
+         new Tuple<>(ChatFormatting.RED,0xFF5555),
+         new Tuple<>(ChatFormatting.LIGHT_PURPLE,0xFF55FF),
+         new Tuple<>(ChatFormatting.YELLOW,0xFFFF55),
+         new Tuple<>(ChatFormatting.WHITE,0xFFFFFF)
    ));
    
-   public static Formatting getClosestFormatting(int colorRGB){
-      Formatting closest = Formatting.WHITE;
+   public static ChatFormatting getClosestFormatting(int colorRGB){
+      ChatFormatting closest = ChatFormatting.WHITE;
       double cDist = Integer.MAX_VALUE;
-      for(Pair<Formatting, Integer> pair : COLOR_MAP){
-         int repColor = pair.getRight();
+      for(Tuple<ChatFormatting, Integer> pair : COLOR_MAP){
+         int repColor = pair.getB();
          double rDist = (((repColor>>16)&0xFF)-((colorRGB>>16)&0xFF))*0.30;
          double gDist = (((repColor>>8)&0xFF)-((colorRGB>>8)&0xFF))*0.59;
          double bDist = ((repColor&0xFF)-(colorRGB&0xFF))*0.11;
          double dist = rDist*rDist + gDist*gDist + bDist*bDist;
          if(dist < cDist){
             cDist = dist;
-            closest = pair.getLeft();
+            closest = pair.getA();
          }
       }
       return closest;
@@ -119,18 +120,18 @@ public class TextUtils {
       return String.format("%,0"+(decimalPlaces+1)+"."+decimalPlaces+"f", num);
    }
    
-   public static MutableText removeItalics(Text text){
-      return removeItalics(Text.literal("").append(text));
+   public static MutableComponent removeItalics(Component text){
+      return removeItalics(Component.literal("").append(text));
    }
    
-   public static MutableText removeItalics(MutableText text){
-      Style parentStyle = Style.EMPTY.withColor(Formatting.DARK_PURPLE).withItalic(false).withBold(false).withUnderline(false).withObfuscated(false).withStrikethrough(false);
-      return text.setStyle(text.getStyle().withParent(parentStyle));
+   public static MutableComponent removeItalics(MutableComponent text){
+      Style parentStyle = Style.EMPTY.withColor(ChatFormatting.DARK_PURPLE).withItalic(false).withBold(false).withUnderlined(false).withObfuscated(false).withStrikethrough(false);
+      return text.setStyle(text.getStyle().applyTo(parentStyle));
    }
    
-   public static MutableText parseString(String input){
+   public static MutableComponent parseString(String input){
       ArrayList<String> matchList = new ArrayList<>();
-      MutableText text = Text.literal("");
+      MutableComponent text = Component.literal("");
       Pattern pattern = Pattern.compile("\\[(.*?)\\]\\(([1234567890abcdef]?[klmno]*)\\)");
       Matcher matcher = pattern.matcher(input);
       int lastEnd = 0;
@@ -153,29 +154,29 @@ public class TextUtils {
             String content = matcher.group(1);
             String formatCode = matcher.group(2);
             
-            text.append(Text.literal(content).formatted(parseFormatCode(formatCode)));
+            text.append(Component.literal(content).withStyle(parseFormatCode(formatCode)));
          }
       }
       
       return text;
    }
    
-   private static Formatting[] parseFormatCode(String code){
-      ArrayList<Formatting> formatting = new ArrayList<>();
+   private static ChatFormatting[] parseFormatCode(String code){
+      ArrayList<ChatFormatting> formatting = new ArrayList<>();
       
       for(int i = 0; i < code.length(); i++){
          char style = code.charAt(i);
          
-         Formatting f = Formatting.byCode(style);
+         ChatFormatting f = ChatFormatting.getByCode(style);
          if(f != null){
             formatting.add(f);
          }
       }
       
-      return formatting.toArray(new Formatting[0]);
+      return formatting.toArray(new ChatFormatting[0]);
    }
    
-   public static String textToString(Text text){
+   public static String textToString(Component text){
       StringBuilder str = new StringBuilder();
       Style parentStyle = text.getStyle();
       
@@ -188,15 +189,15 @@ public class TextUtils {
       
       TextColor parentTextColor = parentStyle.getColor();
       if(parentTextColor != null){
-         Formatting formatting = Formatting.byName(parentTextColor.getName());
+         ChatFormatting formatting = ChatFormatting.getByName(parentTextColor.serialize());
          if(formatting != null){
-            parentColor = formatting.getCode();
+            parentColor = formatting.getChar();
          }
       }
       
-      TextContent parentContent = text.getContent();
-      if(parentContent instanceof PlainTextContent plainTextContent){
-         String contentString = plainTextContent.string();
+      ComponentContents parentContent = text.getContents();
+      if(parentContent instanceof PlainTextContents plainTextContent){
+         String contentString = plainTextContent.text();
          
          if(!contentString.isEmpty()){
             String formatCodes = booleansToFormatCodes(parentItalic, parentBold, parentUnderlined, parentStrikethrough, parentObfuscated);
@@ -204,11 +205,11 @@ public class TextUtils {
          }
       }
       
-      for(Text sibling : text.getSiblings()){
-         TextContent siblingContent = sibling.getContent();
+      for(Component sibling : text.getSiblings()){
+         ComponentContents siblingContent = sibling.getContents();
          
-         if(siblingContent instanceof PlainTextContent plainTextContent){
-            String contentString = plainTextContent.string();
+         if(siblingContent instanceof PlainTextContents plainTextContent){
+            String contentString = plainTextContent.text();
             
             if(!contentString.isEmpty()){
                Style siblingStyle = sibling.getStyle();
@@ -216,9 +217,9 @@ public class TextUtils {
                char color = parentColor;
                TextColor siblingColor = siblingStyle.getColor();
                if(siblingColor != null){
-                  Formatting formatting = Formatting.byName(siblingColor.getName());
+                  ChatFormatting formatting = ChatFormatting.getByName(siblingColor.serialize());
                   if(formatting != null){
-                     color = formatting.getCode();
+                     color = formatting.getChar();
                   }
                }
                String formatCodes = booleansToFormatCodes(
@@ -236,11 +237,11 @@ public class TextUtils {
       return str.toString();
    }
    
-   public static String textToCode(Text text){
+   public static String textToCode(Component text){
       Style parentStyle = text.getStyle();
       ArrayList<String> codes = new ArrayList<>();
       
-      Formatting parentColor = Formatting.WHITE;
+      ChatFormatting parentColor = ChatFormatting.WHITE;
       boolean parentItalic = parentStyle.isItalic();
       boolean parentBold = parentStyle.isBold();
       boolean parentUnderlined = parentStyle.isUnderlined();
@@ -249,34 +250,34 @@ public class TextUtils {
       
       TextColor parentTextColor = parentStyle.getColor();
       if(parentTextColor != null){
-         Formatting formatting = Formatting.byName(parentTextColor.getName());
+         ChatFormatting formatting = ChatFormatting.getByName(parentTextColor.serialize());
          if(formatting != null){
             parentColor = formatting;
          }
       }
       
-      TextContent parentContent = text.getContent();
-      if(parentContent instanceof PlainTextContent plainTextContent){
-         String contentString = plainTextContent.string();
+      ComponentContents parentContent = text.getContents();
+      if(parentContent instanceof PlainTextContents plainTextContent){
+         String contentString = plainTextContent.text();
          
          if(!contentString.isEmpty()){
             codes.add(textToCodeHelper(contentString,parentColor.getName(),parentItalic, parentBold, parentUnderlined, parentStrikethrough, parentObfuscated));
          }
       }
       
-      for(Text sibling : text.getSiblings()){
-         TextContent siblingContent = sibling.getContent();
+      for(Component sibling : text.getSiblings()){
+         ComponentContents siblingContent = sibling.getContents();
          
-         if(siblingContent instanceof PlainTextContent plainTextContent){
-            String contentString = plainTextContent.string();
+         if(siblingContent instanceof PlainTextContents plainTextContent){
+            String contentString = plainTextContent.text();
             
             if(!contentString.isEmpty()){
                Style siblingStyle = sibling.getStyle();
                
-               Formatting color = parentColor;
+               ChatFormatting color = parentColor;
                TextColor siblingColor = siblingStyle.getColor();
                if(siblingColor != null){
-                  Formatting formatting = Formatting.byName(siblingColor.getName());
+                  ChatFormatting formatting = ChatFormatting.getByName(siblingColor.serialize());
                   if(formatting != null){
                      color = formatting;
                   }

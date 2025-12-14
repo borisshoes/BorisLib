@@ -1,10 +1,10 @@
 package net.borisshoes.borislib.tracker;
 
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.Vec3;
 
-public record PlayerMovementEntry(ServerPlayerEntity player, Vec3d position, Vec3d velocity, long timestamp) {
-   public static PlayerMovementEntry blankEntry(ServerPlayerEntity player){
-      return new PlayerMovementEntry(player,player.getEntityPos(), Vec3d.ZERO, System.nanoTime());
+public record PlayerMovementEntry(ServerPlayer player, Vec3 position, Vec3 velocity, long timestamp) {
+   public static PlayerMovementEntry blankEntry(ServerPlayer player){
+      return new PlayerMovementEntry(player,player.position(), Vec3.ZERO, System.nanoTime());
    }
 }

@@ -1,15 +1,15 @@
 package net.borisshoes.borislib.timers;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class TickTimerCallback {
    private int timer;
    protected ItemStack item;
-   protected ServerPlayerEntity player;
+   protected ServerPlayer player;
    
-   public TickTimerCallback(int time, @Nullable ItemStack item, @Nullable ServerPlayerEntity player){
+   public TickTimerCallback(int time, @Nullable ItemStack item, @Nullable ServerPlayer player){
       timer = time;
       this.item = item;
       this.player = player;
@@ -29,7 +29,7 @@ public abstract class TickTimerCallback {
       this.timer = timer;
    }
    
-   public ServerPlayerEntity getPlayer(){
+   public ServerPlayer getPlayer(){
       return player;
    }
 }

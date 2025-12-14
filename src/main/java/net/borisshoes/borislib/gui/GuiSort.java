@@ -1,7 +1,5 @@
 package net.borisshoes.borislib.gui;
 
-import net.minecraft.util.Formatting;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;

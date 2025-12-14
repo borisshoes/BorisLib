@@ -3,11 +3,12 @@ package net.borisshoes.borislib.config;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.registry.Registry;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.text.TranslatableTextContent;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.core.Registry;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.contents.TranslatableContents;
 
 import java.io.*;
 import java.util.Date;
@@ -16,8 +17,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static net.borisshoes.borislib.BorisLib.LOGGER;
-import static net.minecraft.server.command.CommandManager.argument;
-import static net.minecraft.server.command.CommandManager.literal;
+import static net.minecraft.commands.Commands.argument;
+import static net.minecraft.commands.Commands.literal;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class ConfigManager {
@@ -88,7 +89,7 @@ public class ConfigManager {
          
          for(ConfigValue value : this.values){
             if(value.getComment(this.modId) != null){
-               output.write("# " + Text.translatable(value.getComment(this.modId)).getString());
+               output.write("# " + Component.translatable(value.getComment(this.modId)).getString());
                output.newLine();
             }
             output.write(value.name + " = " + value.getValueString());
@@ -100,33 +101,33 @@ public class ConfigManager {
       }
    }
    
-   public LiteralArgumentBuilder<ServerCommandSource> generateCommand(String prefixA, String prefixB){
-      LiteralArgumentBuilder<ServerCommandSource> root;
+   public LiteralArgumentBuilder<CommandSourceStack> generateCommand(String prefixA, String prefixB){
+      LiteralArgumentBuilder<CommandSourceStack> root;
       if(!prefixB.isBlank()){
-         root = literal(prefixA).then(literal(prefixB).requires(source -> source.hasPermissionLevel(2))
+         root = literal(prefixA).then(literal(prefixB).requires(Commands.hasPermission(Commands.LEVEL_ADMINS))
                .executes(ctx -> {
                   values.forEach(value ->
-                        ctx.getSource().sendFeedback(() -> MutableText.of(new TranslatableTextContent(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), false));
+                        ctx.getSource().sendSuccess(() -> MutableComponent.create(new TranslatableContents(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), false));
                   return 1;
                }));
       }else{
-         root = literal(prefixA).requires(source -> source.hasPermissionLevel(2))
+         root = literal(prefixA).requires(Commands.hasPermission(Commands.LEVEL_ADMINS))
                .executes(ctx -> {
                   values.forEach(value ->
-                        ctx.getSource().sendFeedback(() -> MutableText.of(new TranslatableTextContent(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), false));
+                        ctx.getSource().sendSuccess(() -> MutableComponent.create(new TranslatableContents(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), false));
                   return 1;
                });
       }
       values.forEach(value -> {
-            LiteralArgumentBuilder<ServerCommandSource> valueArg = literal(value.name)
+            LiteralArgumentBuilder<CommandSourceStack> valueArg = literal(value.name)
                   .executes(ctx -> {
-                     ctx.getSource().sendFeedback(() -> MutableText.of(new TranslatableTextContent(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), false);
+                     ctx.getSource().sendSuccess(() -> MutableComponent.create(new TranslatableContents(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), false);
                      return 1;
                   })
                   .then(argument(value.name, value.getArgumentType()).suggests(value::getSuggestions)
                         .executes(ctx -> {
                            value.value = value.parseArgumentValue(ctx);
-                           ((CommandContext<ServerCommandSource>) ctx).getSource().sendFeedback(() -> MutableText.of(new TranslatableTextContent(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), true);
+                           ((CommandContext<CommandSourceStack>) ctx).getSource().sendSuccess(() -> MutableComponent.create(new TranslatableContents(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), true);
                            this.save();
                            return 1;
                         }));

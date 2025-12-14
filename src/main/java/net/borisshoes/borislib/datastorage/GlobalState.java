@@ -2,21 +2,21 @@ package net.borisshoes.borislib.datastorage;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.Dynamic;
-import net.minecraft.datafixer.DataFixTypes;
-import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.world.PersistentState;
-import net.minecraft.world.PersistentStateType;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
 
 import java.util.HashMap;
 import java.util.Map;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
-public final class GlobalState extends PersistentState {
+public final class GlobalState extends SavedData {
    public static final String FILE_ID = MOD_ID + "_global";
-   private final Map<String, Map<String, NbtCompound>> data = new HashMap<>();
+   private final Map<String, Map<String, CompoundTag>> data = new HashMap<>();
    private final Map<String, Map<String, Object>> objects = new HashMap<>();
    
    public static final Codec<GlobalState> CODEC = FlatNamespacedMap.CODEC.xmap(m -> {
@@ -25,10 +25,10 @@ public final class GlobalState extends PersistentState {
       return s;
    }, GlobalState::encodeAll);
    
-   public static final PersistentStateType<GlobalState> TYPE = new PersistentStateType<>(FILE_ID, GlobalState::new, CODEC, DataFixTypes.LEVEL);
+   public static final SavedDataType<GlobalState> TYPE = new SavedDataType<>(FILE_ID, GlobalState::new, CODEC, DataFixTypes.LEVEL);
    
-   public static GlobalState get(ServerWorld ow){
-      return ow.getPersistentStateManager().getOrCreate(TYPE);
+   public static GlobalState get(ServerLevel ow){
+      return ow.getDataStorage().computeIfAbsent(TYPE);
    }
    
    @SuppressWarnings("unchecked")
@@ -37,43 +37,43 @@ public final class GlobalState extends PersistentState {
       Object got = modObjs.get(key.key());
       if(got != null) return (T) got;
       
-      Map<String, NbtCompound> modRaw = data.get(key.modId());
+      Map<String, CompoundTag> modRaw = data.get(key.modId());
       if(modRaw != null){
-         NbtCompound tag = modRaw.remove(key.key());
+         CompoundTag tag = modRaw.remove(key.key());
          if(tag != null){
             T decoded = decode(key.codec(), tag);
             modObjs.put(key.key(), decoded);
             if(modRaw.isEmpty()) data.remove(key.modId());
-            markDirty();
+            setDirty();
             return decoded;
          }
       }
       
       T created = key.makeDefaultGlobal();
       modObjs.put(key.key(), created);
-      markDirty();
+      setDirty();
       return created;
    }
    
    public <T> void setLive(DataKey<T> key, T value){
       objects.computeIfAbsent(key.modId(), k -> new HashMap<>()).put(key.key(), value);
-      Map<String, NbtCompound> modRaw = data.get(key.modId());
+      Map<String, CompoundTag> modRaw = data.get(key.modId());
       if(modRaw != null){
          modRaw.remove(key.key());
          if(modRaw.isEmpty()) data.remove(key.modId());
       }
-      markDirty();
+      setDirty();
    }
    
-   Map<String, Map<String, NbtCompound>> encodeAll(){
-      Map<String, Map<String, NbtCompound>> out = new HashMap<>();
+   Map<String, Map<String, CompoundTag>> encodeAll(){
+      Map<String, Map<String, CompoundTag>> out = new HashMap<>();
       data.forEach((modId, inner) -> out.put(modId, new HashMap<>(inner)));
       objects.forEach((modId, objMap) -> {
-         Map<String, NbtCompound> tgt = out.computeIfAbsent(modId, k -> new HashMap<>());
+         Map<String, CompoundTag> tgt = out.computeIfAbsent(modId, k -> new HashMap<>());
          objMap.forEach((key, value) -> {
             DataKey<Object> dk = DataRegistry.get(modId, key, DataKey.StorageScope.GLOBAL);
             if(dk != null){
-               NbtCompound enc = encode(dk.codec(), value);
+               CompoundTag enc = encode(dk.codec(), value);
                tgt.put(key, enc);
             }
          });
@@ -81,17 +81,17 @@ public final class GlobalState extends PersistentState {
       return out;
    }
    
-   public Map<String, Map<String, NbtCompound>> map(){
+   public Map<String, Map<String, CompoundTag>> map(){
       return data;
    }
    
-   private static <T> NbtCompound encode(Codec<T> codec, Object v){
+   private static <T> CompoundTag encode(Codec<T> codec, Object v){
       @SuppressWarnings("unchecked")
       T cast = (T) v;
-      return (NbtCompound) codec.encodeStart(NbtOps.INSTANCE, cast).result().orElse(new NbtCompound());
+      return (CompoundTag) codec.encodeStart(NbtOps.INSTANCE, cast).result().orElse(new CompoundTag());
    }
    
-   private static <T> T decode(Codec<T> codec, NbtCompound tag){
+   private static <T> T decode(Codec<T> codec, CompoundTag tag){
       return codec.parse(new Dynamic<>(NbtOps.INSTANCE, tag)).result().orElseThrow();
    }
 }

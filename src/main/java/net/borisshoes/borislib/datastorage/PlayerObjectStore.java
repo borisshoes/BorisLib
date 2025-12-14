@@ -2,9 +2,8 @@ package net.borisshoes.borislib.datastorage;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.Dynamic;
-import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.util.Identifier;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -15,7 +14,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Supplier;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -34,7 +32,7 @@ public final class PlayerObjectStore {
    
    private static final class Entry {
       final Map<String, Map<String, Object>> objects = new ConcurrentHashMap<>();
-      final Map<String, Map<String, NbtCompound>> raw = new ConcurrentHashMap<>();
+      final Map<String, Map<String, CompoundTag>> raw = new ConcurrentHashMap<>();
    }
    
    public PlayerObjectStore(Path worldRoot){
@@ -56,12 +54,12 @@ public final class PlayerObjectStore {
          Path f = file(id);
          if(!Files.exists(f)) return e;
          try(DataInputStream in = new DataInputStream(new GZIPInputStream(Files.newInputStream(f)))){
-            NbtCompound root = net.minecraft.nbt.NbtIo.readCompound(in);
+            CompoundTag root = net.minecraft.nbt.NbtIo.read(in);
             var dyn = new Dynamic<>(NbtOps.INSTANCE, root);
-            Map<String, Map<String, NbtCompound>> decoded = FlatNamespacedMap.CODEC.parse(dyn).result().orElseGet(HashMap::new);
+            Map<String, Map<String, CompoundTag>> decoded = FlatNamespacedMap.CODEC.parse(dyn).result().orElseGet(HashMap::new);
             // Deep-copy into mutable maps
             decoded.forEach((modId, inner) -> {
-               Map<String, NbtCompound> mutableInner = new ConcurrentHashMap<>(inner);
+               Map<String, CompoundTag> mutableInner = new ConcurrentHashMap<>(inner);
                e.raw.put(modId, mutableInner);
             });
          }catch(Exception ignored){
@@ -78,9 +76,9 @@ public final class PlayerObjectStore {
       if(got != null) return (T) got;
       
       // Try lazy-decode from raw NBT
-      Map<String, NbtCompound> modRaw = e.raw.get(key.modId());
+      Map<String, CompoundTag> modRaw = e.raw.get(key.modId());
       if(modRaw != null){
-         NbtCompound n = modRaw.remove(key.key());
+         CompoundTag n = modRaw.remove(key.key());
          if(n != null){
             T decoded = decode(key.codec(), n);
             modObjs.put(key.key(), decoded);
@@ -101,7 +99,7 @@ public final class PlayerObjectStore {
    public <T> void setLive(UUID u, DataKey<T> key, T value){
       Entry e = getEntry(u);
       e.objects.computeIfAbsent(key.modId(), k -> new ConcurrentHashMap<>()).put(key.key(), value);
-      Map<String, NbtCompound> modRaw = e.raw.get(key.modId());
+      Map<String, CompoundTag> modRaw = e.raw.get(key.modId());
       if(modRaw != null){
          modRaw.remove(key.key());
          if(modRaw.isEmpty()) e.raw.remove(key.modId());
@@ -118,11 +116,11 @@ public final class PlayerObjectStore {
       if(e == null) return;
       
       // Build a namespaced NBT map by encoding live objects + copying remaining raw
-      Map<String, Map<String, NbtCompound>> out = new HashMap<>();
+      Map<String, Map<String, CompoundTag>> out = new HashMap<>();
       // 1) encode objects using registered codecs
       for(var modEntry : e.objects.entrySet()){
          String modId = modEntry.getKey();
-         Map<String, NbtCompound> tgt = out.computeIfAbsent(modId, k -> new HashMap<>());
+         Map<String, CompoundTag> tgt = out.computeIfAbsent(modId, k -> new HashMap<>());
          for(var kv : modEntry.getValue().entrySet()){
             String key = kv.getKey();
             DataKey<Object> dk = DataRegistry.get(modId, key, DataKey.StorageScope.PLAYER);
@@ -137,16 +135,16 @@ public final class PlayerObjectStore {
       // 2) copy any raw entries we never decoded
       for(var modEntry : e.raw.entrySet()){
          String modId = modEntry.getKey();
-         Map<String, NbtCompound> tgt = out.computeIfAbsent(modId, k -> new HashMap<>());
+         Map<String, CompoundTag> tgt = out.computeIfAbsent(modId, k -> new HashMap<>());
          for(var kv : modEntry.getValue().entrySet()){
             tgt.putIfAbsent(kv.getKey(), kv.getValue());
          }
       }
       
       // Write file
-      var dyn = FlatNamespacedMap.CODEC.encodeStart(NbtOps.INSTANCE, out).result().orElseGet(NbtCompound::new);
+      var dyn = FlatNamespacedMap.CODEC.encodeStart(NbtOps.INSTANCE, out).result().orElseGet(CompoundTag::new);
       try(OutputStream os = Files.newOutputStream(file(u)); GZIPOutputStream gz = new GZIPOutputStream(os); DataOutputStream outStr = new DataOutputStream(gz)){
-         net.minecraft.nbt.NbtIo.write(dyn, outStr);
+         net.minecraft.nbt.NbtIo.writeUnnamedTagWithFallback(dyn, outStr);
       }catch(Exception ignored){
       }
    }
@@ -161,11 +159,11 @@ public final class PlayerObjectStore {
       return copy;
    }
    
-   private static <T> NbtCompound encode(Codec<T> codec, T v){
-      return (NbtCompound) codec.encodeStart(NbtOps.INSTANCE, v).result().orElse(new NbtCompound());
+   private static <T> CompoundTag encode(Codec<T> codec, T v){
+      return (CompoundTag) codec.encodeStart(NbtOps.INSTANCE, v).result().orElse(new CompoundTag());
    }
    
-   private static <T> T decode(Codec<T> codec, NbtCompound tag){
+   private static <T> T decode(Codec<T> codec, CompoundTag tag){
       return codec.parse(new Dynamic<>(NbtOps.INSTANCE, tag)).result().orElseThrow();
    }
 }

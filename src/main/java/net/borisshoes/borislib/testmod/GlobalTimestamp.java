@@ -4,9 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.borisshoes.borislib.datastorage.DataKey;
 import net.borisshoes.borislib.datastorage.DataRegistry;
-import net.minecraft.util.Identifier;
-
-import java.util.ArrayList;
+import net.minecraft.resources.Identifier;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
@@ -19,5 +17,5 @@ public class GlobalTimestamp {
       t.timestamp = time;
       return t;
    }));
-   public static final DataKey<GlobalTimestamp> KEY = DataRegistry.register(DataKey.ofGlobal(Identifier.of(MOD_ID, "timestamp"),CODEC, GlobalTimestamp::new));
+   public static final DataKey<GlobalTimestamp> KEY = DataRegistry.register(DataKey.ofGlobal(Identifier.fromNamespaceAndPath(MOD_ID, "timestamp"),CODEC, GlobalTimestamp::new));
 }

@@ -6,7 +6,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.borisshoes.borislib.config.ConfigValue;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -56,13 +56,13 @@ public class ListConfigValue<G,T extends ConfigValue<G>> extends ConfigValue<Lis
    }
    
    @Override
-   public List<G> parseArgumentValue(CommandContext<ServerCommandSource> ctx){
+   public List<G> parseArgumentValue(CommandContext<CommandSourceStack> ctx){
       String str = StringArgumentType.getString(ctx, name);
       return getFromString(str);
    }
    
    @Override
-   public CompletableFuture<Suggestions> getSuggestions(CommandContext<ServerCommandSource> ctx, SuggestionsBuilder builder){
+   public CompletableFuture<Suggestions> getSuggestions(CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder){
       return builder.buildFuture();
    }
    

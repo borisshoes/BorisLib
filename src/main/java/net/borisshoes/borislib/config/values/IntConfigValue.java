@@ -6,7 +6,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.borisshoes.borislib.config.ConfigValue;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
@@ -39,11 +39,11 @@ public class IntConfigValue extends ConfigValue<Integer> {
    }
    
    @Override
-   public Integer parseArgumentValue(CommandContext<ServerCommandSource> ctx){
+   public Integer parseArgumentValue(CommandContext<CommandSourceStack> ctx){
       return IntegerArgumentType.getInteger(ctx, name);
    }
    
-   public CompletableFuture<Suggestions> getSuggestions(CommandContext<ServerCommandSource> context, SuggestionsBuilder builder){
+   public CompletableFuture<Suggestions> getSuggestions(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder){
       if(limits.min > 0 && limits.max - limits.min < 10000){
          String start = builder.getRemaining().toLowerCase(Locale.ROOT);
          Set<String> nums = new HashSet<>();

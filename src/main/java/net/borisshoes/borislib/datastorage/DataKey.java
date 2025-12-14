@@ -1,9 +1,9 @@
 package net.borisshoes.borislib.datastorage;
 
 import com.mojang.serialization.Codec;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.util.Identifier;
-import net.minecraft.world.World;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -11,7 +11,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 
-public record DataKey<T>(Identifier id, StorageScope scope, Codec<T> codec, Supplier<T> globalDef, Function<RegistryKey<World>, T> worldDef, Function<UUID, T> playerDef) {
+public record DataKey<T>(Identifier id, StorageScope scope, Codec<T> codec, Supplier<T> globalDef, Function<ResourceKey<Level>, T> worldDef, Function<UUID, T> playerDef) {
    public DataKey{
       Objects.requireNonNull(id);
       Objects.requireNonNull(scope);
@@ -47,7 +47,7 @@ public record DataKey<T>(Identifier id, StorageScope scope, Codec<T> codec, Supp
       return new DataKey<>(id, StorageScope.GLOBAL, codec, def, null, null);
    }
    
-   public static <T> DataKey<T> ofWorld(Identifier id, Codec<T> codec, Function<RegistryKey<World>, T> def){
+   public static <T> DataKey<T> ofWorld(Identifier id, Codec<T> codec, Function<ResourceKey<Level>, T> def){
       return new DataKey<>(id, StorageScope.WORLD, codec, null, def, null);
    }
    
@@ -59,7 +59,7 @@ public record DataKey<T>(Identifier id, StorageScope scope, Codec<T> codec, Supp
       return globalDef.get();
    }
    
-   public T makeDefaultWorld(RegistryKey<World> worldKey){
+   public T makeDefaultWorld(ResourceKey<Level> worldKey){
       return worldDef.apply(worldKey);
    }
    

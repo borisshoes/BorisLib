@@ -1,7 +1,6 @@
 package net.borisshoes.borislib.gui;
 
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.network.chat.Component;
 
 import java.util.List;
 
@@ -18,8 +17,8 @@ public abstract class GuiFilterSort<A>{
       return color;
    }
    
-   public Text getColoredLabel(){
-      return Text.translatable(key).withColor(color);
+   public Component getColoredLabel(){
+      return Component.translatable(key).withColor(color);
    }
    
    protected abstract List<? extends GuiFilterSort<A>> getList();
@@ -30,6 +29,7 @@ public abstract class GuiFilterSort<A>{
       return getList().getFirst();
    }
    
+   @SuppressWarnings("unchecked")
    protected <B extends GuiFilterSort<A>> B cycle(B sort, boolean backwards){
       List<? extends GuiFilterSort<A>> list = getList();
       int idx = list.indexOf(sort);

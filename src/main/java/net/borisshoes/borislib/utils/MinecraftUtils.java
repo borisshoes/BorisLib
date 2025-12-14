@@ -2,53 +2,44 @@ package net.borisshoes.borislib.utils;
 
 import com.google.common.collect.HashMultimap;
 import com.mojang.authlib.GameProfile;
-import com.mojang.brigadier.context.CommandContext;
-import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.logging.LogUtils;
 import net.borisshoes.borislib.BorisLib;
 import net.borisshoes.borislib.mixins.EntityAccessor;
-import net.minecraft.command.argument.GameProfileArgumentType;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.ContainerComponent;
-import net.minecraft.component.type.ItemEnchantmentsComponent;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentLevelEntry;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.attribute.*;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.entity.projectile.ProjectileUtil;
-import net.minecraft.inventory.Inventory;
-import net.minecraft.inventory.SimpleInventory;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.packet.c2s.common.SyncedClientOptions;
-import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.core.Holder;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.PlayerConfigEntry;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.PrepareSpawnTask;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.storage.NbtReadView;
-import net.minecraft.storage.ReadView;
-import net.minecraft.util.ErrorReporter;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.Pair;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
-import net.minecraft.world.World;
+import net.minecraft.server.level.ClientInformation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.util.Tuple;
+import net.minecraft.world.Container;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.*;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ItemContainerContents;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentInstance;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.phys.*;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -61,31 +52,31 @@ import static org.apache.logging.log4j.Level.WARN;
 
 public class MinecraftUtils {
    
-   private Vec3d findSafeTeleportSpot(ServerPlayerEntity user, double maxRange, double minRange, double leniencyRange, double distStep, double radialStep, double dropStep, boolean checkFluid){
-      ServerWorld world = user.getEntityWorld();
-      Vec3d direction = user.getRotationVector().normalize();
-      Vec3d origin = user.getEntityPos();
+   private Vec3 findSafeTeleportSpot(ServerPlayer user, double maxRange, double minRange, double leniencyRange, double distStep, double radialStep, double dropStep, boolean checkFluid){
+      ServerLevel world = user.level();
+      Vec3 direction = user.getLookAngle().normalize();
+      Vec3 origin = user.position();
       double maxDistSq = (maxRange + leniencyRange) * (maxRange + leniencyRange);
-      Vec3d upRef = Math.abs(direction.y) < 0.999 ? new Vec3d(0, 1, 0) : new Vec3d(1, 0, 0);
-      Vec3d right = direction.crossProduct(upRef).normalize();
-      Vec3d up = direction.crossProduct(right).normalize();
+      Vec3 upRef = Math.abs(direction.y) < 0.999 ? new Vec3(0, 1, 0) : new Vec3(1, 0, 0);
+      Vec3 right = direction.cross(upRef).normalize();
+      Vec3 up = direction.cross(right).normalize();
       for(double d = maxRange; d >= minRange; d -= distStep){
-         Vec3d center = origin.add(direction.multiply(d));
+         Vec3 center = origin.add(direction.scale(d));
          for(double r = 0.0; r <= leniencyRange + 1e-9; r += radialStep){
             int slices = r == 0.0 ? 1 : 12;
             for(int k = 0; k < slices; k++){
                double a = slices == 1 ? 0.0 : (2.0 * Math.PI * k) / slices;
-               Vec3d lateral = right.multiply(r * Math.cos(a)).add(up.multiply(r * Math.sin(a)));
-               Vec3d base = center.add(lateral);
+               Vec3 lateral = right.scale(r * Math.cos(a)).add(up.scale(r * Math.sin(a)));
+               Vec3 base = center.add(lateral);
                double[] yNudges = new double[]{0.0, 0.5, -0.5, 1.0, -1.0};
                for(double yOff : yNudges){
-                  Vec3d candidate = new Vec3d(base.x, base.y + yOff, base.z);
+                  Vec3 candidate = new Vec3(base.x, base.y + yOff, base.z);
                   if(!isSpaceClearFor(user, world, candidate, checkFluid)) continue;
                   if(dropStep < 0 || hasGroundSupport(world, user, candidate)){
                      return candidate;
                   }
-                  Vec3d down = candidate;
-                  while(origin.squaredDistanceTo(down) <= maxDistSq && down.y > world.getBottomY()){
+                  Vec3 down = candidate;
+                  while(origin.distanceToSqr(down) <= maxDistSq && down.y > world.getMinY()){
                      down = down.add(0.0, -dropStep, 0.0);
                      if(!isSpaceClearFor(user, world, down, checkFluid)) break;
                      if(hasGroundSupport(world, user, down)){
@@ -99,27 +90,27 @@ public class MinecraftUtils {
       return null;
    }
    
-   public static boolean hasGroundSupport(World world, Entity entity, Vec3d targetPos){
-      Vec3d delta = targetPos.subtract(entity.getEntityPos());
-      Box targetBox = entity.getBoundingBox().offset(delta);
+   public static boolean hasGroundSupport(Level world, Entity entity, Vec3 targetPos){
+      Vec3 delta = targetPos.subtract(entity.position());
+      AABB targetBox = entity.getBoundingBox().move(delta);
       double eps = 1.0 / 16.0;
-      Box floorProbe = new Box(targetBox.minX, targetBox.minY - eps, targetBox.minZ, targetBox.maxX, targetBox.minY, targetBox.maxZ);
+      AABB floorProbe = new AABB(targetBox.minX, targetBox.minY - eps, targetBox.minZ, targetBox.maxX, targetBox.minY, targetBox.maxZ);
       return world.getBlockCollisions(entity, floorProbe).iterator().hasNext();
    }
    
-   public static boolean isSpaceClearFor(Entity entity, World world, Vec3d targetPos, boolean checkFluid) {
-      Vec3d delta = targetPos.subtract(entity.getEntityPos());
-      Box targetBox = entity.getBoundingBox().offset(delta);
-      return world.isSpaceEmpty(entity, targetBox, checkFluid);
+   public static boolean isSpaceClearFor(Entity entity, Level world, Vec3 targetPos, boolean checkFluid) {
+      Vec3 delta = targetPos.subtract(entity.position());
+      AABB targetBox = entity.getBoundingBox().move(delta);
+      return world.noCollision(entity, targetBox, checkFluid);
    }
    
-   public static <T extends Entity> T getClosestEntity(List<T> list, Vec3d pos){
+   public static <T extends Entity> T getClosestEntity(List<T> list, Vec3 pos){
       T closest = null;
       double smallestDist = Double.MAX_VALUE;
       for(T t : list){
-         if(t.getEntityPos().distanceTo(pos) < smallestDist){
+         if(t.position().distanceTo(pos) < smallestDist){
             closest = t;
-            smallestDist = t.getEntityPos().distanceTo(pos);
+            smallestDist = t.position().distanceTo(pos);
          }
       }
       return closest;
@@ -129,7 +120,7 @@ public class MinecraftUtils {
       ItemEntity largest = null;
       double largestNumber = 0;
       for(ItemEntity itemEntity : list){
-         ItemStack itemStack = itemEntity.getStack();
+         ItemStack itemStack = itemEntity.getItem();
          if(itemStack.getCount() > largestNumber){
             largestNumber = itemStack.getCount();
             largest = itemEntity;
@@ -139,104 +130,104 @@ public class MinecraftUtils {
    }
    
    public static void removeMaxAbsorption(LivingEntity entity, Identifier id, float amount){
-      AttributeContainer attributeContainer = entity.getAttributes();
-      EntityAttributeInstance entityAttributeInstance = attributeContainer.getCustomInstance(EntityAttributes.MAX_ABSORPTION);
+      AttributeMap attributeContainer = entity.getAttributes();
+      AttributeInstance entityAttributeInstance = attributeContainer.getInstance(Attributes.MAX_ABSORPTION);
       if(entityAttributeInstance == null) return;
-      EntityAttributeModifier existing = entityAttributeInstance.getModifier(id);
+      AttributeModifier existing = entityAttributeInstance.getModifier(id);
       if(existing != null){
-         double current = existing.value();
+         double current = existing.amount();
          double newAmount = current-amount;
          entityAttributeInstance.removeModifier(id);
          if(newAmount > 0.01){
-            EntityAttributeModifier modifier = new EntityAttributeModifier(id, newAmount, EntityAttributeModifier.Operation.ADD_VALUE);
-            entityAttributeInstance.addPersistentModifier(modifier);
+            AttributeModifier modifier = new AttributeModifier(id, newAmount, AttributeModifier.Operation.ADD_VALUE);
+            entityAttributeInstance.addPermanentModifier(modifier);
          }
       }
    }
    
    public static void addMaxAbsorption(LivingEntity entity, Identifier id, double amount){
-      AttributeContainer attributeContainer = entity.getAttributes();
-      EntityAttributeModifier modifier = new EntityAttributeModifier(id, amount, EntityAttributeModifier.Operation.ADD_VALUE);
-      EntityAttributeInstance entityAttributeInstance = attributeContainer.getCustomInstance(EntityAttributes.MAX_ABSORPTION);
+      AttributeMap attributeContainer = entity.getAttributes();
+      AttributeModifier modifier = new AttributeModifier(id, amount, AttributeModifier.Operation.ADD_VALUE);
+      AttributeInstance entityAttributeInstance = attributeContainer.getInstance(Attributes.MAX_ABSORPTION);
       if(entityAttributeInstance == null) return;
-      EntityAttributeModifier existing = entityAttributeInstance.getModifier(id);
+      AttributeModifier existing = entityAttributeInstance.getModifier(id);
       if(existing != null){
-         double current = existing.value();
+         double current = existing.amount();
          entityAttributeInstance.removeModifier(id);
-         modifier = new EntityAttributeModifier(id, amount+current, EntityAttributeModifier.Operation.ADD_VALUE);
+         modifier = new AttributeModifier(id, amount+current, AttributeModifier.Operation.ADD_VALUE);
       }
-      entityAttributeInstance.addPersistentModifier(modifier);
+      entityAttributeInstance.addPermanentModifier(modifier);
    }
    
    public static ItemStack removeLore(ItemStack stack){
       ItemStack copy = stack.copy();
-      copy.remove(DataComponentTypes.LORE);
+      copy.remove(DataComponents.LORE);
       return copy;
    }
    
-   public static RegistryEntry<Enchantment> getEnchantment(RegistryKey<Enchantment> key){
+   public static Holder<Enchantment> getEnchantment(ResourceKey<Enchantment> key){
       if(BorisLib.SERVER == null){
          LOGGER.log(WARN,"Attempted to access Enchantment "+key.toString()+" before DRM is available");
          return null;
       }
-      Optional<RegistryEntry.Reference<Enchantment>> opt = BorisLib.SERVER.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT).getOptional(key);
+      Optional<Holder.Reference<Enchantment>> opt = BorisLib.SERVER.registryAccess().lookupOrThrow(Registries.ENCHANTMENT).get(key);
       return opt.orElse(null);
    }
    
-   public static RegistryEntry<Enchantment> getEnchantment(DynamicRegistryManager drm, RegistryKey<Enchantment> key){
-      Optional<RegistryEntry.Reference<Enchantment>> opt = drm.getOrThrow(RegistryKeys.ENCHANTMENT).getOptional(key);
+   public static Holder<Enchantment> getEnchantment(RegistryAccess drm, ResourceKey<Enchantment> key){
+      Optional<Holder.Reference<Enchantment>> opt = drm.lookupOrThrow(Registries.ENCHANTMENT).get(key);
       return opt.orElse(null);
    }
    
-   public static ItemEnchantmentsComponent makeEnchantComponent(EnchantmentLevelEntry... entries){
-      ItemEnchantmentsComponent.Builder builder = new ItemEnchantmentsComponent.Builder(ItemEnchantmentsComponent.DEFAULT);
+   public static ItemEnchantments makeEnchantComponent(EnchantmentInstance... entries){
+      ItemEnchantments.Mutable builder = new ItemEnchantments.Mutable(ItemEnchantments.EMPTY);
       
-      for(EnchantmentLevelEntry entry : entries){
-         builder.add(entry.enchantment(),entry.level());
+      for(EnchantmentInstance entry : entries){
+         builder.upgrade(entry.enchantment(),entry.level());
       }
       
-      return builder.build();
+      return builder.toImmutable();
    }
    
-   public static void giveStacks(PlayerEntity player, ItemStack... stacks){
-      returnItems(new SimpleInventory(stacks),player);
+   public static void giveStacks(Player player, ItemStack... stacks){
+      returnItems(new SimpleContainer(stacks),player);
    }
    
-   public static void returnItems(Inventory inv, PlayerEntity player){
+   public static void returnItems(Container inv, Player player){
       if(inv == null) return;
-      for(int i=0; i<inv.size();i++){
-         ItemStack stack = inv.getStack(i).copy();
+      for(int i = 0; i<inv.getContainerSize(); i++){
+         ItemStack stack = inv.getItem(i).copy();
          if(!stack.isEmpty()){
-            inv.setStack(0,ItemStack.EMPTY);
+            inv.setItem(0, ItemStack.EMPTY);
             
             ItemEntity itemEntity;
-            boolean bl = player.getInventory().insertStack(stack);
+            boolean bl = player.getInventory().add(stack);
             if(!bl || !stack.isEmpty()){
-               itemEntity = player.dropItem(stack, false);
+               itemEntity = player.drop(stack, false);
                if(itemEntity == null) continue;
-               itemEntity.resetPickupDelay();
-               itemEntity.setOwner(player.getUuid());
+               itemEntity.setNoPickUpDelay();
+               itemEntity.setTarget(player.getUUID());
                continue;
             }
             stack.setCount(1);
-            itemEntity = player.dropItem(stack, false);
+            itemEntity = player.drop(stack, false);
             if(itemEntity != null){
-               itemEntity.setDespawnImmediately();
+               itemEntity.makeFakeItem();
             }
-            player.currentScreenHandler.sendContentUpdates();
+            player.containerMenu.broadcastChanges();
          }
       }
    }
    
-   public static boolean removeItems(PlayerEntity player, Item item, int count){
+   public static boolean removeItems(Player player, Item item, int count){
       if(player.isCreative()) return true;
       int remaining = count;
-      PlayerInventory inv = player.getInventory();
-      int[] slots = new int[inv.size()];
-      for(int i = 0; i < inv.size() && remaining > 0; i++){
-         ItemStack stack = inv.getStack(i);
+      Inventory inv = player.getInventory();
+      int[] slots = new int[inv.getContainerSize()];
+      for(int i = 0; i < inv.getContainerSize() && remaining > 0; i++){
+         ItemStack stack = inv.getItem(i);
          int stackCount = stack.getCount();
-         if(stack.isOf(item)){
+         if(stack.is(item)){
             if(remaining < stackCount){
                slots[i] = remaining;
                remaining = 0;
@@ -250,36 +241,36 @@ public class MinecraftUtils {
       
       for(int i = 0; i < slots.length; i++){
          if(slots[i] <= 0) continue;
-         inv.removeStack(i,slots[i]);
+         inv.removeItem(i,slots[i]);
       }
       return true;
    }
    
    public static List<ItemStack> getMatchingItemsFromContainerComp(ItemStack container, Item item){
-      ContainerComponent containerItems = container.getOrDefault(DataComponentTypes.CONTAINER,ContainerComponent.DEFAULT);
+      ItemContainerContents containerItems = container.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY);
       ArrayList<ItemStack> items = new ArrayList<>();
-      for(ItemStack stack : containerItems.iterateNonEmpty()){
-         if(stack.isOf(item)){
+      for(ItemStack stack : containerItems.nonEmptyItems()){
+         if(stack.is(item)){
             items.add(stack);
          }
       }
       return items;
    }
    
-   public static void attributeEffect(LivingEntity livingEntity, RegistryEntry<EntityAttribute> attribute, double value, EntityAttributeModifier.Operation operation, Identifier identifier, boolean remove){
-      boolean hasMod = livingEntity.getAttributes().hasModifierForAttribute(attribute,identifier);
+   public static void attributeEffect(LivingEntity livingEntity, Holder<Attribute> attribute, double value, AttributeModifier.Operation operation, Identifier identifier, boolean remove){
+      boolean hasMod = livingEntity.getAttributes().hasModifier(attribute,identifier);
       if(hasMod && remove){ // Remove the modifier
-         HashMultimap<RegistryEntry<EntityAttribute>, EntityAttributeModifier> map = HashMultimap.create();
-         map.put(attribute, new EntityAttributeModifier(identifier, value, operation));
-         livingEntity.getAttributes().removeModifiers(map);
+         HashMultimap<Holder<Attribute>, AttributeModifier> map = HashMultimap.create();
+         map.put(attribute, new AttributeModifier(identifier, value, operation));
+         livingEntity.getAttributes().removeAttributeModifiers(map);
       }else if(!hasMod && !remove){ // Add the modifier
-         HashMultimap<RegistryEntry<EntityAttribute>, EntityAttributeModifier> map = HashMultimap.create();
-         map.put(attribute, new EntityAttributeModifier(identifier, value, operation));
-         livingEntity.getAttributes().addTemporaryModifiers(map);
+         HashMultimap<Holder<Attribute>, AttributeModifier> map = HashMultimap.create();
+         map.put(attribute, new AttributeModifier(identifier, value, operation));
+         livingEntity.getAttributes().addTransientAttributeModifiers(map);
       }
    }
    
-   public static Pair<ContainerComponent,ItemStack> tryAddStackToContainerComp(ContainerComponent container, int size, ItemStack stack){
+   public static Tuple<ItemContainerContents, ItemStack> tryAddStackToContainerComp(ItemContainerContents container, int size, ItemStack stack){
       List<ItemStack> beltList = new ArrayList<>(container.stream().toList());
       
       // Fill up existing slots first
@@ -287,12 +278,12 @@ public class MinecraftUtils {
          int curCount = stack.getCount();
          if(stack.isEmpty()) break;
          boolean canCombine = !existingStack.isEmpty()
-               && ItemStack.areItemsAndComponentsEqual(existingStack, stack)
+               && ItemStack.isSameItemSameComponents(existingStack, stack)
                && existingStack.isStackable()
-               && existingStack.getCount() < existingStack.getMaxCount();
+               && existingStack.getCount() < existingStack.getMaxStackSize();
          if(!canCombine) continue;
-         int toAdd = Math.min(existingStack.getMaxCount() - existingStack.getCount(),curCount);
-         existingStack.increment(toAdd);
+         int toAdd = Math.min(existingStack.getMaxStackSize() - existingStack.getCount(),curCount);
+         existingStack.grow(toAdd);
          stack.setCount(curCount - toAdd);
       }
       
@@ -300,53 +291,53 @@ public class MinecraftUtils {
       
       if(!stack.isEmpty() && nonEmpty < size){
          if(nonEmpty == beltList.size()){ // No middle empty slots, append new slot to end
-            beltList.add(stack.copyAndEmpty());
+            beltList.add(stack.copyAndClear());
          }else{
             for(int i = 0; i < nonEmpty; i++){ // Find middle empty slot to fill
                if(beltList.get(i).isEmpty()){
-                  beltList.set(i, stack.copyAndEmpty());
+                  beltList.set(i, stack.copyAndClear());
                   break;
                }
             }
          }
       }
-      return new Pair<>(ContainerComponent.fromStacks(beltList),stack);
+      return new Tuple<>(ItemContainerContents.fromItems(beltList),stack);
    }
    
-   public static LasercastResult lasercast(World world, Vec3d startPos, Vec3d direction, double distance, boolean blockedByShields, Entity entity){
-      Vec3d rayEnd = startPos.add(direction.multiply(distance));
-      BlockHitResult raycast = world.raycast(new RaycastContext(startPos,rayEnd, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, entity));
+   public static LasercastResult lasercast(Level world, Vec3 startPos, Vec3 direction, double distance, boolean blockedByShields, Entity entity){
+      Vec3 rayEnd = startPos.add(direction.scale(distance));
+      BlockHitResult raycast = world.clip(new ClipContext(startPos,rayEnd, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity));
       EntityHitResult entityHit;
       List<Entity> hits = new ArrayList<>();
-      Box box = new Box(startPos,raycast.getPos());
-      box = box.expand(2);
+      AABB box = new AABB(startPos,raycast.getLocation());
+      box = box.inflate(2);
       // Primary hitscan check
       do{
-         entityHit = ProjectileUtil.raycast(entity,startPos,raycast.getPos(),box, e -> e instanceof LivingEntity && !e.isSpectator() && !hits.contains(e),distance*2);
+         entityHit = ProjectileUtil.getEntityHitResult(entity,startPos,raycast.getLocation(),box, e -> e instanceof LivingEntity && !e.isSpectator() && !hits.contains(e),distance*2);
          if(entityHit != null && entityHit.getType() == HitResult.Type.ENTITY){
             hits.add(entityHit.getEntity());
          }
       }while(entityHit != null && entityHit.getType() == HitResult.Type.ENTITY);
       
       // Secondary hitscan check to add lenience
-      List<Entity> hits2 = world.getOtherEntities(entity, box, (e)-> e instanceof LivingEntity && !e.isSpectator() && !hits.contains(e) && MathUtils.hitboxRaycast(e,startPos,raycast.getPos()));
+      List<Entity> hits2 = world.getEntities(entity, box, (e)-> e instanceof LivingEntity && !e.isSpectator() && !hits.contains(e) && MathUtils.hitboxRaycast(e,startPos,raycast.getLocation()));
       hits.addAll(hits2);
       hits.sort(Comparator.comparingDouble(e->e.distanceTo(entity)));
       
       if(!blockedByShields){
-         return new LasercastResult(startPos, raycast.getPos(), direction, hits);
+         return new LasercastResult(startPos, raycast.getLocation(), direction, hits);
       }
       
       List<Entity> hits3 = new ArrayList<>();
-      Vec3d endPoint = raycast.getPos();
+      Vec3 endPoint = raycast.getLocation();
       for(Entity hit : hits){
          boolean blocked = false;
-         if(hit instanceof ServerPlayerEntity hitPlayer && hitPlayer.isBlocking()){
-            double dp = hitPlayer.getRotationVecClient().normalize().dotProduct(direction.normalize());
+         if(hit instanceof ServerPlayer hitPlayer && hitPlayer.isBlocking()){
+            double dp = hitPlayer.getForward().normalize().dot(direction.normalize());
             blocked = dp < -0.6;
             if(blocked){
-               SoundUtils.playSound(world,hitPlayer.getBlockPos(), SoundEvents.ITEM_SHIELD_BLOCK, SoundCategory.PLAYERS,1f,1f);
-               endPoint = startPos.add(direction.normalize().multiply(direction.normalize().dotProduct(hitPlayer.getEntityPos().subtract(startPos)))).subtract(direction.normalize());
+               SoundUtils.playSound(world,hitPlayer.blockPosition(), SoundEvents.SHIELD_BLOCK, SoundSource.PLAYERS,1f,1f);
+               endPoint = startPos.add(direction.normalize().scale(direction.normalize().dot(hitPlayer.position().subtract(startPos)))).subtract(direction.normalize());
             }
          }
          hits3.add(hit);
@@ -358,42 +349,42 @@ public class MinecraftUtils {
       return new LasercastResult(startPos,endPoint,direction,hits3);
    }
    
-   public record LasercastResult(Vec3d startPos, Vec3d endPos, Vec3d direction, List<Entity> sortedHits){}
+   public record LasercastResult(Vec3 startPos, Vec3 endPos, Vec3 direction, List<Entity> sortedHits){}
    
-   public static ServerPlayerEntity getRequestedPlayer(MinecraftServer server, PlayerConfigEntry playerEntry){
-      ServerPlayerEntity requestedPlayer = server.getPlayerManager().getPlayer(playerEntry.name());
+   public static ServerPlayer getRequestedPlayer(MinecraftServer server, NameAndId playerEntry){
+      ServerPlayer requestedPlayer = server.getPlayerList().getPlayerByName(playerEntry.name());
       
       if (requestedPlayer == null) {
-         requestedPlayer = new ServerPlayerEntity(server, server.getOverworld(), new GameProfile(playerEntry.id(), playerEntry.name()), SyncedClientOptions.createDefault());
-         Optional<ReadView> readViewOpt = server
-               .getPlayerManager()
+         requestedPlayer = new ServerPlayer(server, server.overworld(), new GameProfile(playerEntry.id(), playerEntry.name()), ClientInformation.createDefault());
+         Optional<ValueInput> readViewOpt = server
+               .getPlayerList()
                .loadPlayerData(playerEntry)
-               .map(playerData -> NbtReadView.create(new ErrorReporter.Logging(LogUtils.getLogger()), server.getRegistryManager(), playerData));
-         readViewOpt.ifPresent(requestedPlayer::readData);
+               .map(playerData -> TagValueInput.create(new ProblemReporter.ScopedCollector(LogUtils.getLogger()), server.registryAccess(), playerData));
+         readViewOpt.ifPresent(requestedPlayer::load);
          
          if (readViewOpt.isPresent()) {
-            ReadView readView = readViewOpt.get();
-            Optional<String> dimension = readView.getOptionalString("Dimension");
+            ValueInput readView = readViewOpt.get();
+            Optional<String> dimension = readView.getString("Dimension");
             
             if (dimension.isPresent()) {
-               ServerWorld world = server.getWorld(RegistryKey.of(RegistryKeys.WORLD, Identifier.tryParse(dimension.get())));
-               if(world != null) ((EntityAccessor) requestedPlayer).callSetWorld(world);
+               ServerLevel world = server.getLevel(ResourceKey.create(Registries.DIMENSION, Identifier.tryParse(dimension.get())));
+               if(world != null) ((EntityAccessor) requestedPlayer).callSetLevel(world);
             }
          }
       }
       return requestedPlayer;
    }
    
-   public static boolean removeItemEntities(ServerWorld serverWorld, Box area, Predicate<ItemStack> predicate, int count){
-      List<ItemEntity> entities = serverWorld.getEntitiesByClass(ItemEntity.class, area, entity -> predicate.test(entity.getStack()));
+   public static boolean removeItemEntities(ServerLevel serverWorld, AABB area, Predicate<ItemStack> predicate, int count){
+      List<ItemEntity> entities = serverWorld.getEntitiesOfClass(ItemEntity.class, area, entity -> predicate.test(entity.getItem()));
       int foundCount = 0;
       for(ItemEntity entity : entities){
-         foundCount += entity.getStack().getCount();
+         foundCount += entity.getItem().getCount();
          if(foundCount >= count) break;
       }
       if(foundCount < count) return false;
       for(ItemEntity entity : entities){
-         ItemStack stack = entity.getStack();
+         ItemStack stack = entity.getItem();
          int stackCount = stack.getCount();
          int toRemove = Math.min(count, stackCount);
          if(toRemove >= stackCount){

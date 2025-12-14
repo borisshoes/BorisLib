@@ -4,15 +4,16 @@ import eu.pb4.sgui.api.ClickType;
 import eu.pb4.sgui.api.elements.GuiElementBuilder;
 import eu.pb4.sgui.api.gui.SimpleGui;
 import net.borisshoes.borislib.utils.AlgoUtils;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.ScreenHandlerType;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.item.ItemStack;
 import org.apache.commons.lang3.function.TriConsumer;
 
 import java.util.List;
-import java.util.function.*;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 public class PagedGui<T> extends SimpleGui {
@@ -31,11 +32,11 @@ public class PagedGui<T> extends SimpleGui {
    private List<T> itemList;
    private List<T> filteredSortedList;
    
-   private int primaryTextColor = Formatting.DARK_PURPLE.getColorValue().intValue();
-   private int secondaryTextColor = Formatting.LIGHT_PURPLE.getColorValue().intValue();
-   private int action1TextColor = Formatting.AQUA.getColorValue().intValue();
-   private int action2TextColor = Formatting.GREEN.getColorValue().intValue();
-   private int action3TextColor = Formatting.YELLOW.getColorValue().intValue();
+   private int primaryTextColor = ChatFormatting.DARK_PURPLE.getColor().intValue();
+   private int secondaryTextColor = ChatFormatting.LIGHT_PURPLE.getColor().intValue();
+   private int action1TextColor = ChatFormatting.AQUA.getColor().intValue();
+   private int action2TextColor = ChatFormatting.GREEN.getColor().intValue();
+   private int action3TextColor = ChatFormatting.YELLOW.getColor().intValue();
    
    private Consumer<ClickType> pageUpFunction = (clickType -> {
       if(pageNum < numPages()){
@@ -73,7 +74,7 @@ public class PagedGui<T> extends SimpleGui {
    private Function<T, GuiElementBuilder> itemElemBuilder = (item -> new GuiElementBuilder(ItemStack.EMPTY));
    private GuiElementBuilder blankItem = new GuiElementBuilder(ItemStack.EMPTY);
    
-   public PagedGui(ScreenHandlerType<?> type, ServerPlayerEntity player, List<T> items){
+   public PagedGui(MenuType<?> type, ServerPlayer player, List<T> items){
       super(type, player, false);
       this.itemList = items;
       if(width >= 3 && height >= 3){
@@ -133,39 +134,39 @@ public class PagedGui<T> extends SimpleGui {
    
    private GuiElementBuilder createNextPageItem(){
       GuiElementBuilder nextPage = GuiElementBuilder.from(GraphicalItem.with(GraphicalItem.RIGHT_ARROW));
-      nextPage.setName(Text.translatable("gui.borislib.next_page_title",pageNum,numPages()).withColor(primaryTextColor));
-      nextPage.addLoreLine(Text.translatable("text.borislib.two_elements",
-            Text.translatable("gui.borislib.click").withColor(action1TextColor),
-            Text.translatable("gui.borislib.next_page_sub").withColor(secondaryTextColor)));
+      nextPage.setName(Component.translatable("gui.borislib.next_page_title",pageNum,numPages()).withColor(primaryTextColor));
+      nextPage.addLoreLine(Component.translatable("text.borislib.two_elements",
+            Component.translatable("gui.borislib.click").withColor(action1TextColor),
+            Component.translatable("gui.borislib.next_page_sub").withColor(secondaryTextColor)));
       nextPage.setCallback(this.pageUpFunction);
       return nextPage;
    }
    
    private GuiElementBuilder createPrevPageItem(){
       GuiElementBuilder prevPage = GuiElementBuilder.from(GraphicalItem.with(GraphicalItem.LEFT_ARROW));
-      prevPage.setName(Text.translatable("gui.borislib.prev_page_title",pageNum,numPages()).withColor(primaryTextColor));
-      prevPage.addLoreLine(Text.translatable("text.borislib.two_elements",
-            Text.translatable("gui.borislib.click").withColor(action1TextColor),
-            Text.translatable("gui.borislib.prev_page_sub").withColor(secondaryTextColor)));
+      prevPage.setName(Component.translatable("gui.borislib.prev_page_title",pageNum,numPages()).withColor(primaryTextColor));
+      prevPage.addLoreLine(Component.translatable("text.borislib.two_elements",
+            Component.translatable("gui.borislib.click").withColor(action1TextColor),
+            Component.translatable("gui.borislib.prev_page_sub").withColor(secondaryTextColor)));
       prevPage.setCallback(this.pageDownFunction);
       return prevPage;
    }
    
    private GuiElementBuilder createSortItem(){
       GuiElementBuilder sortBuilt = GuiElementBuilder.from(GraphicalItem.with(GraphicalItem.SORT)).hideDefaultTooltip();
-      sortBuilt.setName(Text.translatable("gui.borislib.sort").withColor(primaryTextColor));
-      sortBuilt.addLoreLine(Text.translatable("text.borislib.two_elements",
-            Text.translatable("gui.borislib.click").withColor(action1TextColor),
-            Text.translatable("gui.borislib.change_sort").withColor(secondaryTextColor)));
-      sortBuilt.addLoreLine(Text.translatable("text.borislib.two_elements",
-            Text.translatable("gui.borislib.right_click").withColor(action2TextColor),
-            Text.translatable("gui.borislib.change_sort_back").withColor(secondaryTextColor)));
-      sortBuilt.addLoreLine(Text.translatable("text.borislib.two_elements",
-            Text.translatable("gui.borislib.shift_click").withColor(action3TextColor),
-            Text.translatable("gui.borislib.reset_sort").withColor(secondaryTextColor)));
-      sortBuilt.addLoreLine(Text.literal(""));
-      sortBuilt.addLoreLine(Text.translatable("text.borislib.two_elements",
-            Text.translatable("gui.borislib.sorting_by").withColor(secondaryTextColor),
+      sortBuilt.setName(Component.translatable("gui.borislib.sort").withColor(primaryTextColor));
+      sortBuilt.addLoreLine(Component.translatable("text.borislib.two_elements",
+            Component.translatable("gui.borislib.click").withColor(action1TextColor),
+            Component.translatable("gui.borislib.change_sort").withColor(secondaryTextColor)));
+      sortBuilt.addLoreLine(Component.translatable("text.borislib.two_elements",
+            Component.translatable("gui.borislib.right_click").withColor(action2TextColor),
+            Component.translatable("gui.borislib.change_sort_back").withColor(secondaryTextColor)));
+      sortBuilt.addLoreLine(Component.translatable("text.borislib.two_elements",
+            Component.translatable("gui.borislib.shift_click").withColor(action3TextColor),
+            Component.translatable("gui.borislib.reset_sort").withColor(secondaryTextColor)));
+      sortBuilt.addLoreLine(Component.literal(""));
+      sortBuilt.addLoreLine(Component.translatable("text.borislib.two_elements",
+            Component.translatable("gui.borislib.sorting_by").withColor(secondaryTextColor),
             curSort.getColoredLabel()));
       sortBuilt.setCallback(this.cycleSortFunction);
       return sortBuilt;
@@ -173,19 +174,19 @@ public class PagedGui<T> extends SimpleGui {
    
    private GuiElementBuilder createFilterItem(){
       GuiElementBuilder filterBuilt = GuiElementBuilder.from(GraphicalItem.with(GraphicalItem.FILTER)).hideDefaultTooltip();
-      filterBuilt.setName(Text.translatable("gui.borislib.filter").withColor(primaryTextColor));
-      filterBuilt.addLoreLine(Text.translatable("text.borislib.two_elements",
-            Text.translatable("gui.borislib.click").withColor(action1TextColor),
-            Text.translatable("gui.borislib.change_filter").withColor(secondaryTextColor)));
-      filterBuilt.addLoreLine(Text.translatable("text.borislib.two_elements",
-            Text.translatable("gui.borislib.right_click").withColor(action2TextColor),
-            Text.translatable("gui.borislib.change_filter_back").withColor(secondaryTextColor)));
-      filterBuilt.addLoreLine(Text.translatable("text.borislib.two_elements",
-            Text.translatable("gui.borislib.shift_click").withColor(action3TextColor),
-            Text.translatable("gui.borislib.reset_filter").withColor(secondaryTextColor)));
-      filterBuilt.addLoreLine(Text.literal(""));
-      filterBuilt.addLoreLine(Text.translatable("text.borislib.two_elements",
-            Text.translatable("gui.borislib.filtering_by").withColor(secondaryTextColor),
+      filterBuilt.setName(Component.translatable("gui.borislib.filter").withColor(primaryTextColor));
+      filterBuilt.addLoreLine(Component.translatable("text.borislib.two_elements",
+            Component.translatable("gui.borislib.click").withColor(action1TextColor),
+            Component.translatable("gui.borislib.change_filter").withColor(secondaryTextColor)));
+      filterBuilt.addLoreLine(Component.translatable("text.borislib.two_elements",
+            Component.translatable("gui.borislib.right_click").withColor(action2TextColor),
+            Component.translatable("gui.borislib.change_filter_back").withColor(secondaryTextColor)));
+      filterBuilt.addLoreLine(Component.translatable("text.borislib.two_elements",
+            Component.translatable("gui.borislib.shift_click").withColor(action3TextColor),
+            Component.translatable("gui.borislib.reset_filter").withColor(secondaryTextColor)));
+      filterBuilt.addLoreLine(Component.literal(""));
+      filterBuilt.addLoreLine(Component.translatable("text.borislib.two_elements",
+            Component.translatable("gui.borislib.filtering_by").withColor(secondaryTextColor),
             curFilter.getColoredLabel()));
       filterBuilt.setCallback(this.cycleFilterFunction);
       return filterBuilt;

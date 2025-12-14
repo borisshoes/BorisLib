@@ -18,16 +18,16 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.minecraft.item.Item;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.SimpleRegistry;
+import net.minecraft.core.MappedRegistry;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.Pair;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Tuple;
+import net.minecraft.world.item.Item;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -40,24 +40,24 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
    
    public static final Logger LOGGER = LogManager.getLogger("BorisLib");
    public static final ArrayList<TickTimerCallback> SERVER_TIMER_CALLBACKS = new ArrayList<>();
-   public static final ArrayList<Pair<ServerWorld,TickTimerCallback>> WORLD_TIMER_CALLBACKS = new ArrayList<>();
+   public static final ArrayList<Tuple<ServerLevel,TickTimerCallback>> WORLD_TIMER_CALLBACKS = new ArrayList<>();
    public static final String MOD_ID = "borislib";
    public static final String BLANK_UUID = "00000000-0000-4000-8000-000000000000";
-   public static final HashMap<ServerPlayerEntity, PlayerMovementEntry> PLAYER_MOVEMENT_TRACKER = new HashMap<>();
+   public static final HashMap<ServerPlayer, PlayerMovementEntry> PLAYER_MOVEMENT_TRACKER = new HashMap<>();
    
    public static MinecraftServer SERVER = null;
    
-   public static final Registry<GraphicalItem.GraphicElement> GRAPHIC_ITEM_REGISTRY = new SimpleRegistry<>(RegistryKey.ofRegistry(Identifier.of(MOD_ID,"graphic_elements")), Lifecycle.stable());
-   public static final Registry<Item> ITEMS = new SimpleRegistry<>(RegistryKey.ofRegistry(Identifier.of(MOD_ID,"item")), Lifecycle.stable());
-   public static final Registry<LoginCallback> LOGIN_CALLBACKS = new SimpleRegistry<>(RegistryKey.ofRegistry(Identifier.of(MOD_ID,"login_callback")), Lifecycle.stable());
+   public static final Registry<GraphicalItem.GraphicElement> GRAPHIC_ITEM_REGISTRY = new MappedRegistry<>(ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(MOD_ID,"graphic_elements")), Lifecycle.stable());
+   public static final Registry<Item> ITEMS = new MappedRegistry<>(ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(MOD_ID,"item")), Lifecycle.stable());
+   public static final Registry<LoginCallback> LOGIN_CALLBACKS = new MappedRegistry<>(ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(MOD_ID,"login_callback")), Lifecycle.stable());
    
-   public static final Item GRAPHICAL_ITEM = registerItem("graphical_item", new GraphicalItem(new Item.Settings().maxCount(99)));
+   public static final Item GRAPHICAL_ITEM = registerItem("graphical_item", new GraphicalItem(new Item.Properties().stacksTo(99)));
    
    public static final LoginCallback ITEM_RETURN_LOGIN_CALLBACK = registerCallback(new ItemReturnLoginCallback());
    
    public static final ItemModDataHandler BORISLIB_ITEM_DATA = new ItemModDataHandler(MOD_ID);
    
-   public static final DataKey<LoginCallbackContainer> LOGIN_CALLBACKS_KEY = DataRegistry.register(DataKey.ofPlayer(Identifier.of(MOD_ID,"login_callbacks"),LoginCallbackContainer.CODEC, LoginCallbackContainer::new));
+   public static final DataKey<LoginCallbackContainer> LOGIN_CALLBACKS_KEY = DataRegistry.register(DataKey.ofPlayer(Identifier.fromNamespaceAndPath(MOD_ID,"login_callbacks"),LoginCallbackContainer.CODEC, LoginCallbackContainer::new));
    
    @Override
    public void onInitialize(){
@@ -86,8 +86,8 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
       // TODO serialize on world stop?
    }
    
-   public static boolean addTickTimerCallback(ServerWorld world, TickTimerCallback callback){
-      return WORLD_TIMER_CALLBACKS.add(new Pair<>(world,callback));
+   public static boolean addTickTimerCallback(ServerLevel world, TickTimerCallback callback){
+      return WORLD_TIMER_CALLBACKS.add(new Tuple<>(world,callback));
       // TODO serialize on world stop?
    }
    
@@ -100,14 +100,14 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
    }
    
    public static LoginCallback createCallback(Identifier id){
-      LoginCallback callback = LOGIN_CALLBACKS.get(id);
+      LoginCallback callback = LOGIN_CALLBACKS.getValue(id);
       if(callback == null) return null;
       return callback.makeNew();
    }
    
    private static Item registerItem(String id, Item item){
-      Identifier identifier = Identifier.of(MOD_ID,id);
-      Registry.register(ITEMS, identifier, Registry.register(Registries.ITEM, identifier, item));
+      Identifier identifier = Identifier.fromNamespaceAndPath(MOD_ID,id);
+      Registry.register(ITEMS, identifier, Registry.register(BuiltInRegistries.ITEM, identifier, item));
       return item;
    }
    

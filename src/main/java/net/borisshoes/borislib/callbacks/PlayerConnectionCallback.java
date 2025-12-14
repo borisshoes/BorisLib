@@ -5,8 +5,8 @@ import net.borisshoes.borislib.datastorage.DataAccess;
 import net.borisshoes.borislib.tracker.PlayerMovementEntry;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 
 import java.util.ArrayList;
 import java.util.UUID;
@@ -15,20 +15,20 @@ import static net.borisshoes.borislib.BorisLib.PLAYER_MOVEMENT_TRACKER;
 
 public class PlayerConnectionCallback {
    
-   public static void onPlayerJoin(ServerPlayNetworkHandler handler, PacketSender packetSender, MinecraftServer server){
-      ServerPlayerEntity player = handler.player;
+   public static void onPlayerJoin(ServerGamePacketListenerImpl handler, PacketSender packetSender, MinecraftServer server){
+      ServerPlayer player = handler.player;
       DataAccess.onPlayerJoin(player);
       
       if(!PLAYER_MOVEMENT_TRACKER.containsKey(player)){
          PLAYER_MOVEMENT_TRACKER.put(player, PlayerMovementEntry.blankEntry(player));
       }
       
-      UUID playerId = player.getUuid();
+      UUID playerId = player.getUUID();
       LoginCallbackContainer container = DataAccess.getPlayer(playerId, BorisLib.LOGIN_CALLBACKS_KEY);
       
       ArrayList<LoginCallback> toBeRemoved = new ArrayList<>();
       for(LoginCallback callback : container.getCallbacks()){
-         if(callback.getPlayer().equals(player.getUuidAsString())){
+         if(callback.getPlayer().equals(player.getStringUUID())){
             callback.onLogin(handler,server);
             toBeRemoved.add(callback);
          }
@@ -39,7 +39,7 @@ public class PlayerConnectionCallback {
       }
    }
    
-   public static void onPlayerLeave(ServerPlayNetworkHandler handler, MinecraftServer server){
+   public static void onPlayerLeave(ServerGamePacketListenerImpl handler, MinecraftServer server){
       DataAccess.onPlayerQuit(handler.player);
    }
 }

@@ -4,8 +4,8 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.borisshoes.borislib.datastorage.DataKey;
 import net.borisshoes.borislib.datastorage.DataRegistry;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,5 +30,5 @@ public final class WorldMarker {
                CODEC.listOf().fieldOf("markers").forGetter(list -> list)
          ).apply(instance, markers -> markers)
    );
-   public static final DataKey<List<WorldMarker>> KEY = DataRegistry.register(DataKey.ofWorld(Identifier.of(MOD_ID, "markers"),LIST,(key) -> new ArrayList<>()));
+   public static final DataKey<List<WorldMarker>> KEY = DataRegistry.register(DataKey.ofWorld(Identifier.fromNamespaceAndPath(MOD_ID, "markers"),LIST,(key) -> new ArrayList<>()));
 }

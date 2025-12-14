@@ -6,7 +6,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.borisshoes.borislib.config.ConfigValue;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.CompletableFuture;
@@ -36,11 +36,11 @@ public class DoubleConfigValue extends ConfigValue<Double> {
    }
    
    @Override
-   public Double parseArgumentValue(CommandContext<ServerCommandSource> ctx){
+   public Double parseArgumentValue(CommandContext<CommandSourceStack> ctx){
       return DoubleArgumentType.getDouble(ctx, name);
    }
    
-   public CompletableFuture<Suggestions> getSuggestions(CommandContext<ServerCommandSource> context, SuggestionsBuilder builder){
+   public CompletableFuture<Suggestions> getSuggestions(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder){
       return builder.buildFuture();
    }
    

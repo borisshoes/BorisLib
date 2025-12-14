@@ -3,14 +3,14 @@ package net.borisshoes.borislib.datastorage;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.Dynamic;
 import net.borisshoes.borislib.BorisLib;
-import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.registry.RegistryKey;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.world.World;
-import net.minecraft.util.WorldSavePath;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.LevelResource;
 
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -18,7 +18,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Supplier;
 
 public final class DataAccess {
    private static volatile PlayerObjectStore playerStore;
@@ -26,7 +25,7 @@ public final class DataAccess {
    
    // TODO, load on first access
    public static void onServerStarted(MinecraftServer s){
-      Path root = s.getOverworld().getServer().getSavePath(WorldSavePath.ROOT);
+      Path root = s.overworld().getServer().getWorldPath(LevelResource.ROOT);
       playerStore = new PlayerObjectStore(root);
    }
    
@@ -43,9 +42,9 @@ public final class DataAccess {
       if(playerStore == null) return;
       
       // Always auto-save ALL ONLINE players during any save (autosave or manual).
-      for(ServerPlayerEntity sp : s.getPlayerManager().getPlayerList()){
-         playerStore.save(sp.getUuid());
-         DIRTY_PLAYERS.remove(sp.getUuid());
+      for(ServerPlayer sp : s.getPlayerList().getPlayers()){
+         playerStore.save(sp.getUUID());
+         DIRTY_PLAYERS.remove(sp.getUUID());
       }
       
       for(UUID u : DIRTY_PLAYERS){
@@ -54,16 +53,16 @@ public final class DataAccess {
       DIRTY_PLAYERS.clear();
    }
    
-   public static void onPlayerQuit(ServerPlayerEntity p){
-      if(playerStore != null) playerStore.save(p.getUuid());
-      DIRTY_PLAYERS.remove(p.getUuid());
+   public static void onPlayerQuit(ServerPlayer p){
+      if(playerStore != null) playerStore.save(p.getUUID());
+      DIRTY_PLAYERS.remove(p.getUUID());
    }
    
-   public static void onPlayerJoin(ServerPlayerEntity p){
+   public static void onPlayerJoin(ServerPlayer p){
       if(playerStore != null){
-         playerStore.save(p.getUuid());
-         DIRTY_PLAYERS.remove(p.getUuid());
-         playerStore.preload(p.getUuid()); // loads/creates the entry; leaves values lazily decoded
+         playerStore.save(p.getUUID());
+         DIRTY_PLAYERS.remove(p.getUUID());
+         playerStore.preload(p.getUUID()); // loads/creates the entry; leaves values lazily decoded
       }
    }
    
@@ -72,12 +71,12 @@ public final class DataAccess {
    }
    
    public static <T> T getGlobal(DataKey<T> key){
-      GlobalState s = GlobalState.get(BorisLib.SERVER.getOverworld());
+      GlobalState s = GlobalState.get(BorisLib.SERVER.overworld());
       return s.getLive(key);
    }
    
-   public static <T> T getWorld(RegistryKey<World> wk, DataKey<T> key){
-      ServerWorld w = BorisLib.SERVER.getWorld(wk);
+   public static <T> T getWorld(ResourceKey<Level> wk, DataKey<T> key){
+      ServerLevel w = BorisLib.SERVER.getLevel(wk);
       WorldState s = WorldState.get(w);
       return s.getLive(wk, key);
    }
@@ -89,11 +88,11 @@ public final class DataAccess {
    }
    
    public static <T> void setGlobal(DataKey<T> key, T value){
-      GlobalState s = GlobalState.get(BorisLib.SERVER.getOverworld());
+      GlobalState s = GlobalState.get(BorisLib.SERVER.overworld());
       s.setLive(key, value);
    }
    
-   public static <T> void setWorld(ServerWorld w, DataKey<T> key, T value){
+   public static <T> void setWorld(ServerLevel w, DataKey<T> key, T value){
       WorldState s = WorldState.get(w);
       s.setLive(key, value);
    }
@@ -103,11 +102,11 @@ public final class DataAccess {
       DIRTY_PLAYERS.add(u);
    }
    
-   private static <T> NbtCompound encode(Codec<T> codec, T v){
-      return (NbtCompound) codec.encodeStart(NbtOps.INSTANCE, v).result().orElse(new NbtCompound());
+   private static <T> CompoundTag encode(Codec<T> codec, T v){
+      return (CompoundTag) codec.encodeStart(NbtOps.INSTANCE, v).result().orElse(new CompoundTag());
    }
    
-   private static <T> T decode(Codec<T> codec, NbtCompound tag){
+   private static <T> T decode(Codec<T> codec, CompoundTag tag){
       return codec.parse(new Dynamic<>(NbtOps.INSTANCE, tag)).result().orElseThrow();
    }
    
@@ -115,8 +114,8 @@ public final class DataAccess {
       Map<UUID, T> out = new HashMap<>();
       
       // Always include online players (force-decode into live objects)
-      for(ServerPlayerEntity sp : BorisLib.SERVER.getPlayerManager().getPlayerList()){
-         out.put(sp.getUuid(), playerStore.getLive(sp.getUuid(), key));
+      for(ServerPlayer sp : BorisLib.SERVER.getPlayerList().getPlayers()){
+         out.put(sp.getUUID(), playerStore.getLive(sp.getUUID(), key));
       }
       
       // Include any additional cached offline players (objects snapshot)

@@ -2,18 +2,11 @@ package net.borisshoes.borislib.callbacks;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.borisshoes.borislib.BorisLib;
 import net.borisshoes.borislib.utils.CodecUtils;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.storage.ReadView;
-import net.minecraft.storage.WriteView;
-import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-
-import static net.borisshoes.borislib.BorisLib.LOGGER;
 
 public class LoginCallbackContainer {
    public static final Codec<LoginCallbackContainer> CODEC = RecordCodecBuilder.create(i -> i.group(

@@ -1,32 +1,32 @@
 package net.borisshoes.borislib.utils;
 
 import net.borisshoes.borislib.BorisLib;
-import net.minecraft.util.Pair;
+import net.minecraft.util.Tuple;
 
 import java.util.*;
 
 public class AlgoUtils {
    
-   public static <T> T getWeightedOption(List<Pair<T,Integer>> options){
+   public static <T> T getWeightedOption(List<Tuple<T,Integer>> options){
       return getWeightedOption(options, new Random().nextLong());
    }
    
-   public static <T> T getWeightedOption(List<Pair<T,Integer>> options, long seed){
+   public static <T> T getWeightedOption(List<Tuple<T,Integer>> options, long seed){
       ArrayList<T> weightedList = new ArrayList<>();
-      for(Pair<T, Integer> option : options){
-         for(int i = 0; i < option.getRight(); i++){
-            weightedList.add(option.getLeft());
+      for(Tuple<T, Integer> option : options){
+         for(int i = 0; i < option.getB(); i++){
+            weightedList.add(option.getA());
          }
       }
       Random random = new Random(seed);
       return weightedList.get(random.nextInt(weightedList.size()));
    }
    
-   public static <T> List<Pair<T,Integer>> randomlySpace(List<T> items, int size, long seed){
+   public static <T> List<Tuple<T,Integer>> randomlySpace(List<T> items, int size, long seed){
       Random random = new Random(seed);
       
       List<Integer> remaining = new ArrayList<>();
-      List<Pair<T,Integer>> randomized = new ArrayList<>();
+      List<Tuple<T,Integer>> randomized = new ArrayList<>();
       
       for(int i = 0; i < size; i++){
          remaining.add(i);
@@ -35,7 +35,7 @@ public class AlgoUtils {
       int i = 0;
       while(i < items.size() && !remaining.isEmpty()){
          int index = random.nextInt(remaining.size());
-         randomized.add(new Pair<>(items.get(i),remaining.get(index)));
+         randomized.add(new Tuple<>(items.get(i),remaining.get(index)));
          remaining.remove(remaining.get(index));
          i++;
       }

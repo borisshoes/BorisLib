@@ -1,17 +1,17 @@
 package net.borisshoes.borislib.timers;
 
 import net.borisshoes.borislib.BorisLib;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.server.level.ServerLevel;
 import org.jetbrains.annotations.Nullable;
 
 public class RepeatTimer extends TickTimerCallback {
    private final Runnable task;
    private final int ticks;
    private final int interval;
-   private final ServerWorld world;
+   private final ServerLevel world;
    
    
-   public RepeatTimer(int interval, int ticks, Runnable task, @Nullable ServerWorld world){
+   public RepeatTimer(int interval, int ticks, Runnable task, @Nullable ServerLevel world){
       super(interval, null, null);
       this.ticks = ticks;
       this.world = world;

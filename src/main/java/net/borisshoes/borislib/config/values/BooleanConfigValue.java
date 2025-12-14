@@ -6,7 +6,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.borisshoes.borislib.config.ConfigValue;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
@@ -33,11 +33,11 @@ public class BooleanConfigValue extends ConfigValue<Boolean> {
    }
    
    @Override
-   public Boolean parseArgumentValue(CommandContext<ServerCommandSource> ctx){
+   public Boolean parseArgumentValue(CommandContext<CommandSourceStack> ctx){
       return BoolArgumentType.getBool(ctx, name);
    }
    
-   public CompletableFuture<Suggestions> getSuggestions(CommandContext<ServerCommandSource> context, SuggestionsBuilder builder){
+   public CompletableFuture<Suggestions> getSuggestions(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder){
       Set<String> options = new HashSet<>();
       options.add("true");
       options.add("false");

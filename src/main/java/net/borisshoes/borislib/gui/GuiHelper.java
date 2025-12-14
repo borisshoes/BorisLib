@@ -1,29 +1,24 @@
 package net.borisshoes.borislib.gui;
 
-import eu.pb4.sgui.api.ClickType;
 import eu.pb4.sgui.api.elements.GuiElementBuilder;
 import eu.pb4.sgui.api.gui.SimpleGui;
-import net.borisshoes.borislib.utils.AlgoUtils;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.network.chat.Component;
 
 import java.util.List;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
 
 public class GuiHelper {
    
-   public static void outlineGUI(SimpleGui gui, int color, Text borderText){
+   public static void outlineGUI(SimpleGui gui, int color, Component borderText){
       outlineGUI(gui,color,borderText,null);
    }
    
-   public static void outlineGUI(SimpleGui gui, int color, Text borderText, List<Text> lore){
+   public static void outlineGUI(SimpleGui gui, int color, Component borderText, List<Component> lore){
       int width = gui.getWidth();
       int height = gui.getHeight();
       outlineGUI(width, height, gui,color,borderText,lore);
    }
    
-   public static void outlineGUI(int width, int height, SimpleGui gui, int color, Text borderText, List<Text> lore){
+   public static void outlineGUI(int width, int height, SimpleGui gui, int color, Component borderText, List<Component> lore){
       int size = width*height;
       for(int i = 0; i < size; i++){
          gui.clearSlot(i);
@@ -62,7 +57,7 @@ public class GuiHelper {
          }else{
             menuItem.setName(borderText).hideDefaultTooltip();
             if(lore != null && !lore.isEmpty()){
-               for(Text text : lore){
+               for(Component text : lore){
                   menuItem.addLoreLine(text);
                }
             }

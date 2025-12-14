@@ -5,9 +5,9 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "EntityAccessor",
-    "PlayerInventoryAccessor",
-    "ServerPlayerEntityMixin",
-    "ServerPlayNetworkHandlerMixin"
+    "InventoryAccessor",
+    "ServerGamePacketListenerImplMixin",
+    "ServerPlayerMixin"
   ],
   "client": [
   ],

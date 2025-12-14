@@ -1,6 +1,6 @@
 package net.borisshoes.borislib.datastorage;
 
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.Identifier;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

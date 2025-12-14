@@ -5,7 +5,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.borisshoes.borislib.utils.TextUtils;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.CompletableFuture;
@@ -28,9 +28,9 @@ public abstract class ConfigValue<T>{
    
    public abstract ArgumentType<?> getArgumentType();
    
-   public abstract T parseArgumentValue(CommandContext<ServerCommandSource> ctx);
+   public abstract T parseArgumentValue(CommandContext<CommandSourceStack> ctx);
    
-   public abstract CompletableFuture<Suggestions> getSuggestions(CommandContext<ServerCommandSource> ctx, SuggestionsBuilder builder);
+   public abstract CompletableFuture<Suggestions> getSuggestions(CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder);
    
    public abstract String getValueString();
    
