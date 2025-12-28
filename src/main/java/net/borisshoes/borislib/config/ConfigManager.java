@@ -145,6 +145,15 @@ public class ConfigManager {
       return values.stream().filter(value -> value.name.equals(name)).findFirst().map(iConfigValue -> iConfigValue.value).orElse(null);
    }
    
+   public Object getValue(IConfigSetting<?> setting){
+      try{
+         return this.getValue(setting.getName());
+      }catch(Exception e){
+         LOGGER.error(e.toString());
+      }
+      return null;
+   }
+   
    public int getInt(IConfigSetting<?> setting){
       try{
          Object value = this.getValue(setting.getName());

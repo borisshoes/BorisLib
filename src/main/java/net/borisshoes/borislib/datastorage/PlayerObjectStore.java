@@ -2,7 +2,9 @@ package net.borisshoes.borislib.datastorage;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.Dynamic;
+import net.borisshoes.borislib.BorisLib;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 
 import java.io.DataInputStream;
@@ -90,6 +92,7 @@ public final class PlayerObjectStore {
       // Create default
       T created = key.makeDefaultPlayer(u);
       if(created == null){
+         BorisLib.LOGGER.warn("DataKey<{}> default factory returned null for player {}. This may cause issues.", key.id(), u);
          throw new IllegalStateException("DataKey<" + key.id() + "> default factory returned null for player " + u);
       }
       modObjs.put(key.key(), created);
@@ -144,7 +147,7 @@ public final class PlayerObjectStore {
       // Write file
       var dyn = FlatNamespacedMap.CODEC.encodeStart(NbtOps.INSTANCE, out).result().orElseGet(CompoundTag::new);
       try(OutputStream os = Files.newOutputStream(file(u)); GZIPOutputStream gz = new GZIPOutputStream(os); DataOutputStream outStr = new DataOutputStream(gz)){
-         net.minecraft.nbt.NbtIo.writeUnnamedTagWithFallback(dyn, outStr);
+         NbtIo.writeUnnamedTagWithFallback(dyn, outStr);
       }catch(Exception ignored){
       }
    }

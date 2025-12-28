@@ -2,6 +2,7 @@ package net.borisshoes.borislib.datastorage;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.Dynamic;
+import net.borisshoes.borislib.BorisLib;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.server.level.ServerLevel;
@@ -50,6 +51,9 @@ public final class GlobalState extends SavedData {
       }
       
       T created = key.makeDefaultGlobal();
+      if(created == null){
+         BorisLib.LOGGER.warn("DataKey<{}> default factory returned null for GLOBAL scope. This may cause issues.", key.id());
+      }
       modObjs.put(key.key(), created);
       setDirty();
       return created;

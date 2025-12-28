@@ -2,6 +2,7 @@ package net.borisshoes.borislib.datastorage;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.Dynamic;
+import net.borisshoes.borislib.BorisLib;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.resources.ResourceKey;
@@ -52,6 +53,9 @@ public final class WorldState extends SavedData {
       }
       
       T created = key.makeDefaultWorld(worldKey);
+      if(created == null){
+         BorisLib.LOGGER.warn("DataKey<{}> default factory returned null for world {}. This may cause issues.", key.id(), worldKey);
+      }
       modObjs.put(key.key(), created);
       setDirty();
       return created;
