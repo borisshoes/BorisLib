@@ -60,7 +60,8 @@ public final class GlobalState extends SavedData {
    }
    
    public <T> void setLive(DataKey<T> key, T value){
-      objects.computeIfAbsent(key.modId(), k -> new HashMap<>()).put(key.key(), value);
+      T toStore = value != null ? value : key.makeDefaultGlobal();
+      objects.computeIfAbsent(key.modId(), k -> new HashMap<>()).put(key.key(), toStore);
       Map<String, CompoundTag> modRaw = data.get(key.modId());
       if(modRaw != null){
          modRaw.remove(key.key());

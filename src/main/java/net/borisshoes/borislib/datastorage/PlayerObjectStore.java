@@ -101,7 +101,8 @@ public final class PlayerObjectStore {
    
    public <T> void setLive(UUID u, DataKey<T> key, T value){
       Entry e = getEntry(u);
-      e.objects.computeIfAbsent(key.modId(), k -> new ConcurrentHashMap<>()).put(key.key(), value);
+      T toStore = value != null ? value : key.makeDefaultPlayer(u);
+      e.objects.computeIfAbsent(key.modId(), k -> new ConcurrentHashMap<>()).put(key.key(), toStore);
       Map<String, CompoundTag> modRaw = e.raw.get(key.modId());
       if(modRaw != null){
          modRaw.remove(key.key());

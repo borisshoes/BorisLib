@@ -67,39 +67,53 @@ public final class DataAccess {
    }
    
    public static void markPlayerDirty(UUID u){
+      ensureServerSide("markPlayerDirty");
       DIRTY_PLAYERS.add(u);
    }
    
    public static <T> T getGlobal(DataKey<T> key){
+      ensureServerSide("getGlobal");
       GlobalState s = GlobalState.get(BorisLib.SERVER.overworld());
       return s.getLive(key);
    }
    
    public static <T> T getWorld(ResourceKey<Level> wk, DataKey<T> key){
+      ensureServerSide("getWorld");
       ServerLevel w = BorisLib.SERVER.getLevel(wk);
       WorldState s = WorldState.get(w);
       return s.getLive(wk, key);
    }
    
    public static <T> T getPlayer(UUID u, DataKey<T> key){
+      ensureServerSide("getPlayer");
       T v = playerStore.getLive(u, key);
       DIRTY_PLAYERS.add(u); // always schedule this player for serialization on next save
       return v;
    }
    
    public static <T> void setGlobal(DataKey<T> key, T value){
+      ensureServerSide("setGlobal");
       GlobalState s = GlobalState.get(BorisLib.SERVER.overworld());
       s.setLive(key, value);
    }
    
    public static <T> void setWorld(ServerLevel w, DataKey<T> key, T value){
+      ensureServerSide("setWorld");
       WorldState s = WorldState.get(w);
-      s.setLive(key, value);
+      s.setLive(w.dimension(), key, value);
    }
    
    public static <T> void setPlayer(UUID u, DataKey<T> key, T value){
+      ensureServerSide("setPlayer");
       playerStore.setLive(u, key, value);
       DIRTY_PLAYERS.add(u);
+   }
+   
+   private static void ensureServerSide(String methodName){
+      if(BorisLib.SERVER == null || playerStore == null){
+         throw new IllegalStateException("DataAccess." + methodName + "() must be called from server-side code. " +
+               "Server or playerStore is null - this usually means you're calling from a client that isn't hosting the world.");
+      }
    }
    
    private static <T> CompoundTag encode(Codec<T> codec, T v){
@@ -111,6 +125,7 @@ public final class DataAccess {
    }
    
    public static <T> Map<UUID, T> allPlayerDataFor(DataKey<T> key){
+      ensureServerSide("allPlayerDataFor");
       Map<UUID, T> out = new HashMap<>();
       
       // Always include online players (force-decode into live objects)

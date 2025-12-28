@@ -61,8 +61,9 @@ public final class WorldState extends SavedData {
       return created;
    }
    
-   public <T> void setLive(DataKey<T> key, T value){
-      objects.computeIfAbsent(key.modId(), k -> new HashMap<>()).put(key.key(), value);
+   public <T> void setLive(ResourceKey<Level> worldKey, DataKey<T> key, T value){
+      T toStore = value != null ? value : key.makeDefaultWorld(worldKey);
+      objects.computeIfAbsent(key.modId(), k -> new HashMap<>()).put(key.key(), toStore);
       Map<String, CompoundTag> modRaw = data.get(key.modId());
       if(modRaw != null){
          modRaw.remove(key.key());
