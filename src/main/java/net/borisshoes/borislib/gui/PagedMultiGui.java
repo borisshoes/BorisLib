@@ -134,6 +134,10 @@ public class PagedMultiGui extends PagedGuiBase {
       return (GuiMode<T>) modes.get(ind);
    }
    
+   public int getCurrentModeInd(){
+      return currentModeInd;
+   }
+   
    public static class GuiMode<T> {
       
       private final TriConsumer<T, Integer, ClickType> elemClickFunction;
