@@ -23,7 +23,7 @@ public class PagedMultiGui extends PagedGuiBase {
       super(type, player, false);
    }
    
-   public <T> PagedMultiGui addMode(String key, List<T> items, Function<T, GuiElementBuilder> elemBuilder, TriConsumer<T, Integer, ClickType> elemClickFunction, GuiSort<T> defaultSort, GuiFilter<T> defaultFilter){
+   public <T> PagedMultiGui addMode(List<T> items, Function<T, GuiElementBuilder> elemBuilder, TriConsumer<T, Integer, ClickType> elemClickFunction, GuiSort<T> defaultSort, GuiFilter<T> defaultFilter){
       GuiMode<T> config = new GuiMode<>(items, elemBuilder, elemClickFunction, defaultSort, defaultFilter);
       modes.add(config);
       if(currentModeInd == -1){
@@ -127,6 +127,11 @@ public class PagedMultiGui extends PagedGuiBase {
    @SuppressWarnings("unchecked")
    public <T> GuiMode<T> getCurrentConfig(){
       return (GuiMode<T>) modes.get(currentModeInd);
+   }
+   
+   @SuppressWarnings("unchecked")
+   public <T> GuiMode<T> getConfig(int ind){
+      return (GuiMode<T>) modes.get(ind);
    }
    
    public static class GuiMode<T> {
