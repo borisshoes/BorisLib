@@ -28,6 +28,7 @@ public class PagedMultiGui extends PagedGuiBase {
       modes.add(config);
       if(currentModeInd == -1){
          currentModeInd = modes.size()-1;
+         regenPageFunctions();
       }
       return this;
    }
@@ -36,12 +37,9 @@ public class PagedMultiGui extends PagedGuiBase {
       getCurrentConfig().buildPage(this);
    }
    
-   public <T> void switchMode(int ind){
-      if(ind < 0 || ind >= modes.size()) return;
-      this.currentModeInd = ind;
+   protected <T> void regenPageFunctions(){
       GuiMode<T> curMode = getCurrentConfig();
       this.pageNum = curMode.getPageNum();
-      
       this.pageUpFunction = (clickType -> {
          if(pageNum < numPages()){
             pageNum++;
@@ -74,6 +72,14 @@ public class PagedMultiGui extends PagedGuiBase {
             buildPage();
          }
       });
+   }
+   
+   public <T> void switchMode(int ind){
+      if(ind < 0 || ind >= modes.size()) return;
+      this.currentModeInd = ind;
+      GuiMode<T> curMode = getCurrentConfig();
+      this.pageNum = curMode.getPageNum();
+      regenPageFunctions();
       buildPage();
    }
    
@@ -160,10 +166,10 @@ public class PagedMultiGui extends PagedGuiBase {
          int numPages = gui.numPages();
          gui.pageNum = Math.clamp(gui.pageNum,1,Math.max(1,numPages));
          
-         if(gui.sortInd >= 0) gui.setSlot(gui.sortInd,gui.createSortItem());
-         if(gui.filterInd >= 0) gui.setSlot(gui.filterInd,gui.createFilterItem());
-         if(gui.nextInd >= 0) gui.setSlot(gui.nextInd,gui.createNextPageItem());
-         if(gui.prevInd >= 0) gui.setSlot(gui.prevInd,gui.createPrevPageItem());
+         if(gui.sortInd >= 0 && curSort != null) gui.setSlot(gui.sortInd,gui.createSortItem());
+         if(gui.filterInd >= 0 && curFilter != null) gui.setSlot(gui.filterInd,gui.createFilterItem());
+         if(gui.nextInd >= 0 && numPages > 1) gui.setSlot(gui.nextInd,gui.createNextPageItem());
+         if(gui.prevInd >= 0 && numPages > 1) gui.setSlot(gui.prevInd,gui.createPrevPageItem());
          
          List<T> pageItems = AlgoUtils.listToPage(getFilteredItems(),pageNum,gui.pageSize());
          int pageIndex = 0;

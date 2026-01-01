@@ -74,10 +74,10 @@ public class PagedGui<T> extends PagedGuiBase {
       pageNum = Math.clamp(pageNum,1,Math.max(1,numPages));
       List<T> pageItems = AlgoUtils.listToPage(filteredSortedList,pageNum,pageSize());
       
-      if(sortInd >= 0) setSlot(sortInd,createSortItem());
-      if(filterInd >= 0) setSlot(filterInd,createFilterItem());
-      if(nextInd >= 0) setSlot(nextInd,createNextPageItem());
-      if(prevInd >= 0) setSlot(prevInd,createPrevPageItem());
+      if(sortInd >= 0 && curSort != null) setSlot(sortInd,createSortItem());
+      if(filterInd >= 0 && curFilter != null) setSlot(filterInd,createFilterItem());
+      if(nextInd >= 0 && numPages > 1) setSlot(nextInd,createNextPageItem());
+      if(prevInd >= 0 && numPages > 1) setSlot(prevInd,createPrevPageItem());
       
       int pageIndex = 0;
       for(int paneY = 0; paneY < paneHeight; paneY++){
