@@ -11,6 +11,7 @@ import org.apache.commons.lang3.function.TriConsumer;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -23,7 +24,7 @@ public class PagedMultiGui extends PagedGuiBase {
       super(type, player, false);
    }
    
-   public <T> PagedMultiGui addMode(List<T> items, Function<T, GuiElementBuilder> elemBuilder, TriConsumer<T, Integer, ClickType> elemClickFunction, GuiSort<T> defaultSort, GuiFilter<T> defaultFilter){
+   public <T> PagedMultiGui addMode(List<T> items, BiFunction<T, Integer, GuiElementBuilder> elemBuilder, TriConsumer<T, Integer, ClickType> elemClickFunction, GuiSort<T> defaultSort, GuiFilter<T> defaultFilter){
       GuiMode<T> config = new GuiMode<>(items, elemBuilder, elemClickFunction, defaultSort, defaultFilter);
       modes.add(config);
       if(currentModeInd == -1){
@@ -42,13 +43,13 @@ public class PagedMultiGui extends PagedGuiBase {
       this.pageNum = curMode.getPageNum();
       this.pageUpFunction = (clickType -> {
          if(pageNum < numPages()){
-            pageNum++;
+            curMode.setPageNum(++pageNum);
             buildPage();
          }
       });
       this.pageDownFunction = (clickType -> {
          if(pageNum > 1){
-            pageNum--;
+            curMode.setPageNum(--pageNum);
             buildPage();
          }
       });
@@ -147,14 +148,14 @@ public class PagedMultiGui extends PagedGuiBase {
    public static class GuiMode<T> {
       
       private final TriConsumer<T, Integer, ClickType> elemClickFunction;
-      private final Function<T, GuiElementBuilder> elemBuilder;
+      private final BiFunction<T, Integer, GuiElementBuilder> elemBuilder;
       private List<T> items;
       private List<T> filteredSortedList;
       private GuiSort<T> curSort;
       private GuiFilter<T> curFilter;
       private int pageNum = 1;
       
-      public GuiMode(List<T> items, Function<T, GuiElementBuilder> elemBuilder, TriConsumer<T, Integer, ClickType> elemClickFunction, GuiSort<T> defaultSort, GuiFilter<T> defaultFilter){
+      public GuiMode(List<T> items, BiFunction<T, Integer, GuiElementBuilder> elemBuilder, TriConsumer<T, Integer, ClickType> elemClickFunction, GuiSort<T> defaultSort, GuiFilter<T> defaultFilter){
          this.items = items;
          this.elemBuilder = elemBuilder;
          this.elemClickFunction = elemClickFunction;
@@ -164,7 +165,8 @@ public class PagedMultiGui extends PagedGuiBase {
       
       public void buildPage(PagedMultiGui gui){
          int numPages = gui.numPages();
-         gui.pageNum = Math.clamp(gui.pageNum,1,Math.max(1,numPages));
+         this.pageNum = Math.clamp(this.pageNum,1,Math.max(1,numPages));
+         gui.pageNum = this.pageNum;
          
          if(gui.sortInd >= 0 && curSort != null) gui.setSlot(gui.sortInd,gui.createSortItem());
          if(gui.filterInd >= 0 && curFilter != null) gui.setSlot(gui.filterInd,gui.createFilterItem());
@@ -178,7 +180,7 @@ public class PagedMultiGui extends PagedGuiBase {
                int guiIndex = gui.paneStartInd + (pageIndex / gui.paneWidth) * gui.width + (pageIndex % gui.paneWidth);
                if(pageIndex < pageItems.size()){
                   T item = pageItems.get(pageIndex);
-                  GuiElementBuilder builder = getElemBuilder().apply(item);
+                  GuiElementBuilder builder = getElemBuilder().apply(item,pageIndex);
                   final int finalPageIndex = pageIndex;
                   builder.setCallback(clickType -> getElemClickFunction().accept(item, finalPageIndex, clickType));
                   gui.setSlot(guiIndex, builder);
@@ -210,7 +212,7 @@ public class PagedMultiGui extends PagedGuiBase {
          return this.filteredSortedList;
       }
       
-      public Function<T, GuiElementBuilder> getElemBuilder(){
+      public BiFunction<T, Integer, GuiElementBuilder> getElemBuilder(){
          return elemBuilder;
       }
       

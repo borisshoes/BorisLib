@@ -12,6 +12,7 @@ import net.minecraft.world.item.ItemStack;
 import org.apache.commons.lang3.function.TriConsumer;
 
 import java.util.List;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -24,7 +25,7 @@ public class PagedGui<T> extends PagedGuiBase {
    private List<T> filteredSortedList;
    
    private TriConsumer<T, Integer, ClickType> elemClickFunction = (item, index, clickType) -> {};
-   private Function<T, GuiElementBuilder> itemElemBuilder = (item -> new GuiElementBuilder(ItemStack.EMPTY));
+   private BiFunction<T, Integer, GuiElementBuilder> itemElemBuilder = (item, index) -> new GuiElementBuilder(ItemStack.EMPTY);
    
    public PagedGui(MenuType<?> type, ServerPlayer player, List<T> items){
       super(type, player, false);
@@ -85,7 +86,7 @@ public class PagedGui<T> extends PagedGuiBase {
             int guiIndex = paneStartInd + (pageIndex / paneWidth) * width + (pageIndex % paneWidth);
             if(pageIndex < pageItems.size()){
                T item = pageItems.get(pageIndex);
-               GuiElementBuilder builder = itemElemBuilder.apply(item);
+               GuiElementBuilder builder = itemElemBuilder.apply(item, pageIndex);
                final int finalPageIndex = pageIndex;
                builder.setCallback(clickType -> elemClickFunction.accept(item, finalPageIndex, clickType));
                setSlot(guiIndex, builder);
@@ -154,7 +155,7 @@ public class PagedGui<T> extends PagedGuiBase {
       return this;
    }
    
-   public PagedGui<T> itemElemBuilder(Function<T, GuiElementBuilder> builder){
+   public PagedGui<T> itemElemBuilder(BiFunction<T, Integer, GuiElementBuilder> builder){
       this.itemElemBuilder = builder;
       return this;
    }
@@ -189,7 +190,7 @@ public class PagedGui<T> extends PagedGuiBase {
       return elemClickFunction;
    }
    
-   public Function<T, GuiElementBuilder> getItemElemBuilder(){
+   public BiFunction<T, Integer, GuiElementBuilder> getItemElemBuilder(){
       return itemElemBuilder;
    }
 }

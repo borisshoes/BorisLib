@@ -34,7 +34,7 @@ public class TestGui extends PagedGui<Item> {
       action2TextColor(ChatFormatting.GOLD.getColor().intValue());
       action3TextColor(ChatFormatting.YELLOW.getColor().intValue());
       
-      itemElemBuilder((item) -> {
+      itemElemBuilder((item, index) -> {
          GuiElementBuilder builder = GuiElementBuilder.from(item.getDefaultInstance());
          builder.setName(Component.translatable(item.getDescriptionId()).withColor(0x00ff00));
          builder.addLoreLine(Component.literal("Hi there!"));
