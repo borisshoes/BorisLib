@@ -60,9 +60,11 @@ public final class DataAccess {
    
    public static void onPlayerJoin(ServerPlayer p){
       if(playerStore != null){
-         playerStore.save(p.getUUID());
-         DIRTY_PLAYERS.remove(p.getUUID());
-         playerStore.preload(p.getUUID()); // loads/creates the entry; leaves values lazily decoded
+         UUID pid = p.getUUID();
+         playerStore.save(pid);
+         DIRTY_PLAYERS.remove(pid);
+         playerStore.preload(pid); // loads/creates the entry; leaves values lazily decoded
+         DataAccess.getPlayer(pid, BorisLib.PLAYER_DATA_KEY).onLogin(p);
       }
    }
    

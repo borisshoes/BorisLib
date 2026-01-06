@@ -3,7 +3,6 @@ package net.borisshoes.borislib.gui;
 import eu.pb4.sgui.api.ClickType;
 import eu.pb4.sgui.api.elements.GuiElementBuilder;
 import net.borisshoes.borislib.utils.AlgoUtils;
-import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.inventory.MenuType;
@@ -12,7 +11,6 @@ import org.apache.commons.lang3.function.TriConsumer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.stream.Stream;
 
 public class PagedMultiGui extends PagedGuiBase {
@@ -25,8 +23,8 @@ public class PagedMultiGui extends PagedGuiBase {
    }
    
    public <T> PagedMultiGui addMode(List<T> items, BiFunction<T, Integer, GuiElementBuilder> elemBuilder, TriConsumer<T, Integer, ClickType> elemClickFunction, GuiSort<T> defaultSort, GuiFilter<T> defaultFilter){
-      GuiMode<T> config = new GuiMode<>(items, elemBuilder, elemClickFunction, defaultSort, defaultFilter);
-      modes.add(config);
+      GuiMode<T> mode = new GuiMode<>(items, elemBuilder, elemClickFunction, defaultSort, defaultFilter);
+      modes.add(mode);
       if(currentModeInd == -1){
          currentModeInd = modes.size()-1;
          regenPageFunctions();
@@ -35,11 +33,11 @@ public class PagedMultiGui extends PagedGuiBase {
    }
    
    public void buildPage(){
-      getCurrentConfig().buildPage(this);
+      getCurrentMode().buildPage(this);
    }
    
    protected <T> void regenPageFunctions(){
-      GuiMode<T> curMode = getCurrentConfig();
+      GuiMode<T> curMode = getCurrentMode();
       this.pageNum = curMode.getPageNum();
       this.pageUpFunction = (clickType -> {
          if(pageNum < numPages()){
@@ -78,7 +76,7 @@ public class PagedMultiGui extends PagedGuiBase {
    public <T> void switchMode(int ind){
       if(ind < 0 || ind >= modes.size()) return;
       this.currentModeInd = ind;
-      GuiMode<T> curMode = getCurrentConfig();
+      GuiMode<T> curMode = getCurrentMode();
       this.pageNum = curMode.getPageNum();
       regenPageFunctions();
       buildPage();
@@ -86,12 +84,12 @@ public class PagedMultiGui extends PagedGuiBase {
    
    @Override
    public int numPages(){
-      GuiMode<?> curMode = getCurrentConfig();
+      GuiMode<?> curMode = getCurrentMode();
       return Math.max(1,(int) (Math.ceil((float)curMode.getFilteredItems().size()/(this.paneWidth*this.paneHeight))));
    }
    
    protected GuiElementBuilder createSortItem(){
-      GuiMode<?> curMode = getCurrentConfig();
+      GuiMode<?> curMode = getCurrentMode();
       GuiElementBuilder sortBuilt = GuiElementBuilder.from(GraphicalItem.with(GraphicalItem.SORT)).hideDefaultTooltip();
       sortBuilt.setName(Component.translatable("gui.borislib.sort").withColor(primaryTextColor));
       sortBuilt.addLoreLine(Component.translatable("text.borislib.two_elements",
@@ -111,7 +109,7 @@ public class PagedMultiGui extends PagedGuiBase {
       return sortBuilt;
    }
    protected GuiElementBuilder createFilterItem(){
-      GuiMode<?> curMode = getCurrentConfig();
+      GuiMode<?> curMode = getCurrentMode();
       GuiElementBuilder filterBuilt = GuiElementBuilder.from(GraphicalItem.with(GraphicalItem.FILTER)).hideDefaultTooltip();
       filterBuilt.setName(Component.translatable("gui.borislib.filter").withColor(primaryTextColor));
       filterBuilt.addLoreLine(Component.translatable("text.borislib.two_elements",
@@ -132,12 +130,12 @@ public class PagedMultiGui extends PagedGuiBase {
    }
    
    @SuppressWarnings("unchecked")
-   public <T> GuiMode<T> getCurrentConfig(){
+   public <T> GuiMode<T> getCurrentMode(){
       return (GuiMode<T>) modes.get(currentModeInd);
    }
    
    @SuppressWarnings("unchecked")
-   public <T> GuiMode<T> getConfig(int ind){
+   public <T> GuiMode<T> getMode(int ind){
       return (GuiMode<T>) modes.get(ind);
    }
    

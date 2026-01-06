@@ -49,7 +49,7 @@ public class GuiHelper {
          }else if(right){
             menuItem = GuiElementBuilder.from(GraphicalItem.withColor(GraphicalItem.MENU_RIGHT,color));
          }else{
-            menuItem = GuiElementBuilder.from(GraphicalItem.withColor(GraphicalItem.MENU_TOP,color));
+            menuItem = GuiElementBuilder.from(GraphicalItem.withColor(GraphicalItem.PAGE_BG,color));
          }
          
          if(borderText.getString().isEmpty()){

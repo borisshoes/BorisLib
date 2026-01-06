@@ -6,6 +6,7 @@ import net.borisshoes.borislib.callbacks.*;
 import net.borisshoes.borislib.datastorage.DataAccess;
 import net.borisshoes.borislib.datastorage.DataKey;
 import net.borisshoes.borislib.datastorage.DataRegistry;
+import net.borisshoes.borislib.datastorage.DefaultPlayerData;
 import net.borisshoes.borislib.gui.GraphicalItem;
 import net.borisshoes.borislib.testmod.Commands;
 import net.borisshoes.borislib.timers.TickTimerCallback;
@@ -58,6 +59,7 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
    public static final ItemModDataHandler BORISLIB_ITEM_DATA = new ItemModDataHandler(MOD_ID);
    
    public static final DataKey<LoginCallbackContainer> LOGIN_CALLBACKS_KEY = DataRegistry.register(DataKey.ofPlayer(Identifier.fromNamespaceAndPath(MOD_ID,"login_callbacks"),LoginCallbackContainer.CODEC, LoginCallbackContainer::new));
+   public static final DataKey<DefaultPlayerData> PLAYER_DATA_KEY = DataRegistry.register(DataKey.ofPlayer(Identifier.fromNamespaceAndPath(MOD_ID,"playerdata"), DefaultPlayerData.CODEC,DefaultPlayerData::new));
    
    @Override
    public void onInitialize(){
