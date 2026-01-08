@@ -4,6 +4,7 @@
   "package": "net.borisshoes.borislib.mixins",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "DedicatedServerMixin",
     "EntityAccessor",
     "InventoryAccessor",
     "ServerGamePacketListenerImplMixin",

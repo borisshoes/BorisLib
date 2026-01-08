@@ -2,11 +2,15 @@ package net.borisshoes.borislib.utils;
 
 import com.google.common.collect.HashMultimap;
 import com.mojang.authlib.GameProfile;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.mojang.datafixers.util.Either;
 import com.mojang.logging.LogUtils;
 import net.borisshoes.borislib.BorisLib;
 import net.borisshoes.borislib.mixins.EntityAccessor;
 import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
@@ -50,16 +54,22 @@ import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.phys.*;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
 import static net.borisshoes.borislib.BorisLib.LOGGER;
 import static org.apache.logging.log4j.Level.WARN;
 
 public class MinecraftUtils {
+   
+   public static CompletableFuture<Suggestions> getPlayerSuggestions(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
+      String start = builder.getRemaining().toLowerCase(Locale.ROOT);
+      Set<String> items = new HashSet<>();
+      context.getSource().getOnlinePlayerNames().forEach(name -> items.add(name.toLowerCase(Locale.ROOT)));
+      items.stream().filter(s -> s.startsWith(start)).forEach(builder::suggest);
+      return builder.buildFuture();
+   }
    
    public static Either<Item, TagKey<Item>> parseItemOrTag(String str){
       if(str.startsWith("#")){ // It's a tag

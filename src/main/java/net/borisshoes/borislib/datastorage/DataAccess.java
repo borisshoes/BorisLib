@@ -23,9 +23,8 @@ public final class DataAccess {
    private static volatile PlayerObjectStore playerStore;
    private static final Set<UUID> DIRTY_PLAYERS = ConcurrentHashMap.newKeySet();
    
-   // TODO, load on first access
-   public static void onServerStarted(MinecraftServer s){
-      Path root = s.overworld().getServer().getWorldPath(LevelResource.ROOT);
+   public static void onServerStarting(MinecraftServer server){
+      Path root = server.getWorldPath(LevelResource.ROOT);
       playerStore = new PlayerObjectStore(root);
    }
    
