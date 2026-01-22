@@ -63,6 +63,18 @@ import static org.apache.logging.log4j.Level.WARN;
 
 public class MinecraftUtils {
    
+   /**
+    * Returns the first item in the registry that matches the given tag.
+    * @param tag The TagKey to search for
+    * @return The first matching Item, or null if no items match the tag
+    */
+   public static Item getFirstItemFromTag(TagKey<Item> tag){
+      return BuiltInRegistries.ITEM.get(tag)
+            .flatMap(holders -> holders.stream().findFirst())
+            .map(Holder::value)
+            .orElse(null);
+   }
+   
    public static CompletableFuture<Suggestions> getPlayerSuggestions(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
       String start = builder.getRemaining().toLowerCase(Locale.ROOT);
       Set<String> items = new HashSet<>();

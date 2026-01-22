@@ -11,6 +11,7 @@ import net.minecraft.world.ItemStackWithSlot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.AABB;
 
 import java.util.Arrays;
 import java.util.List;
@@ -28,6 +29,14 @@ public class CodecUtils {
          return DataResult.error(() -> "Invalid UUID: " + s);
       }
    }, UUID::toString);
+   public static final Codec<AABB> AABB_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+         Codec.DOUBLE.fieldOf("minX").forGetter(box -> box.minX),
+         Codec.DOUBLE.fieldOf("minY").forGetter(box -> box.minY),
+         Codec.DOUBLE.fieldOf("minZ").forGetter(box -> box.minZ),
+         Codec.DOUBLE.fieldOf("maxX").forGetter(box -> box.maxX),
+         Codec.DOUBLE.fieldOf("maxY").forGetter(box -> box.maxY),
+         Codec.DOUBLE.fieldOf("maxZ").forGetter(box -> box.maxZ)
+   ).apply(instance, AABB::new));
    
    public static final Codec<ItemStackWithSlot> BIG_STACK_CODEC = RecordCodecBuilder.create(
          instance -> instance.group(ExtraCodecs.NON_NEGATIVE_INT.fieldOf("Slot").orElse(0).forGetter(ItemStackWithSlot::slot), ItemStack.MAP_CODEC.forGetter(ItemStackWithSlot::stack))
