@@ -1,17 +1,20 @@
 package net.borisshoes.borislib.datastorage;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.Dynamic;
 import net.borisshoes.borislib.BorisLib;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -35,6 +38,9 @@ public final class PlayerObjectStore {
    private static final class Entry {
       final Map<String, Map<String, Object>> objects = new ConcurrentHashMap<>();
       final Map<String, Map<String, CompoundTag>> raw = new ConcurrentHashMap<>();
+      // Backup raw data loaded lazily for recovery purposes
+      Map<String, Map<String, CompoundTag>> backupRaw = null;
+      boolean backupLoaded = false;
    }
    
    public PlayerObjectStore(Path worldRoot){
@@ -50,13 +56,107 @@ public final class PlayerObjectStore {
       return dir.resolve(u.toString() + ".dat");
    }
    
+   private Path backupFile(UUID u){
+      return dir.resolve(u.toString() + ".dat_old");
+   }
+   
+   /**
+    * Attempts to read NBT from the main file, falling back to backup if corrupted.
+    * Returns null if both files are missing or corrupted.
+    */
+   @Nullable
+   private CompoundTag readWithBackup(UUID u){
+      Path main = file(u);
+      Path backup = backupFile(u);
+      
+      // Try main file first
+      if(Files.exists(main)){
+         try(DataInputStream in = new DataInputStream(new GZIPInputStream(Files.newInputStream(main)))){
+            return NbtIo.read(in);
+         }catch(Exception e){
+            BorisLib.LOGGER.warn("Failed to read player data file {}, trying backup: {}", main, e.getMessage());
+         }
+      }
+      
+      // Fall back to backup
+      if(Files.exists(backup)){
+         try(DataInputStream in = new DataInputStream(new GZIPInputStream(Files.newInputStream(backup)))){
+            BorisLib.LOGGER.info("Successfully loaded player data from backup file for {}", u);
+            return NbtIo.read(in);
+         }catch(Exception e){
+            BorisLib.LOGGER.error("Failed to read backup player data file {} as well: {}", backup, e.getMessage());
+         }
+      }
+      
+      return null;
+   }
+   
+   /**
+    * Reads only the backup file NBT without affecting the main data.
+    * Returns null if backup doesn't exist or is corrupted.
+    */
+   @Nullable
+   private CompoundTag readBackupOnly(UUID u){
+      Path backup = backupFile(u);
+      if(!Files.exists(backup)) return null;
+      try(DataInputStream in = new DataInputStream(new GZIPInputStream(Files.newInputStream(backup)))){
+         return NbtIo.read(in);
+      }catch(Exception e){
+         BorisLib.LOGGER.warn("Failed to read backup file for recovery: {}", e.getMessage());
+         return null;
+      }
+   }
+   
+   /**
+    * Lazily loads and parses the backup file's raw data for recovery purposes.
+    */
+   private void ensureBackupLoaded(UUID u, Entry e){
+      if(e.backupLoaded) return;
+      e.backupLoaded = true;
+      
+      CompoundTag backupRoot = readBackupOnly(u);
+      if(backupRoot == null) return;
+      
+      try{
+         var dyn = new Dynamic<>(NbtOps.INSTANCE, backupRoot);
+         Map<String, Map<String, CompoundTag>> decoded = FlatNamespacedMap.CODEC.parse(dyn).result().orElse(null);
+         if(decoded != null){
+            e.backupRaw = new HashMap<>();
+            decoded.forEach((modId, inner) -> e.backupRaw.put(modId, new HashMap<>(inner)));
+         }
+      }catch(Exception ex){
+         BorisLib.LOGGER.warn("Failed to parse backup data structure for recovery: {}", ex.getMessage());
+      }
+   }
+   
+   /**
+    * Attempts to recover a key's data from the backup file.
+    * Returns null if backup doesn't have valid data for this key.
+    */
+   @Nullable
+   private <T> T tryRecoverFromBackup(UUID u, Entry e, DataKey<T> key){
+      ensureBackupLoaded(u, e);
+      if(e.backupRaw == null) return null;
+      
+      Map<String, CompoundTag> modRaw = e.backupRaw.get(key.modId());
+      if(modRaw == null) return null;
+      
+      CompoundTag backupTag = modRaw.get(key.key());
+      if(backupTag == null) return null;
+      
+      T recovered = decode(key.codec(), backupTag, key.id().toString() + " (from backup)");
+      if(recovered != null){
+         BorisLib.LOGGER.info("Successfully recovered data for key {} player {} from backup", key.id(), u);
+      }
+      return recovered;
+   }
+   
    private Entry getEntry(UUID u){
       return cache.computeIfAbsent(u, id -> {
          Entry e = new Entry();
-         Path f = file(id);
-         if(!Files.exists(f)) return e;
-         try(DataInputStream in = new DataInputStream(new GZIPInputStream(Files.newInputStream(f)))){
-            CompoundTag root = net.minecraft.nbt.NbtIo.read(in);
+         CompoundTag root = readWithBackup(id);
+         if(root == null) return e;
+         try{
             var dyn = new Dynamic<>(NbtOps.INSTANCE, root);
             Map<String, Map<String, CompoundTag>> decoded = FlatNamespacedMap.CODEC.parse(dyn).result().orElseGet(HashMap::new);
             // Deep-copy into mutable maps
@@ -64,7 +164,8 @@ public final class PlayerObjectStore {
                Map<String, CompoundTag> mutableInner = new ConcurrentHashMap<>(inner);
                e.raw.put(modId, mutableInner);
             });
-         }catch(Exception ignored){
+         }catch(Exception ex){
+            BorisLib.LOGGER.error("Failed to parse player data structure for {}: {}", id, ex.getMessage());
          }
          return e;
       });
@@ -82,10 +183,22 @@ public final class PlayerObjectStore {
       if(modRaw != null){
          CompoundTag n = modRaw.remove(key.key());
          if(n != null){
-            T decoded = decode(key.codec(), n);
-            modObjs.put(key.key(), decoded);
+            T decoded = decode(key.codec(), n, key.id().toString());
+            if(decoded != null){
+               modObjs.put(key.key(), decoded);
+               if(modRaw.isEmpty()) e.raw.remove(key.modId());
+               return decoded;
+            }
+            // decode returned null (corrupted data), try to recover from backup
+            BorisLib.LOGGER.warn("Corrupted data for key {} player {}, attempting recovery from backup", key.id(), u);
             if(modRaw.isEmpty()) e.raw.remove(key.modId());
-            return decoded;
+            
+            T recovered = tryRecoverFromBackup(u, e, key);
+            if(recovered != null){
+               modObjs.put(key.key(), recovered);
+               return recovered;
+            }
+            BorisLib.LOGGER.warn("Could not recover key {} for player {} from backup, using default value", key.id(), u);
          }
       }
       
@@ -145,11 +258,35 @@ public final class PlayerObjectStore {
          }
       }
       
-      // Write file
+      // Write file with backup rotation:
+      // 1. Write to temp file
+      // 2. Move existing main -> backup (if main exists)
+      // 3. Move temp -> main
+      Path main = file(u);
+      Path backup = backupFile(u);
+      Path temp = dir.resolve(u.toString() + ".dat_tmp");
+      
       var dyn = FlatNamespacedMap.CODEC.encodeStart(NbtOps.INSTANCE, out).result().orElseGet(CompoundTag::new);
-      try(OutputStream os = Files.newOutputStream(file(u)); GZIPOutputStream gz = new GZIPOutputStream(os); DataOutputStream outStr = new DataOutputStream(gz)){
-         NbtIo.writeUnnamedTagWithFallback(dyn, outStr);
-      }catch(Exception ignored){
+      try{
+         // Write to temp file first
+         try(OutputStream os = Files.newOutputStream(temp); GZIPOutputStream gz = new GZIPOutputStream(os); DataOutputStream outStr = new DataOutputStream(gz)){
+            NbtIo.writeUnnamedTagWithFallback(dyn, outStr);
+         }
+         
+         // Rotate: main -> backup (only if main exists and is valid)
+         if(Files.exists(main)){
+            Files.move(main, backup, StandardCopyOption.REPLACE_EXISTING);
+         }
+         
+         // Move temp -> main
+         Files.move(temp, main, StandardCopyOption.REPLACE_EXISTING);
+      }catch(Exception ex){
+         BorisLib.LOGGER.error("Failed to save player data for {}: {}", u, ex.getMessage());
+         // Clean up temp file if it exists
+         try{
+            Files.deleteIfExists(temp);
+         }catch(Exception ignored){
+         }
       }
    }
    
@@ -167,7 +304,17 @@ public final class PlayerObjectStore {
       return (CompoundTag) codec.encodeStart(NbtOps.INSTANCE, v).result().orElse(new CompoundTag());
    }
    
-   private static <T> T decode(Codec<T> codec, CompoundTag tag){
-      return codec.parse(new Dynamic<>(NbtOps.INSTANCE, tag)).result().orElseThrow();
+   /**
+    * Safely decodes NBT using the given codec.
+    * Returns null if decoding fails (corrupted/incompatible data), with a warning logged.
+    */
+   @Nullable
+   private static <T> T decode(Codec<T> codec, CompoundTag tag, String keyId){
+      DataResult<T> result = codec.parse(new Dynamic<>(NbtOps.INSTANCE, tag));
+      if(result.error().isPresent()){
+         BorisLib.LOGGER.warn("Failed to decode data for key {}: {}", keyId, result.error().get().message());
+         return null;
+      }
+      return result.result().orElse(null);
    }
 }

@@ -1,6 +1,7 @@
 package net.borisshoes.borislib.datastorage;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.Dynamic;
 import net.borisshoes.borislib.BorisLib;
 import net.minecraft.nbt.CompoundTag;
@@ -11,6 +12,7 @@ import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -44,11 +46,16 @@ public final class WorldState extends SavedData {
       if(modRaw != null){
          CompoundTag tag = modRaw.remove(key.key());
          if(tag != null){
-            T decoded = decode(key.codec(), tag);
-            modObjs.put(key.key(), decoded);
+            T decoded = decode(key.codec(), tag, key.id().toString());
+            if(decoded != null){
+               modObjs.put(key.key(), decoded);
+               if(modRaw.isEmpty()) data.remove(key.modId());
+               setDirty();
+               return decoded;
+            }
+            // decode returned null (corrupted data), fall through to create default
+            BorisLib.LOGGER.warn("Corrupted data for world key {} in world {}, using default value", key.id(), worldKey);
             if(modRaw.isEmpty()) data.remove(key.modId());
-            setDirty();
-            return decoded;
          }
       }
       
@@ -98,7 +105,12 @@ public final class WorldState extends SavedData {
       return (CompoundTag) codec.encodeStart(NbtOps.INSTANCE, cast).result().orElse(new CompoundTag());
    }
    
-   private static <T> T decode(Codec<T> codec, CompoundTag tag){
-      return codec.parse(new Dynamic<>(NbtOps.INSTANCE, tag)).result().orElseThrow();
+   private static <T> T decode(Codec<T> codec, CompoundTag tag, String keyId){
+      DataResult<T> result = codec.parse(new Dynamic<>(NbtOps.INSTANCE, tag));
+      if(result.error().isPresent()){
+         BorisLib.LOGGER.warn("Failed to decode world data for key {}: {}", keyId, result.error().get().message());
+         return null;
+      }
+      return result.result().orElse(null);
    }
 }

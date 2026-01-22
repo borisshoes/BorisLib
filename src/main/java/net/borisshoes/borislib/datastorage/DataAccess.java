@@ -1,6 +1,7 @@
 package net.borisshoes.borislib.datastorage;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.Dynamic;
 import net.borisshoes.borislib.BorisLib;
 import net.minecraft.nbt.CompoundTag;
@@ -11,6 +12,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.LevelResource;
+import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -122,7 +124,12 @@ public final class DataAccess {
    }
    
    private static <T> T decode(Codec<T> codec, CompoundTag tag){
-      return codec.parse(new Dynamic<>(NbtOps.INSTANCE, tag)).result().orElseThrow();
+      DataResult<T> result = codec.parse(new Dynamic<>(NbtOps.INSTANCE, tag));
+      if(result.error().isPresent()){
+         BorisLib.LOGGER.warn("Failed to decode data: {}", result.error().get().message());
+         return null;
+      }
+      return result.result().orElse(null);
    }
    
    public static <T> Map<UUID, T> allPlayerDataFor(DataKey<T> key){
