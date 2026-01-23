@@ -379,20 +379,35 @@ public class MinecraftUtils {
       Vec3 rayEnd = startPos.add(direction.scale(distance));
       BlockHitResult raycast = world.clip(new ClipContext(startPos,rayEnd, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity));
       EntityHitResult entityHit;
+      Set<Entity> hitSet = new HashSet<>();
       List<Entity> hits = new ArrayList<>();
       AABB box = new AABB(startPos,raycast.getLocation());
       box = box.inflate(2);
-      // Primary hitscan check
+      // Primary hitscan check with iteration limit to prevent infinite loops
+      // The loop finds entities one at a time (closest first) by excluding already-found entities
+      int maxIterations = 1000;
+      int iterations = 0;
       do{
-         entityHit = ProjectileUtil.getEntityHitResult(entity,startPos,raycast.getLocation(),box, e -> e instanceof LivingEntity && !e.isSpectator() && !hits.contains(e),distance*2);
+         entityHit = ProjectileUtil.getEntityHitResult(entity,startPos,raycast.getLocation(),box, e -> e instanceof LivingEntity && !e.isSpectator() && !hitSet.contains(e),distance*2);
          if(entityHit != null && entityHit.getType() == HitResult.Type.ENTITY){
-            hits.add(entityHit.getEntity());
+            Entity hitEntity = entityHit.getEntity();
+            if(!hitSet.add(hitEntity)){
+               LOGGER.warn("Lasercast duplicate entity detected despite filter - breaking to prevent infinite loop");
+               break;
+            }
+            hits.add(hitEntity);
          }
-      }while(entityHit != null && entityHit.getType() == HitResult.Type.ENTITY);
+         iterations++;
+      }while(entityHit != null && entityHit.getType() == HitResult.Type.ENTITY && iterations < maxIterations);
+      
+      if(iterations >= maxIterations){
+         LOGGER.warn("Lasercast hit iteration limit ({}) at pos {} direction {} - possible infinite loop prevented", maxIterations, startPos, direction);
+      }
       
       // Secondary hitscan check to add lenience
-      List<Entity> hits2 = world.getEntities(entity, box, (e)-> e instanceof LivingEntity && !e.isSpectator() && !hits.contains(e) && MathUtils.hitboxRaycast(e,startPos,raycast.getLocation()));
+      List<Entity> hits2 = world.getEntities(entity, box, (e)-> e instanceof LivingEntity && !e.isSpectator() && !hitSet.contains(e) && MathUtils.hitboxRaycast(e,startPos,raycast.getLocation()));
       hits.addAll(hits2);
+      hitSet.addAll(hits2);
       hits.sort(Comparator.comparingDouble(e->e.distanceTo(entity)));
       
       if(!blockedByShields){
