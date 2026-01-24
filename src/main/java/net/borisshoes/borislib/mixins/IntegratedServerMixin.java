@@ -17,6 +17,6 @@ public class IntegratedServerMixin {
    private void borislib$initializeServer(CallbackInfoReturnable<Boolean> cir){
       MinecraftServer server = (MinecraftServer) (Object) this;
       BorisLib.SERVER = server;
-      DataAccess.onServerStarting(server);
+      DataAccess.onServerStarted(server);
    }
 }
