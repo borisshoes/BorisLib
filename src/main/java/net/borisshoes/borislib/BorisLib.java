@@ -69,7 +69,7 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
       ServerTickEvents.END_SERVER_TICK.register(ServerTickCallback::onTick);
       ServerPlayConnectionEvents.JOIN.register(PlayerConnectionCallback::onPlayerJoin);
       ServerPlayConnectionEvents.DISCONNECT.register(PlayerConnectionCallback::onPlayerLeave);
-      ServerLifecycleEvents.SERVER_STARTED.register(DataAccess::onServerStarting);
+      ServerLifecycleEvents.SERVER_STARTED.register(DataAccess::onServerStarted);
       ServerLifecycleEvents.SERVER_STOPPED.register(DataAccess::onServerStop);
       ServerLifecycleEvents.AFTER_SAVE.register(DataAccess::onServerSave);
       CommandRegistrationCallback.EVENT.register(Commands::register);

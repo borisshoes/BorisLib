@@ -242,7 +242,13 @@ public final class PlayerObjectStore {
             String key = kv.getKey();
             DataKey<Object> dk = DataRegistry.get(modId, key, DataKey.StorageScope.PLAYER);
             if(dk != null){
-               tgt.put(key, encode(dk.codec(), kv.getValue()));
+               CompoundTag encoded = encode(dk.codec(), kv.getValue(), dk.id().toString());
+               // Validate: skip empty compounds to avoid saving uninitialized data
+               if(encoded == null || encoded.isEmpty()){
+                  BorisLib.LOGGER.warn("Skipping save for key {} player {} - encoded data is empty/invalid", dk.id(), u);
+                  continue;
+               }
+               tgt.put(key, encoded);
             }else{
                // No registered codec? Skip to avoid corrupting data.
             }
@@ -300,8 +306,22 @@ public final class PlayerObjectStore {
       return copy;
    }
    
-   private static <T> CompoundTag encode(Codec<T> codec, T v){
-      return (CompoundTag) codec.encodeStart(NbtOps.INSTANCE, v).result().orElse(new CompoundTag());
+   /**
+    * Safely encodes an object to NBT using the given codec.
+    * Returns null if encoding fails, with a warning logged.
+    */
+   @Nullable
+   private static <T> CompoundTag encode(Codec<T> codec, T v, String keyId){
+      if(v == null){
+         BorisLib.LOGGER.warn("Cannot encode null value for key {}", keyId);
+         return null;
+      }
+      DataResult<net.minecraft.nbt.Tag> result = codec.encodeStart(NbtOps.INSTANCE, v);
+      if(result.error().isPresent()){
+         BorisLib.LOGGER.warn("Failed to encode data for key {}: {}", keyId, result.error().get().message());
+         return null;
+      }
+      return (CompoundTag) result.result().orElse(null);
    }
    
    /**

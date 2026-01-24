@@ -25,7 +25,7 @@ public final class DataAccess {
    private static volatile PlayerObjectStore playerStore;
    private static final Set<UUID> DIRTY_PLAYERS = ConcurrentHashMap.newKeySet();
    
-   public static void onServerStarting(MinecraftServer server){
+   public static void onServerStarted(MinecraftServer server){
       Path root = server.getWorldPath(LevelResource.ROOT);
       playerStore = new PlayerObjectStore(root);
    }
@@ -62,10 +62,9 @@ public final class DataAccess {
    public static void onPlayerJoin(ServerPlayer p){
       if(playerStore != null){
          UUID pid = p.getUUID();
-         playerStore.save(pid);
-         DIRTY_PLAYERS.remove(pid);
-         playerStore.preload(pid); // loads/creates the entry; leaves values lazily decoded
+         playerStore.preload(pid);
          DataAccess.getPlayer(pid, BorisLib.PLAYER_DATA_KEY).onLogin(p);
+         DIRTY_PLAYERS.add(pid); // Mark dirty so it gets saved on next server save
       }
    }
    
