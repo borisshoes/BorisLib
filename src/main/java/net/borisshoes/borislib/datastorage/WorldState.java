@@ -109,6 +109,7 @@ public final class WorldState extends SavedData {
       DataResult<T> result = codec.parse(new Dynamic<>(NbtOps.INSTANCE, tag));
       if(result.error().isPresent()){
          BorisLib.LOGGER.warn("Failed to decode world data for key {}: {}", keyId, result.error().get().message());
+         BorisLib.LOGGER.warn("  NBT contents: {}", tag.isEmpty() ? "(empty)" : tag);
          return null;
       }
       return result.result().orElse(null);
