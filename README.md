@@ -10,3 +10,6 @@ This library has a few key features:
 - A server-based velocity tracker for estimating the player's movement vectors without specialized packets
 - A library of modular, pre-made, geometric and animated particle effects
 - A whole bunch of useful utility methods for various mathematical operations, data structures, algorithms, text and sounds.
+
+### Translation Credits:
+- Russian - Reset1712
