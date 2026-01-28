@@ -26,6 +26,7 @@ public class ParticleEffectUtils {
       if(numSegments <= 0) return;
       List<Vec3> points = new ArrayList<>();
       points.add(p1);
+      if(p1.subtract(p2).length() > 256) return;
       double dx = (p2.x-p1.x)/numSegments;
       double dy = (p2.y-p1.y)/numSegments;
       double dz = (p2.z-p1.z)/numSegments;
@@ -55,6 +56,7 @@ public class ParticleEffectUtils {
       List<Vec3> points = new ArrayList<>();
       Vec3 p1 = s1.get();
       Vec3 p2 = s2.get();
+      if(p1.subtract(p2).length() > 256) return;
       points.add(p1);
       double dx = (p2.x-p1.x)/numSegments;
       double dy = (p2.y-p1.y)/numSegments;
@@ -114,6 +116,7 @@ public class ParticleEffectUtils {
    
    public static void animatedLightningBolt(ServerLevel world, Vec3 p1, Vec3 p2, int numSegments, double maxDevDist, ParticleOptions type, int particlesPerBlock, int count, double delta, double speed, boolean longDist, int persistMod, int duration){
       if(numSegments <= 0) return;
+      if(p1.subtract(p2).length() > 256) return;
       List<Vec3> points = new ArrayList<>();
       points.add(p1);
       double dx = (p2.x-p1.x)/numSegments;
@@ -163,7 +166,9 @@ public class ParticleEffectUtils {
    
    private static void animatedLightningBoltHelper(ServerLevel world, HashMap<Supplier<Vec3>, Integer> points, ParticleOptions type, int count, double delta, double speed, boolean longDist, int persistMod, int tick){
       int highestTick = 0;
+      int pCount = 0;
       for(Map.Entry<Supplier<Vec3>, Integer> entry : points.entrySet()){
+         if(pCount >= 1000) break;
          int pTick = entry.getValue();
          Vec3 point = entry.getKey().get();
          if(pTick > highestTick) highestTick = pTick;
@@ -175,6 +180,7 @@ public class ParticleEffectUtils {
          }else{
             world.sendParticles(type,point.x,point.y,point.z,count,delta,delta,delta,speed);
          }
+         pCount++;
       }
       
       if(tick < highestTick){

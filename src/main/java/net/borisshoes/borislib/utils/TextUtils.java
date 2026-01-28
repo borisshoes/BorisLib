@@ -293,11 +293,11 @@ public class TextUtils {
       }
       
       if(codes.isEmpty()){
-         return "Text.literal(\"\");";
+         return "Component.literal(\"\");";
       }else if(codes.size() == 1){
          return codes.getFirst();
       }else{
-         String finalCode = "Text.literal(\"\")";
+         String finalCode = "Component.literal(\"\")";
          for(String code : codes){
             finalCode += "\n\t.append("+code.replace(";","")+")";
          }
@@ -306,24 +306,24 @@ public class TextUtils {
    }
    
    private static String textToCodeHelper(String content, String color, boolean italic, boolean bold, boolean underlined, boolean strikethrough, boolean obfuscated){
-      String code = "Text.literal(\""+content+"\")";
+      String code = "Component.literal(\""+content+"\")";
       
-      code += ".formatted(";
-      code += "Formatting."+color.toUpperCase(Locale.ROOT)+",";
+      code += ".withStyle(";
+      code += "ChatFormatting."+color.toUpperCase(Locale.ROOT)+",";
       if(italic){
-         code += "Formatting.ITALIC,";
+         code += "ChatFormatting.ITALIC,";
       }
       if(bold){
-         code += "Formatting.BOLD,";
+         code += "ChatFormatting.BOLD,";
       }
       if(underlined){
-         code += "Formatting.UNDERLINE,";
+         code += "ChatFormatting.UNDERLINE,";
       }
       if(strikethrough){
-         code += "Formatting.STRIKETHROUGH,";
+         code += "ChatFormatting.STRIKETHROUGH,";
       }
       if(obfuscated){
-         code += "Formatting.OBFUSCATED,";
+         code += "ChatFormatting.OBFUSCATED,";
       }
       code = code.substring(0,code.length()-1) + ")";
       code += ";";
