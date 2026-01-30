@@ -12,7 +12,7 @@ public abstract class Event {
    public final int lifespan;
    public final Identifier id;
    private final UUID uuid;
-   private int timeAlive;
+   protected int timeAlive;
    private boolean removalMark;
    
    public Event(Identifier id, int lifespan){
@@ -25,6 +25,9 @@ public abstract class Event {
    
    public void tick(){
       timeAlive++;
+      if(timeAlive >= lifespan){
+         onExpiry();
+      }
    }
    
    public boolean isExpired(){
@@ -38,6 +41,8 @@ public abstract class Event {
    public void markForRemoval(){
       this.removalMark = true;
    }
+   
+   public void onExpiry(){}
    
    public static <T extends Event> List<T> getEventsOfType(Class<T> eventType){
       List<T> filteredEvents = new ArrayList<>();
