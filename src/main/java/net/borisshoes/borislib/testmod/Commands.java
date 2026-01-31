@@ -2,12 +2,15 @@ package net.borisshoes.borislib.testmod;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import net.borisshoes.borislib.BorisLib;
 import net.borisshoes.borislib.callbacks.ItemReturnTimerCallback;
 import net.borisshoes.borislib.datastorage.DataAccess;
+import net.borisshoes.borislib.datastorage.DefaultPlayerData;
 import net.borisshoes.borislib.gui.GuiHelper;
 import net.borisshoes.borislib.timers.GenericTimer;
 import net.borisshoes.borislib.timers.RepeatTimer;
+import net.borisshoes.borislib.utils.AlgoUtils;
 import net.borisshoes.borislib.utils.MinecraftUtils;
 import net.borisshoes.borislib.utils.ParticleEffectUtils;
 import net.borisshoes.borislib.utils.TextUtils;
@@ -15,19 +18,22 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.ItemStack;
 
-import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import static com.mojang.brigadier.arguments.IntegerArgumentType.getInteger;
 import static com.mojang.brigadier.arguments.IntegerArgumentType.integer;
-import static com.mojang.brigadier.arguments.StringArgumentType.getString;
-import static com.mojang.brigadier.arguments.StringArgumentType.word;
+import static com.mojang.brigadier.arguments.StringArgumentType.*;
+import static net.borisshoes.borislib.BorisLib.BLANK_UUID;
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 import static net.minecraft.commands.Commands.argument;
 import static net.minecraft.commands.Commands.literal;
@@ -37,6 +43,9 @@ import static net.minecraft.commands.arguments.item.ItemArgument.item;
 public class Commands {
    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext access, net.minecraft.commands.Commands.CommandSelection env){
       dispatcher.register(literal("borislib").executes(Commands::getVersion)
+            .then(literal("player").requires(net.minecraft.commands.Commands.hasPermission(net.minecraft.commands.Commands.LEVEL_ADMINS))
+                  .then(argument("player", string()).suggests(MinecraftUtils::getPlayerSuggestions)
+                        .executes(context -> Commands.playerInfo(context, getString(context, "player")))))
             .then(literal("testmod").requires(net.minecraft.commands.Commands.hasPermission(net.minecraft.commands.Commands.LEVEL_ADMINS))
                   .then(literal("worldcallback")
                         .then(argument("ticks", integer(0))
@@ -79,23 +88,23 @@ public class Commands {
    
    private static int readTimestamp(CommandContext<CommandSourceStack> context){
       GlobalTimestamp timestamp = DataAccess.getGlobal(GlobalTimestamp.KEY);
-      context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.timestamp_read",timestamp.timestamp), false);
+      context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.timestamp_read", timestamp.timestamp), false);
       return 1;
    }
    
    private static int setTimestamp(CommandContext<CommandSourceStack> context){
       GlobalTimestamp timestamp = DataAccess.getGlobal(GlobalTimestamp.KEY);
       timestamp.timestamp = System.currentTimeMillis();
-      context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.timestamp_set",timestamp.timestamp), false);
+      context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.timestamp_set", timestamp.timestamp), false);
       return 1;
    }
    
    private static int listMarkers(CommandContext<CommandSourceStack> context){
       for(ServerLevel world : context.getSource().getServer().getAllLevels()){
-         List<WorldMarker> markers = DataAccess.getWorld(world.dimension(),WorldMarker.KEY);
-         context.getSource().sendSuccess(() -> Component.literal(world.dimension().toString()+": "),false);
+         WorldMarker.MarkerList markers = DataAccess.getWorld(world.dimension(), WorldMarker.KEY);
+         context.getSource().sendSuccess(() -> Component.literal(world.dimension().toString() + ": "), false);
          for(WorldMarker marker : markers){
-            context.getSource().sendSuccess(() -> Component.literal(" - "+marker.id+": "+marker.pos.toShortString()),false);
+            context.getSource().sendSuccess(() -> Component.literal(" - " + marker.id + ": " + marker.pos.toShortString()), false);
          }
       }
       return 0;
@@ -103,10 +112,10 @@ public class Commands {
    
    private static int removeMarker(CommandContext<CommandSourceStack> context, String name){
       ServerLevel world = context.getSource().getLevel();
-      List<WorldMarker> markers = DataAccess.getWorld(world.dimension(),WorldMarker.KEY);
-      List<WorldMarker> newMarkers = markers.stream().filter(m -> !m.id.equals(name)).toList();
-      DataAccess.setWorld(world,WorldMarker.KEY,newMarkers);
-      boolean removed = newMarkers.size() < markers.size();
+      WorldMarker.MarkerList markers = DataAccess.getWorld(world.dimension(), WorldMarker.KEY);
+      int sizeBefore = markers.size();
+      markers.removeIf(m -> m.id.equals(name));
+      boolean removed = markers.size() < sizeBefore;
       if(removed){
          context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.marker_remove_some"), false);
          return 1;
@@ -119,12 +128,12 @@ public class Commands {
    private static int placeMarker(CommandContext<CommandSourceStack> context, String name){
       if(context.getSource().isPlayer()){
          ServerLevel world = context.getSource().getLevel();
-         List<WorldMarker> markers = DataAccess.getWorld(world.dimension(),WorldMarker.KEY);
+         WorldMarker.MarkerList markers = DataAccess.getWorld(world.dimension(), WorldMarker.KEY);
          WorldMarker m = new WorldMarker();
          m.pos = BlockPos.containing(context.getSource().getPosition());
          m.id = name;
          markers.add(m);
-         context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.marker_set",name), false);
+         context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.marker_set", name), false);
       }else{
          context.getSource().sendFailure(Component.translatable("text.borislib.must_be_executed_by_player"));
          return -1;
@@ -183,6 +192,63 @@ public class Commands {
    private static int getVersion(CommandContext<CommandSourceStack> context){
       context.getSource().sendSuccess(() -> Component.literal("BorisLib " + FabricLoader.getInstance().getModContainer(MOD_ID).get().getMetadata().getVersion().getFriendlyString()), false);
       return 1;
+   }
+   
+   private static int playerInfo(CommandContext<CommandSourceStack> context, String playerArg){
+      UUID uuid = AlgoUtils.getUUID(playerArg);
+      
+      if(uuid.toString().equals(BLANK_UUID)){
+         // Check online players first
+         ServerPlayer onlinePlayer = context.getSource().getServer().getPlayerList().getPlayerByName(playerArg);
+         if(onlinePlayer != null){
+            uuid = onlinePlayer.getUUID();
+         } else {
+            // Look through our stored player data for a matching username
+            Map<UUID,DefaultPlayerData> allPlayerData = DataAccess.allPlayerDataFor(BorisLib.PLAYER_DATA_KEY);
+            for(Map.Entry<UUID,DefaultPlayerData> entry : allPlayerData.entrySet()){
+               DefaultPlayerData data = entry.getValue();
+               if(playerArg.equalsIgnoreCase(data.getUsername()) || data.getKnownUsernames().stream().anyMatch(name -> name.equalsIgnoreCase(playerArg))){
+                  uuid = entry.getKey();
+                  break;
+               }
+            }
+         }
+      }
+      
+      if(uuid.toString().equals(BLANK_UUID)){
+         context.getSource().sendFailure(Component.literal("Could not find player: " + playerArg));
+         return 0;
+      }
+      
+      try {
+         DefaultPlayerData data = DataAccess.getPlayer(uuid, BorisLib.PLAYER_DATA_KEY);
+         context.getSource().sendSuccess(() -> Component.literal("=== DefaultPlayerData ===").withStyle(ChatFormatting.GOLD), false);
+         
+         final UUID finalUuid = uuid;
+         context.getSource().sendSuccess(() -> Component.literal("UUID: ").withStyle(ChatFormatting.GRAY)
+               .append(Component.literal(finalUuid.toString()).withStyle(ChatFormatting.WHITE)), false);
+         
+         context.getSource().sendSuccess(() -> Component.literal("Username: ").withStyle(ChatFormatting.GRAY)
+               .append(Component.literal(data.getUsername() != null ? data.getUsername() : "(none)").withStyle(ChatFormatting.WHITE)), false);
+         
+         context.getSource().sendSuccess(() -> Component.literal("Known Usernames: ").withStyle(ChatFormatting.GRAY)
+               .append(Component.literal(data.getKnownUsernames().isEmpty() ? "(none)" : String.join(", ", data.getKnownUsernames())).withStyle(ChatFormatting.WHITE)), false);
+         
+         context.getSource().sendSuccess(() -> Component.literal("Has Profile Data: ").withStyle(ChatFormatting.GRAY)
+               .append(Component.literal(data.getResolvableProfile() != null ? "Yes" : "No").withStyle(data.getResolvableProfile() != null ? ChatFormatting.GREEN : ChatFormatting.RED)), false);
+         
+         if(data.getResolvableProfile() != null){
+            // Show the player face if we have profile data
+            context.getSource().sendSuccess(() -> Component.literal("Player Face: ").withStyle(ChatFormatting.GRAY)
+                  .append(data.getFaceTextComponent().copy().withStyle(ChatFormatting.WHITE)), false);
+         }
+         
+         return 1;
+      } catch (Exception e) {
+         context.getSource().sendFailure(Component.literal("Error retrieving player data: " + e.getMessage()));
+         BorisLib.LOGGER.error("Error in playerInfo command: {}", e.getMessage());
+         return 0;
+      }
    }
    
    private static int worldCallback(CommandContext<CommandSourceStack> ctx, int ticks){

@@ -1,12 +1,12 @@
 package net.borisshoes.borislib.datastorage;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.DataResult;
-import com.mojang.serialization.Dynamic;
+import com.mojang.logging.LogUtils;
 import net.borisshoes.borislib.BorisLib;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.NbtOps;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.ValueInput;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.DataInputStream;
@@ -29,7 +29,7 @@ import static net.borisshoes.borislib.BorisLib.MOD_ID;
  * Two maps per player:
  * - objects: decoded live objects (modId -> key -> Object)
  * - raw: raw NBT for keys not yet accessed (modId -> key -> NbtCompound)
- * On save: encode objects via DataRegistry, and write any remaining raw entries as-is.
+ * On save: encode objects via StorableData.write(), and write any remaining raw entries as-is.
  */
 public final class PlayerObjectStore {
    private final Path dir;
@@ -118,8 +118,7 @@ public final class PlayerObjectStore {
       if(backupRoot == null) return;
       
       try{
-         var dyn = new Dynamic<>(NbtOps.INSTANCE, backupRoot);
-         Map<String, Map<String, CompoundTag>> decoded = FlatNamespacedMap.CODEC.parse(dyn).result().orElse(null);
+         Map<String, Map<String, CompoundTag>> decoded = parseNamespacedMap(backupRoot);
          if(decoded != null){
             e.backupRaw = new HashMap<>();
             decoded.forEach((modId, inner) -> e.backupRaw.put(modId, new HashMap<>(inner)));
@@ -130,11 +129,30 @@ public final class PlayerObjectStore {
    }
    
    /**
+    * Parses a CompoundTag as a nested map of {modId -> {key -> CompoundTag}}.
+    */
+   private Map<String, Map<String, CompoundTag>> parseNamespacedMap(CompoundTag root){
+      Map<String, Map<String, CompoundTag>> result = new HashMap<>();
+      for(String modId : root.keySet()){
+         if(root.get(modId) instanceof CompoundTag modTag){
+            Map<String, CompoundTag> inner = new HashMap<>();
+            for(String key : modTag.keySet()){
+               if(modTag.get(key) instanceof CompoundTag keyTag){
+                  inner.put(key, keyTag);
+               }
+            }
+            result.put(modId, inner);
+         }
+      }
+      return result;
+   }
+   
+   /**
     * Attempts to recover a key's data from the backup file.
     * Returns null if backup doesn't have valid data for this key.
     */
    @Nullable
-   private <T> T tryRecoverFromBackup(UUID u, Entry e, DataKey<T> key){
+   private <T extends StorableData> T tryRecoverFromBackup(UUID u, Entry e, DataKey<T> key){
       ensureBackupLoaded(u, e);
       if(e.backupRaw == null) return null;
       
@@ -144,7 +162,7 @@ public final class PlayerObjectStore {
       CompoundTag backupTag = modRaw.get(key.key());
       if(backupTag == null) return null;
       
-      T recovered = decode(key.codec(), backupTag, key.id().toString() + " (from backup)");
+      T recovered = decode(key, backupTag, u, key.id().toString() + " (from backup)");
       if(recovered != null){
          BorisLib.LOGGER.info("Successfully recovered data for key {} player {} from backup", key.id(), u);
       }
@@ -157,13 +175,14 @@ public final class PlayerObjectStore {
          CompoundTag root = readWithBackup(id);
          if(root == null) return e;
          try{
-            var dyn = new Dynamic<>(NbtOps.INSTANCE, root);
-            Map<String, Map<String, CompoundTag>> decoded = FlatNamespacedMap.CODEC.parse(dyn).result().orElseGet(HashMap::new);
-            // Deep-copy into mutable maps
-            decoded.forEach((modId, inner) -> {
-               Map<String, CompoundTag> mutableInner = new ConcurrentHashMap<>(inner);
-               e.raw.put(modId, mutableInner);
-            });
+            Map<String, Map<String, CompoundTag>> decoded = parseNamespacedMap(root);
+            if(decoded != null){
+               // Deep-copy into mutable maps
+               decoded.forEach((modId, inner) -> {
+                  Map<String, CompoundTag> mutableInner = new ConcurrentHashMap<>(inner);
+                  e.raw.put(modId, mutableInner);
+               });
+            }
          }catch(Exception ex){
             BorisLib.LOGGER.error("Failed to parse player data structure for {}: {}", id, ex.getMessage());
          }
@@ -172,7 +191,7 @@ public final class PlayerObjectStore {
    }
    
    @SuppressWarnings("unchecked")
-   public <T> T getLive(UUID u, DataKey<T> key){
+   public <T extends StorableData> T getLive(UUID u, DataKey<T> key){
       Entry e = getEntry(u);
       Map<String, Object> modObjs = e.objects.computeIfAbsent(key.modId(), k -> new ConcurrentHashMap<>());
       Object got = modObjs.get(key.key());
@@ -183,7 +202,7 @@ public final class PlayerObjectStore {
       if(modRaw != null){
          CompoundTag n = modRaw.remove(key.key());
          if(n != null){
-            T decoded = decode(key.codec(), n, key.id().toString());
+            T decoded = decode(key, n, u, key.id().toString());
             if(decoded != null){
                modObjs.put(key.key(), decoded);
                if(modRaw.isEmpty()) e.raw.remove(key.modId());
@@ -212,9 +231,13 @@ public final class PlayerObjectStore {
       return created;
    }
    
-   public <T> void setLive(UUID u, DataKey<T> key, T value){
+   public <T extends StorableData> void setLive(UUID u, DataKey<T> key, T value){
       Entry e = getEntry(u);
       T toStore = value != null ? value : key.makeDefaultPlayer(u);
+      if(toStore == null){
+         BorisLib.LOGGER.error("Cannot store null value for key {} player {} and default factory also returned null", key.id(), u);
+         return;
+      }
       e.objects.computeIfAbsent(key.modId(), k -> new ConcurrentHashMap<>()).put(key.key(), toStore);
       Map<String, CompoundTag> modRaw = e.raw.get(key.modId());
       if(modRaw != null){
@@ -230,37 +253,61 @@ public final class PlayerObjectStore {
    
    public void save(UUID u){
       Entry e = cache.get(u);
-      if(e == null) return;
+      if(e == null){
+         BorisLib.LOGGER.debug("No cache entry for player {} during save, skipping", u);
+         return;
+      }
       
       // Build a namespaced NBT map by encoding live objects + copying remaining raw
-      Map<String, Map<String, CompoundTag>> out = new HashMap<>();
-      // 1) encode objects using registered codecs
+      CompoundTag out = new CompoundTag();
+      
+      // 1) encode objects using StorableData.write()
       for(var modEntry : e.objects.entrySet()){
          String modId = modEntry.getKey();
-         Map<String, CompoundTag> tgt = out.computeIfAbsent(modId, k -> new HashMap<>());
-         for(var kv : modEntry.getValue().entrySet()){
-            String key = kv.getKey();
-            DataKey<Object> dk = DataRegistry.get(modId, key, DataKey.StorageScope.PLAYER);
-            if(dk != null){
-               CompoundTag encoded = encode(dk.codec(), kv.getValue(), dk.id().toString());
-               // Validate: skip empty compounds to avoid saving uninitialized data
-               if(encoded == null || encoded.isEmpty()){
-                  BorisLib.LOGGER.warn("Skipping save for key {} player {} - encoded data is empty/invalid", dk.id(), u);
-                  continue;
-               }
-               tgt.put(key, encoded);
-            }else{
-               // No registered codec? Skip to avoid corrupting data.
+         try{
+            CompoundTag modTag = out.getCompoundOrEmpty(modId);
+            if(modTag.isEmpty()){
+               modTag = new CompoundTag();
+               out.put(modId, modTag);
             }
+            for(var kv : modEntry.getValue().entrySet()){
+               String key = kv.getKey();
+               Object value = kv.getValue();
+               try{
+                  if(value instanceof StorableData storable){
+                     CompoundTag encoded = encode(storable, modId + ":" + key);
+                     // Validate: skip empty compounds to avoid saving uninitialized data
+                     if(encoded == null || encoded.isEmpty()){
+                        BorisLib.LOGGER.warn("Skipping save for key {}:{} player {} - encoded data is empty/invalid", modId, key, u);
+                        continue;
+                     }
+                     modTag.put(key, encoded);
+                  }
+               }catch(Exception ex){
+                  BorisLib.LOGGER.error("Failed to encode key {}:{} for player {}: {}", modId, key, u, ex.getMessage());
+               }
+            }
+         }catch(Exception ex){
+            BorisLib.LOGGER.error("Failed to save data for mod {} player {}: {}", modId, u, ex.getMessage());
          }
       }
       
       // 2) copy any raw entries we never decoded
       for(var modEntry : e.raw.entrySet()){
          String modId = modEntry.getKey();
-         Map<String, CompoundTag> tgt = out.computeIfAbsent(modId, k -> new HashMap<>());
-         for(var kv : modEntry.getValue().entrySet()){
-            tgt.putIfAbsent(kv.getKey(), kv.getValue());
+         try{
+            CompoundTag modTag = out.getCompoundOrEmpty(modId);
+            if(modTag.isEmpty()){
+               modTag = new CompoundTag();
+               out.put(modId, modTag);
+            }
+            for(var kv : modEntry.getValue().entrySet()){
+               if(!modTag.contains(kv.getKey())){
+                  modTag.put(kv.getKey(), kv.getValue());
+               }
+            }
+         }catch(Exception ex){
+            BorisLib.LOGGER.error("Failed to copy raw data for mod {} player {}: {}", modId, u, ex.getMessage());
          }
       }
       
@@ -270,22 +317,26 @@ public final class PlayerObjectStore {
       // 3. Move temp -> main
       Path main = file(u);
       Path backup = backupFile(u);
-      Path temp = dir.resolve(u.toString() + ".dat_tmp");
+      Path temp = dir.resolve(u + ".dat_tmp");
       
-      var dyn = FlatNamespacedMap.CODEC.encodeStart(NbtOps.INSTANCE, out).result().orElseGet(CompoundTag::new);
       try{
          // Write to temp file first
          try(OutputStream os = Files.newOutputStream(temp); GZIPOutputStream gz = new GZIPOutputStream(os); DataOutputStream outStr = new DataOutputStream(gz)){
-            NbtIo.writeUnnamedTagWithFallback(dyn, outStr);
+            NbtIo.writeUnnamedTagWithFallback(out, outStr);
          }
          
          // Rotate: main -> backup (only if main exists and is valid)
          if(Files.exists(main)){
-            Files.move(main, backup, StandardCopyOption.REPLACE_EXISTING);
+            try{
+               Files.move(main, backup, StandardCopyOption.REPLACE_EXISTING);
+            }catch(Exception ex){
+               BorisLib.LOGGER.warn("Failed to create backup for player {}, continuing anyway: {}", u, ex.getMessage());
+            }
          }
          
          // Move temp -> main
          Files.move(temp, main, StandardCopyOption.REPLACE_EXISTING);
+         BorisLib.LOGGER.debug("Successfully saved player data for {}", u);
       }catch(Exception ex){
          BorisLib.LOGGER.error("Failed to save player data for {}: {}", u, ex.getMessage());
          // Clean up temp file if it exists
@@ -307,35 +358,53 @@ public final class PlayerObjectStore {
    }
    
    /**
-    * Safely encodes an object to NBT using the given codec.
+    * Safely encodes a StorableData object to NBT.
     * Returns null if encoding fails, with a warning logged.
     */
    @Nullable
-   private static <T> CompoundTag encode(Codec<T> codec, T v, String keyId){
-      if(v == null){
+   private static CompoundTag encode(StorableData data, String keyId){
+      if(data == null){
          BorisLib.LOGGER.warn("Cannot encode null value for key {}", keyId);
          return null;
       }
-      DataResult<net.minecraft.nbt.Tag> result = codec.encodeStart(NbtOps.INSTANCE, v);
-      if(result.error().isPresent()){
-         BorisLib.LOGGER.warn("Failed to encode data for key {}: {}", keyId, result.error().get().message());
+      try{
+         CompoundTag tag = new CompoundTag();
+         data.writeNbt(tag);
+         return tag;
+      }catch(Exception e){
+         BorisLib.LOGGER.warn("Failed to encode data for key {}: {}", keyId, e.getMessage());
          return null;
       }
-      return (CompoundTag) result.result().orElse(null);
    }
    
    /**
-    * Safely decodes NBT using the given codec.
-    * Returns null if decoding fails (corrupted/incompatible data), with a warning logged.
+    * Safely decodes NBT into a StorableData object using ValueInput.
+    * Creates a default instance and populates it field-by-field for partial decode resilience.
+    * Returns null only if the default factory fails.
     */
    @Nullable
-   private static <T> T decode(Codec<T> codec, CompoundTag tag, String keyId){
-      DataResult<T> result = codec.parse(new Dynamic<>(NbtOps.INSTANCE, tag));
-      if(result.error().isPresent()){
-         BorisLib.LOGGER.warn("Failed to decode data for key {}: {}", keyId, result.error().get().message());
+   private static <T extends StorableData> T decode(DataKey<T> key, CompoundTag tag, UUID playerUuid, String keyId){
+      try{
+         // Create a fresh default instance
+         T instance = key.makeDefaultPlayer(playerUuid);
+         if(instance == null){
+            BorisLib.LOGGER.error("DataKey<{}> default factory returned null during decode for player {}", keyId, playerUuid);
+            return null;
+         }
+         
+         if(BorisLib.SERVER == null){
+            BorisLib.LOGGER.error("Cannot decode player key {} for player {} - server is null", keyId, playerUuid);
+            return null;
+         }
+         
+         // Read field-by-field - each field handles its own errors/defaults
+         ValueInput view = TagValueInput.create(new ProblemReporter.ScopedCollector(LogUtils.getLogger()), BorisLib.SERVER.registryAccess(), tag);
+         instance.read(view);
+         return instance;
+      }catch(Exception e){
+         BorisLib.LOGGER.error("Failed to decode data for key {} player {}: {}", keyId, playerUuid, e.getMessage());
          BorisLib.LOGGER.warn("  NBT contents: {}", tag.isEmpty() ? "(empty)" : tag);
          return null;
       }
-      return result.result().orElse(null);
    }
 }

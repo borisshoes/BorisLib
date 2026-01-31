@@ -1,18 +1,12 @@
 package net.borisshoes.borislib.datastorage;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.DataResult;
-import com.mojang.serialization.Dynamic;
 import net.borisshoes.borislib.BorisLib;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.LevelResource;
-import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -26,45 +20,87 @@ public final class DataAccess {
    private static final Set<UUID> DIRTY_PLAYERS = ConcurrentHashMap.newKeySet();
    
    public static void onServerStarted(MinecraftServer server){
-      Path root = server.getWorldPath(LevelResource.ROOT);
-      playerStore = new PlayerObjectStore(root);
+      try{
+         Path root = server.getWorldPath(LevelResource.ROOT);
+         playerStore = new PlayerObjectStore(root);
+         BorisLib.LOGGER.info("BorisLib data storage initialized at {}", root);
+      }catch(Exception e){
+         BorisLib.LOGGER.error("Failed to initialize BorisLib data storage: {}", e.getMessage());
+      }
    }
    
    public static void onServerStop(MinecraftServer s){
-      if(playerStore == null) return;
+      if(playerStore == null){
+         BorisLib.LOGGER.warn("PlayerStore is null during server stop, skipping data save");
+         return;
+      }
       // Flush everything we currently have cached
-      for(UUID u : playerStore.snapshotAllObjects().keySet()){
-         playerStore.save(u);
+      try{
+         int count = 0;
+         for(UUID u : playerStore.snapshotAllObjects().keySet()){
+            playerStore.save(u);
+            count++;
+         }
+         BorisLib.LOGGER.info("Saved {} player data entries on server stop", count);
+      }catch(Exception e){
+         BorisLib.LOGGER.error("Error during server stop data save: {}", e.getMessage());
       }
       DIRTY_PLAYERS.clear();
    }
    
    public static void onServerSave(MinecraftServer s, boolean flush, boolean force){
-      if(playerStore == null) return;
-      
-      // Always auto-save ALL ONLINE players during any save (autosave or manual).
-      for(ServerPlayer sp : s.getPlayerList().getPlayers()){
-         playerStore.save(sp.getUUID());
-         DIRTY_PLAYERS.remove(sp.getUUID());
+      if(playerStore == null){
+         BorisLib.LOGGER.warn("PlayerStore is null during server save, skipping");
+         return;
       }
       
-      for(UUID u : DIRTY_PLAYERS){
-         playerStore.save(u);
+      try{
+         // Always auto-save ALL ONLINE players during any save (autosave or manual).
+         for(ServerPlayer sp : s.getPlayerList().getPlayers()){
+            try{
+               playerStore.save(sp.getUUID());
+               DIRTY_PLAYERS.remove(sp.getUUID());
+            }catch(Exception e){
+               BorisLib.LOGGER.error("Failed to save data for online player {}: {}", sp.getUUID(), e.getMessage());
+            }
+         }
+         
+         for(UUID u : DIRTY_PLAYERS){
+            try{
+               playerStore.save(u);
+            }catch(Exception e){
+               BorisLib.LOGGER.error("Failed to save data for dirty player {}: {}", u, e.getMessage());
+            }
+         }
+         DIRTY_PLAYERS.clear();
+      }catch(Exception e){
+         BorisLib.LOGGER.error("Error during server save: {}", e.getMessage());
       }
-      DIRTY_PLAYERS.clear();
    }
    
    public static void onPlayerQuit(ServerPlayer p){
-      if(playerStore != null) playerStore.save(p.getUUID());
+      if(playerStore != null){
+         try{
+            playerStore.save(p.getUUID());
+         }catch(Exception e){
+            BorisLib.LOGGER.error("Failed to save data on player quit for {}: {}", p.getUUID(), e.getMessage());
+         }
+      }
       DIRTY_PLAYERS.remove(p.getUUID());
    }
    
    public static void onPlayerJoin(ServerPlayer p){
       if(playerStore != null){
-         UUID pid = p.getUUID();
-         playerStore.preload(pid);
-         DataAccess.getPlayer(pid, BorisLib.PLAYER_DATA_KEY).onLogin(p);
-         DIRTY_PLAYERS.add(pid); // Mark dirty so it gets saved on next server save
+         try{
+            UUID pid = p.getUUID();
+            playerStore.preload(pid);
+            DataAccess.getPlayer(pid, BorisLib.PLAYER_DATA_KEY).onLogin(p);
+            DIRTY_PLAYERS.add(pid); // Mark dirty so it gets saved on next server save
+         }catch(Exception e){
+            BorisLib.LOGGER.error("Failed to process player join for {}: {}", p.getUUID(), e.getMessage());
+         }
+      }else{
+         BorisLib.LOGGER.warn("PlayerStore is null during player join for {}", p.getUUID());
       }
    }
    
@@ -73,39 +109,39 @@ public final class DataAccess {
       DIRTY_PLAYERS.add(u);
    }
    
-   public static <T> T getGlobal(DataKey<T> key){
+   public static <T extends StorableData> T getGlobal(DataKey<T> key){
       ensureServerSide("getGlobal");
       GlobalState s = GlobalState.get(BorisLib.SERVER.overworld());
       return s.getLive(key);
    }
    
-   public static <T> T getWorld(ResourceKey<Level> wk, DataKey<T> key){
+   public static <T extends StorableData> T getWorld(ResourceKey<Level> wk, DataKey<T> key){
       ensureServerSide("getWorld");
       ServerLevel w = BorisLib.SERVER.getLevel(wk);
       WorldState s = WorldState.get(w);
       return s.getLive(wk, key);
    }
    
-   public static <T> T getPlayer(UUID u, DataKey<T> key){
+   public static <T extends StorableData> T getPlayer(UUID u, DataKey<T> key){
       ensureServerSide("getPlayer");
       T v = playerStore.getLive(u, key);
       DIRTY_PLAYERS.add(u); // always schedule this player for serialization on next save
       return v;
    }
    
-   public static <T> void setGlobal(DataKey<T> key, T value){
+   public static <T extends StorableData> void setGlobal(DataKey<T> key, T value){
       ensureServerSide("setGlobal");
       GlobalState s = GlobalState.get(BorisLib.SERVER.overworld());
       s.setLive(key, value);
    }
    
-   public static <T> void setWorld(ServerLevel w, DataKey<T> key, T value){
+   public static <T extends StorableData> void setWorld(ServerLevel w, DataKey<T> key, T value){
       ensureServerSide("setWorld");
       WorldState s = WorldState.get(w);
       s.setLive(w.dimension(), key, value);
    }
    
-   public static <T> void setPlayer(UUID u, DataKey<T> key, T value){
+   public static <T extends StorableData> void setPlayer(UUID u, DataKey<T> key, T value){
       ensureServerSide("setPlayer");
       playerStore.setLive(u, key, value);
       DIRTY_PLAYERS.add(u);
@@ -118,20 +154,7 @@ public final class DataAccess {
       }
    }
    
-   private static <T> CompoundTag encode(Codec<T> codec, T v){
-      return (CompoundTag) codec.encodeStart(NbtOps.INSTANCE, v).result().orElse(new CompoundTag());
-   }
-   
-   private static <T> T decode(Codec<T> codec, CompoundTag tag){
-      DataResult<T> result = codec.parse(new Dynamic<>(NbtOps.INSTANCE, tag));
-      if(result.error().isPresent()){
-         BorisLib.LOGGER.warn("Failed to decode data: {}", result.error().get().message());
-         return null;
-      }
-      return result.result().orElse(null);
-   }
-   
-   public static <T> Map<UUID, T> allPlayerDataFor(DataKey<T> key){
+   public static <T extends StorableData> Map<UUID, T> allPlayerDataFor(DataKey<T> key){
       ensureServerSide("allPlayerDataFor");
       Map<UUID, T> out = new HashMap<>();
       

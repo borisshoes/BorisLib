@@ -1,28 +1,41 @@
 package net.borisshoes.borislib.callbacks;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.borisshoes.borislib.utils.CodecUtils;
+import net.borisshoes.borislib.datastorage.StorableData;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.world.level.storage.ValueInput;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-public class LoginCallbackContainer {
-   public static final Codec<LoginCallbackContainer> CODEC = RecordCodecBuilder.create(i -> i.group(
-         LoginCallback.LOGIN_CALLBACK_CODEC.listOf().optionalFieldOf("callbacks", List.of()).forGetter(LoginCallbackContainer::getCallbacks),
-         CodecUtils.UUID_CODEC.fieldOf("uuid").forGetter(c -> c.playerID)
-   ).apply(i, (list, uuid) -> {
-      LoginCallbackContainer c = new LoginCallbackContainer(uuid);
-      c.callbacks.addAll(list);
-      return c;
-   }));
+public class LoginCallbackContainer implements StorableData {
    
    public final List<LoginCallback> callbacks = new ArrayList<>();
    public final UUID playerID;
    
    public LoginCallbackContainer(UUID uuid){
       this.playerID = uuid;
+   }
+   
+   @Override
+   public void read(ValueInput view){
+      this.callbacks.clear();
+      for(LoginCallback callback : view.listOrEmpty("callbacks", LoginCallback.LOGIN_CALLBACK_CODEC)){
+         this.callbacks.add(callback);
+      }
+   }
+   
+   @Override
+   public void writeNbt(CompoundTag tag){
+      tag.putString("uuid", playerID.toString());
+      
+      ListTag callbackList = new ListTag();
+      for(LoginCallback callback : callbacks){
+         LoginCallback.LOGIN_CALLBACK_CODEC.encodeStart(NbtOps.INSTANCE, callback).result().ifPresent(callbackList::add);
+      }
+      tag.put("callbacks", callbackList);
    }
    
    public List<LoginCallback> getCallbacks(){

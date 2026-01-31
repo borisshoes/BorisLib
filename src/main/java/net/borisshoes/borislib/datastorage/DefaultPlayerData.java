@@ -2,11 +2,12 @@ package net.borisshoes.borislib.datastorage;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.borisshoes.borislib.BorisLib;
-import net.borisshoes.borislib.utils.CodecUtils;
-import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.StringTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.objects.PlayerSprite;
 import net.minecraft.server.MinecraftServer;
@@ -19,26 +20,13 @@ import net.minecraft.world.entity.decoration.Mannequin;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.ResolvableProfile;
+import net.minecraft.world.level.storage.ValueInput;
 
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.UUID;
 
-public class DefaultPlayerData {
-   
-   public static final Codec<DefaultPlayerData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-         CodecUtils.UUID_CODEC.fieldOf("playerID").forGetter(DefaultPlayerData::getPlayerID),
-         Codec.STRING.fieldOf("username").orElse("").forGetter(DefaultPlayerData::getUsername),
-         CodecUtils.STRING_LIST.fieldOf("knownUsernames").orElse(new ArrayList<>()).forGetter(DefaultPlayerData::getKnownUsernames),
-         ResolvableProfile.CODEC.optionalFieldOf("resolvableProfile").forGetter(data -> Optional.ofNullable(data.resProf))
-   ).apply(instance, (playerID, username, knownUsernames, resProf) -> {
-      DefaultPlayerData data = new DefaultPlayerData(playerID);
-      data.username = username;
-      data.knownUsernames.clear();
-      data.knownUsernames.addAll(knownUsernames);
-      data.resProf = resProf.orElse(null);
-      return data;
-   }));
+public class DefaultPlayerData implements StorableData {
    
    private final UUID playerID;
    private final ArrayList<String> knownUsernames = new ArrayList<>();
@@ -49,29 +37,72 @@ public class DefaultPlayerData {
       this.playerID = playerID;
    }
    
+   @Override
+   public void read(ValueInput view){
+      this.username = view.getString("username").orElse("");
+      
+      for(String s : view.listOrEmpty("knownUsernames", Codec.STRING)){
+         if(!s.isEmpty() && !this.knownUsernames.contains(s)){
+            this.knownUsernames.add(s);
+         }
+      }
+      
+      for(ResolvableProfile prof : view.listOrEmpty("resolvableProfile_list", ResolvableProfile.CODEC)){
+         this.resProf = prof;
+         break;
+      }
+   }
+   
+   @Override
+   public void writeNbt(CompoundTag tag){
+      tag.putString("playerID", playerID.toString());
+      tag.putString("username", username != null ? username : "");
+      ListTag usernameList = new ListTag();
+      for(String name : knownUsernames){
+         if(name != null && !name.isEmpty()){
+            usernameList.add(StringTag.valueOf(name));
+         }
+      }
+      tag.put("knownUsernames", usernameList);
+      if(resProf != null){
+         ListTag profList = new ListTag();
+         ResolvableProfile.CODEC.encodeStart(NbtOps.INSTANCE, resProf).result().ifPresent(profList::add);
+         if(!profList.isEmpty()){
+            tag.put("resolvableProfile_list", profList);
+         }
+      }
+   }
+   
    public void onLogin(ServerPlayer player){
-      GameProfile profile = player.getGameProfile();
-      this.resProf = ResolvableProfile.createResolved(profile);
-      this.username = profile.name();
-      if(!this.knownUsernames.contains(this.username)){
-         this.knownUsernames.add(this.username);
+      try{
+         GameProfile profile = player.getGameProfile();
+         this.resProf = ResolvableProfile.createResolved(profile);
+         this.username = profile.name();
+         if(!this.knownUsernames.contains(this.username)){
+            this.knownUsernames.add(this.username);
+         }
+      }catch(Exception e){
+         BorisLib.LOGGER.error("Failed to process login data for player {}: {}", playerID, e.getMessage());
       }
    }
    
    public void tryResolve(MinecraftServer server){
       ProfileResolver profileResolver = server.services().profileResolver();
       Util.nonCriticalIoPool().execute(() -> {
-         Optional<GameProfile> optional = profileResolver.fetchById(playerID);
-         server.execute(() -> optional.ifPresentOrElse(
-               gameProfile -> {
-                  this.resProf = ResolvableProfile.createResolved(gameProfile);
-                  this.username = gameProfile.name();
-                  if(!this.knownUsernames.contains(this.username)){
-                     this.knownUsernames.add(this.username);
-                  }
+         try{
+            Optional<GameProfile> optional = profileResolver.fetchById(playerID);
+            server.execute(() -> optional.ifPresentOrElse(
+                  gameProfile -> {
+                     this.resProf = ResolvableProfile.createResolved(gameProfile);
+                     this.username = gameProfile.name();
+                     if(!this.knownUsernames.contains(this.username)){
+                        this.knownUsernames.add(this.username);
+                     }
                   }, () -> BorisLib.LOGGER.warn("Failed to resolve profile data for player {}", playerID)
-               )
-         );
+            ));
+         }catch(Exception e){
+            BorisLib.LOGGER.warn("Exception while resolving profile for player {}: {}", playerID, e.getMessage());
+         }
       });
    }
    

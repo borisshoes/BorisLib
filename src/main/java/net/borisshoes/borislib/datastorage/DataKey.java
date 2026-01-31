@@ -1,6 +1,5 @@
 package net.borisshoes.borislib.datastorage;
 
-import com.mojang.serialization.Codec;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
@@ -11,11 +10,11 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 
-public record DataKey<T>(Identifier id, StorageScope scope, Codec<T> codec, Supplier<T> globalDef, Function<ResourceKey<Level>, T> worldDef, Function<UUID, T> playerDef) {
+public record DataKey<T extends StorableData>(Identifier id, StorageScope scope, Supplier<T> globalDef,
+                                              Function<ResourceKey<Level>, T> worldDef, Function<UUID, T> playerDef) {
    public DataKey{
       Objects.requireNonNull(id);
       Objects.requireNonNull(scope);
-      Objects.requireNonNull(codec);
       switch(scope){
          case GLOBAL -> {
             Objects.requireNonNull(globalDef, "globalDef required for GLOBAL DataKey");
@@ -43,16 +42,16 @@ public record DataKey<T>(Identifier id, StorageScope scope, Codec<T> codec, Supp
       return id.getPath();
    }
    
-   public static <T> DataKey<T> ofGlobal(Identifier id, Codec<T> codec, Supplier<T> def){
-      return new DataKey<>(id, StorageScope.GLOBAL, codec, def, null, null);
+   public static <T extends StorableData> DataKey<T> ofGlobal(Identifier id, Supplier<T> def){
+      return new DataKey<>(id, StorageScope.GLOBAL, def, null, null);
    }
    
-   public static <T> DataKey<T> ofWorld(Identifier id, Codec<T> codec, Function<ResourceKey<Level>, T> def){
-      return new DataKey<>(id, StorageScope.WORLD, codec, null, def, null);
+   public static <T extends StorableData> DataKey<T> ofWorld(Identifier id, Function<ResourceKey<Level>, T> def){
+      return new DataKey<>(id, StorageScope.WORLD, null, def, null);
    }
    
-   public static <T> DataKey<T> ofPlayer(Identifier id, Codec<T> codec, Function<java.util.UUID, T> def){
-      return new DataKey<>(id, StorageScope.PLAYER, codec, null, null, def);
+   public static <T extends StorableData> DataKey<T> ofPlayer(Identifier id, Function<java.util.UUID, T> def){
+      return new DataKey<>(id, StorageScope.PLAYER, null, null, def);
    }
    
    public T makeDefaultGlobal(){

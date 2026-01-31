@@ -58,8 +58,8 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
    
    public static final ItemModDataHandler BORISLIB_ITEM_DATA = new ItemModDataHandler(MOD_ID);
    
-   public static final DataKey<LoginCallbackContainer> LOGIN_CALLBACKS_KEY = DataRegistry.register(DataKey.ofPlayer(Identifier.fromNamespaceAndPath(MOD_ID,"login_callbacks"),LoginCallbackContainer.CODEC, LoginCallbackContainer::new));
-   public static final DataKey<DefaultPlayerData> PLAYER_DATA_KEY = DataRegistry.register(DataKey.ofPlayer(Identifier.fromNamespaceAndPath(MOD_ID,"playerdata"), DefaultPlayerData.CODEC,DefaultPlayerData::new));
+   public static final DataKey<LoginCallbackContainer> LOGIN_CALLBACKS_KEY = DataRegistry.register(DataKey.ofPlayer(Identifier.fromNamespaceAndPath(MOD_ID,"login_callbacks"), LoginCallbackContainer::new));
+   public static final DataKey<DefaultPlayerData> PLAYER_DATA_KEY = DataRegistry.register(DataKey.ofPlayer(Identifier.fromNamespaceAndPath(MOD_ID,"playerdata"), DefaultPlayerData::new));
    
    @Override
    public void onInitialize(){
