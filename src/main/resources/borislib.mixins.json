@@ -8,6 +8,8 @@
     "EntityAccessor",
     "IntegratedServerMixin",
     "InventoryAccessor",
+    "LivingEntityMixin",
+    "ServerCommonPacketListenerImplMxiin",
     "ServerGamePacketListenerImplMixin",
     "ServerPlayerMixin"
   ],

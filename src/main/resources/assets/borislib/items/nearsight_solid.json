@@ -1,0 +1,8 @@
+{
+    "model": {
+        "type": "minecraft:model",
+        "model": "borislib:block/nearsight_solid"
+    },
+    "hand_animation_on_swap": false
+}
+

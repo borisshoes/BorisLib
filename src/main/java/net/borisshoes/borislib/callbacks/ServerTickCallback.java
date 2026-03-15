@@ -1,7 +1,10 @@
 package net.borisshoes.borislib.callbacks;
 
+import net.borisshoes.borislib.datastorage.ConditionData;
+import net.borisshoes.borislib.datastorage.DataAccess;
 import net.borisshoes.borislib.events.Event;
 import net.borisshoes.borislib.timers.TickTimerCallback;
+import net.borisshoes.borislib.utils.ParticlePacketBuffer;
 import net.minecraft.server.MinecraftServer;
 import org.apache.logging.log4j.Level;
 import org.jetbrains.annotations.NotNull;
@@ -22,7 +25,14 @@ public class ServerTickCallback {
          for(Event event : RECENT_EVENTS){
             event.tick();
          }
+         
+         // Tick Conditions for all living entities
+         DataAccess.getGlobal(ConditionData.KEY).tick(server);
+         
          RECENT_EVENTS.removeIf(Event::isExpired);
+         
+         // Flush buffered particle packets as bundles
+         ParticlePacketBuffer.flush();
       }catch(Exception e){
          LOGGER.log(Level.ERROR,e);
       }
