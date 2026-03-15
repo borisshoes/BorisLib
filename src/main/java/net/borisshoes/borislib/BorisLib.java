@@ -73,6 +73,9 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
    public static final ItemModDataHandler BORISLIB_ITEM_DATA = new ItemModDataHandler(MOD_ID);
    
    public static final TagKey<EntityType<?>> IGNORES_NEARSIGHT = TagKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(MOD_ID, "ignores_nearsight"));
+   public static final TagKey<EntityType<?>> IGNORES_FEEBLE = TagKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(MOD_ID, "ignores_feeble"));
+   public static final TagKey<EntityType<?>> IGNORES_VULNERABLE = TagKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(MOD_ID, "ignores_vulnerable"));
+   public static final TagKey<EntityType<?>> IGNORES_DECAY = TagKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(MOD_ID, "ignores_decay"));
    
    public static final DataKey<LoginCallbackContainer> LOGIN_CALLBACKS_KEY = DataRegistry.register(DataKey.ofPlayer(Identifier.fromNamespaceAndPath(MOD_ID, "login_callbacks"), LoginCallbackContainer::new));
    public static final DataKey<DefaultPlayerData> PLAYER_DATA_KEY = DataRegistry.register(DataKey.ofPlayer(Identifier.fromNamespaceAndPath(MOD_ID, "playerdata"), DefaultPlayerData::new));

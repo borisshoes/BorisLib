@@ -5,6 +5,7 @@ import net.borisshoes.borislib.conditions.Condition;
 import net.borisshoes.borislib.conditions.ConditionInstance;
 import net.borisshoes.borislib.conditions.Conditions;
 import net.borisshoes.borislib.utils.CodecUtils;
+import net.borisshoes.borislib.utils.MinecraftUtils;
 import net.minecraft.core.Holder;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -92,7 +93,7 @@ public class ConditionData implements StorableData {
             continue;
          }
          
-         LivingEntity entity = findLivingEntity(server, entityId);
+         LivingEntity entity = MinecraftUtils.findLivingEntity(server, entityId);
          if(entity == null) continue; // Entity not loaded, skip ticking but keep data
          
          try{
@@ -132,14 +133,6 @@ public class ConditionData implements StorableData {
       for(UUID id : toRemove){
          entityConditions.remove(id);
       }
-   }
-   
-   private static LivingEntity findLivingEntity(MinecraftServer server, UUID entityId){
-      for(ServerLevel level : server.getAllLevels()){
-         Entity entity = level.getEntity(entityId);
-         if(entity instanceof LivingEntity living) return living;
-      }
-      return null;
    }
 }
 

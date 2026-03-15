@@ -37,6 +37,10 @@ public abstract class Condition {
    
    public abstract void onRemove(MinecraftServer server, LivingEntity entity, float value, boolean particles);
    
+   public boolean canApply(LivingEntity entity){
+      return true;
+   }
+   
    public Identifier getId(){
       return id;
    }

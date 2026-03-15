@@ -4,6 +4,7 @@ import com.mojang.serialization.Lifecycle;
 import net.borisshoes.borislib.BorisLib;
 import net.borisshoes.borislib.datastorage.ConditionData;
 import net.borisshoes.borislib.datastorage.DataAccess;
+import net.borisshoes.borislib.utils.MinecraftUtils;
 import net.minecraft.core.Holder;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
@@ -11,6 +12,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import org.apache.commons.lang3.tuple.ImmutableTriple;
@@ -34,21 +37,28 @@ public class Conditions {
     * Must be called during mod initialization to ensure conditions are registered
     * before anything queries the CONDITIONS registry.
     */
-   public static void initialize(){}
+   public static void initialize(){
+   }
    
    public static ConditionData getConditionData(){
       return DataAccess.getGlobal(ConditionData.KEY);
    }
    
    public static float getConditionValue(UUID entityId, Holder<Condition> holder){
-      Triple<Float,Boolean,Boolean> cond = getPrevalingCondition(entityId,holder);
+      Triple<Float, Boolean, Boolean> cond = getPrevalingCondition(entityId, holder);
       return cond == null ? holder.value().getBase() : cond.getLeft();
    }
    
+   public static Triple<Float, Boolean, Boolean> getPrevalingCondition(UUID entityId, Holder<Condition> holder){
+      List<ConditionInstance> conditions = getConditionInstancesOf(entityId, holder);
+      if(conditions.isEmpty()) return null;
+      return getPrevalingCondition(conditions, holder);
+   }
+   
    // Returns the value, stacking, particles of the overall condition status for an entity
-   public static Triple<Float,Boolean,Boolean> getPrevalingCondition(UUID entityId, Holder<Condition> holder){
-      List<ConditionInstance> stacking = getConditionInstancesOf(entityId, holder).stream().filter(ConditionInstance::isStacking).toList();
-      List<ConditionInstance> nonStacking = getConditionInstancesOf(entityId, holder).stream().filter(i -> !i.isStacking()).toList();
+   public static Triple<Float, Boolean, Boolean> getPrevalingCondition(List<ConditionInstance> conditions, Holder<Condition> holder){
+      List<ConditionInstance> stacking = conditions.stream().filter(ConditionInstance::isStacking).toList();
+      List<ConditionInstance> nonStacking = conditions.stream().filter(i -> !i.isStacking()).toList();
       if(stacking.isEmpty() && nonStacking.isEmpty()) return null;
       
       boolean prevailStacking = true;
@@ -88,7 +98,7 @@ public class Conditions {
          }
       }
       
-      return new ImmutableTriple<>(prevailValue,prevailStacking,prevailParticles);
+      return new ImmutableTriple<>(prevailValue, prevailStacking, prevailParticles);
    }
    
    // Adds a condition to an entity, returns if that condition instance was already applied
@@ -97,6 +107,21 @@ public class Conditions {
    public static boolean addCondition(MinecraftServer server, LivingEntity entity, ConditionInstance instance){
       ConditionData data = getConditionData();
       ArrayList<ConditionInstance> conditions = data.getConditions(entity.getUUID());
+      
+      if(!instance.getCondition().value().canApply(entity)) return false;
+      if(instance.getCondition().value().isHarmful()){
+         UUID inflictedBy = instance.getInflictedBy();
+         LivingEntity inflictedEntity = MinecraftUtils.findLivingEntity(server, inflictedBy);
+         if(inflictedEntity != null){
+            if(inflictedEntity.isAlliedTo(entity)){
+               return false;
+            }
+            if(entity instanceof ServerPlayer player){
+               if(inflictedEntity instanceof ServerPlayer otherPlayer && !otherPlayer.canHarmPlayer(player)) return false;
+            }
+         }
+      }
+      
       boolean hadType = conditions.stream().anyMatch(ci -> ci.getCondition().equals(instance.getCondition()));
       for(int i = 0; i < conditions.size(); i++){
          ConditionInstance existing = conditions.get(i);
@@ -107,7 +132,7 @@ public class Conditions {
       }
       conditions.add(instance);
       if(!hadType){
-         Triple<Float,Boolean,Boolean> stats = getPrevalingCondition(entity.getUUID(), instance.getCondition());
+         Triple<Float, Boolean, Boolean> stats = getPrevalingCondition(entity.getUUID(), instance.getCondition());
          if(stats != null) instance.getCondition().value().onApply(server, entity, stats.getLeft(), stats.getRight());
       }
       return false;
@@ -120,7 +145,7 @@ public class Conditions {
       // Collect distinct condition types and trigger onRemove for each
       conditions.stream().map(ConditionInstance::getCondition).distinct()
             .forEach(holder -> {
-               Triple<Float,Boolean,Boolean> stats = getPrevalingCondition(entity.getUUID(), holder);
+               Triple<Float, Boolean, Boolean> stats = getPrevalingCondition(entity.getUUID(), holder);
                if(stats != null) holder.value().onRemove(server, entity, stats.getLeft(), stats.getRight());
             });
       data.getAllConditions().remove(entity.getUUID());
@@ -130,8 +155,8 @@ public class Conditions {
    public static boolean removeConditions(MinecraftServer server, LivingEntity entity, Holder<Condition> holder){
       ConditionData data = getConditionData();
       ArrayList<ConditionInstance> conditions = data.getConditions(entity.getUUID());
-      Triple<Float,Boolean,Boolean> stats = getPrevalingCondition(entity.getUUID(),holder);
-      if(stats != null) holder.value().onRemove(server,entity,stats.getLeft(),stats.getRight());
+      Triple<Float, Boolean, Boolean> stats = getPrevalingCondition(entity.getUUID(), holder);
+      if(stats != null) holder.value().onRemove(server, entity, stats.getLeft(), stats.getRight());
       return conditions.removeIf(inst -> inst.getCondition().equals(holder));
    }
    
@@ -139,10 +164,11 @@ public class Conditions {
    public static boolean removeCondition(MinecraftServer server, LivingEntity entity, Holder<Condition> holder, Identifier id){
       ConditionData data = getConditionData();
       ArrayList<ConditionInstance> conditions = data.getConditions(entity.getUUID());
-      Triple<Float,Boolean,Boolean> stats = getPrevalingCondition(entity.getUUID(),holder);
+      Triple<Float, Boolean, Boolean> stats = getPrevalingCondition(entity.getUUID(), holder);
       boolean removed = conditions.removeIf(inst -> inst.getCondition().equals(holder) && inst.getId().equals(id));
       if(removed){
-         if(stats != null && conditions.stream().noneMatch(inst -> inst.getCondition().equals(holder))) holder.value().onRemove(server,entity,stats.getLeft(),stats.getRight());
+         if(stats != null && conditions.stream().noneMatch(inst -> inst.getCondition().equals(holder)))
+            holder.value().onRemove(server, entity, stats.getLeft(), stats.getRight());
       }
       return removed;
    }

@@ -1,5 +1,6 @@
 package net.borisshoes.borislib.conditions;
 
+import net.borisshoes.borislib.BorisLib;
 import net.minecraft.core.particles.ColorParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.Identifier;
@@ -17,6 +18,11 @@ public class DecayCondition extends Condition{
    
    protected DecayCondition(){
       super(Identifier.fromNamespaceAndPath(MOD_ID, "decay"), MobEffectCategory.HARMFUL, 0.0f, 0.0f, Float.MAX_VALUE);
+   }
+   
+   @Override
+   public boolean canApply(LivingEntity entity){
+      return !entity.getType().is(BorisLib.IGNORES_DECAY);
    }
    
    @Override

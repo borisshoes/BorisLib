@@ -39,6 +39,11 @@ public class NearsightCondition extends Condition {
    }
    
    @Override
+   public boolean canApply(LivingEntity entity){
+      return !entity.getType().is(BorisLib.IGNORES_NEARSIGHT);
+   }
+   
+   @Override
    public void onTick(MinecraftServer server, LivingEntity entity, float value, boolean particles){
       value = -value;
       if(entity.level() instanceof ServerLevel level){

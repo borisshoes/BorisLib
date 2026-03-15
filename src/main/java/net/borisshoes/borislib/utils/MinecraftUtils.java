@@ -63,6 +63,14 @@ import static org.apache.logging.log4j.Level.WARN;
 
 public class MinecraftUtils {
    
+   public static LivingEntity findLivingEntity(MinecraftServer server, UUID entityId){
+      for(ServerLevel level : server.getAllLevels()){
+         Entity entity = level.getEntity(entityId);
+         if(entity instanceof LivingEntity living) return living;
+      }
+      return null;
+   }
+   
    /**
     * Returns the first item in the registry that matches the given tag.
     * @param tag The TagKey to search for

@@ -1,5 +1,6 @@
 package net.borisshoes.borislib.conditions;
 
+import net.borisshoes.borislib.BorisLib;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.resources.Identifier;
@@ -15,6 +16,11 @@ public class FeebleCondition extends Condition{
    
    protected FeebleCondition(){
       super(Identifier.fromNamespaceAndPath(MOD_ID,"feeble"), MobEffectCategory.HARMFUL, 1.0f, 0.0f, 1.0f, true);
+   }
+   
+   @Override
+   public boolean canApply(LivingEntity entity){
+      return !entity.getType().is(BorisLib.IGNORES_FEEBLE);
    }
    
    @Override
