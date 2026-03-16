@@ -7,6 +7,7 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.borisshoes.borislib.config.ConfigValue;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.util.Mth;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
@@ -30,7 +31,7 @@ public class IntConfigValue extends ConfigValue<Integer> {
    
    @Override
    public Integer getFromString(String value){
-      return Integer.parseInt(value);
+      return Mth.clamp(Integer.parseInt(value), limits.min, limits.max);
    }
    
    @Override

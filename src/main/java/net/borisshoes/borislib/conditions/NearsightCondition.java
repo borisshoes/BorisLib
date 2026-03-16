@@ -35,7 +35,7 @@ public class NearsightCondition extends Condition {
    private static final Identifier TRANSPARENT_ID = Identifier.fromNamespaceAndPath(MOD_ID, "nearsight_transparent");
    
    protected NearsightCondition(){
-      super(Identifier.fromNamespaceAndPath(MOD_ID, "nearsight"), MobEffectCategory.HARMFUL, 0.0f, -128.0f, 0.0f);
+      super(Identifier.fromNamespaceAndPath(MOD_ID, "nearsight"), MobEffectCategory.HARMFUL, 0.0f, 0.0f, 128.0f, true);
    }
    
    @Override
@@ -45,7 +45,6 @@ public class NearsightCondition extends Condition {
    
    @Override
    public void onTick(MinecraftServer server, LivingEntity entity, float value, boolean particles){
-      value = -value;
       if(entity.level() instanceof ServerLevel level){
          if(particles && level.random.nextFloat() < 0.1){
             double width = entity.getBbWidth();

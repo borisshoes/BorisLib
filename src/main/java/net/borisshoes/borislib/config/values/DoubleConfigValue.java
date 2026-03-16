@@ -7,6 +7,7 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.borisshoes.borislib.config.ConfigValue;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.util.Mth;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.CompletableFuture;
@@ -27,7 +28,7 @@ public class DoubleConfigValue extends ConfigValue<Double> {
    
    @Override
    public Double getFromString(String value){
-      return Double.parseDouble(value);
+      return Mth.clamp(Double.parseDouble(value), limits.min, limits.max);
    }
    
    @Override

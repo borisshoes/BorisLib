@@ -63,6 +63,8 @@ public class Conditions {
       
       boolean prevailStacking = true;
       boolean prevailParticles = false;
+      boolean hasStacking = !stacking.isEmpty();
+      boolean hasNonStacking = !nonStacking.isEmpty();
       float prevailValue = 0;
       
       float base = holder.value().getBase();
@@ -81,7 +83,12 @@ public class Conditions {
          if(multTot.hasParticles()) prevailParticles = true;
       }
       prevailValue = holder.value().sanitizeValue(baseModded);
+      if(!hasNonStacking){
+         if(prevailValue == holder.value().getBase()) return null;
+         return new ImmutableTriple<>(prevailValue, true, prevailParticles);
+      }
       
+      boolean init = false;
       for(ConditionInstance instance : nonStacking){
          base = holder.value().getBase();
          if(instance.getOperation() == AttributeModifier.Operation.ADD_VALUE){
@@ -91,13 +98,17 @@ public class Conditions {
          }else if(instance.getOperation() == AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL){
             base *= 1.0f + instance.getValue();
          }
-         if(holder.value().isReversedImportance() ? base < prevailValue : base > prevailValue){
+         base = holder.value().sanitizeValue(base);
+         boolean replace = (!init && !hasStacking) || (holder.value().isReversedImportance() ? base < prevailValue : base > prevailValue);
+         if(replace){
             prevailValue = base;
             prevailStacking = false;
+            init = true;
             prevailParticles = instance.hasParticles();
          }
       }
       
+      if(prevailValue == holder.value().getBase()) return null;
       return new ImmutableTriple<>(prevailValue, prevailStacking, prevailParticles);
    }
    

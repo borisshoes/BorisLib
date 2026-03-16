@@ -38,7 +38,7 @@ public class LivingEntityMixin {
    private boolean borislib$canTarget(boolean original, LivingEntity target){
       LivingEntity livingEntity = (LivingEntity) (Object) this;
       float nearsight = Conditions.getConditionValue(livingEntity.getUUID(),Conditions.NEARSIGHT);
-      boolean outOfRange = target.distanceTo(livingEntity) > Math.abs(nearsight) / 2.0;
+      boolean outOfRange = target.distanceTo(livingEntity) > nearsight / 2.0;
       if(nearsight != Conditions.NEARSIGHT.value().getBase() && outOfRange && !livingEntity.getType().is(BorisLib.IGNORES_NEARSIGHT)){
          return false;
       }

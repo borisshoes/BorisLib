@@ -75,8 +75,12 @@ public class BorisLibCommands {
                                                 .then(argument("operation", string()).suggests(BorisLibCommands::suggestOperations)
                                                       .then(argument("particles", bool())
                                                             .then(argument("stacking", bool())
-                                                                  .then(argument("identifier", id())
-                                                                        .executes(BorisLibCommands::conditionAddFull))))
+                                                                  .then(argument("persistent", bool())
+                                                                        .then(argument("inflictedBy", entity())
+                                                                              .then(argument("identifier", id())
+                                                                                    .executes(BorisLibCommands::conditionAddFullWithInflicter)))
+                                                                        .then(argument("identifier", id())
+                                                                              .executes(BorisLibCommands::conditionAddFull)))))
                                                       .then(argument("identifier", id())
                                                             .executes(BorisLibCommands::conditionAddShort))))))))
                   .then(literal("remove")
@@ -451,38 +455,19 @@ public class BorisLibCommands {
       }
    }
    
+   private static int conditionAddFullWithInflicter(CommandContext<CommandSourceStack> context){
+      try{
+         Entity inflicter = getEntity(context, "inflictedBy");
+         return conditionAdd(context, getBool(context, "particles"), getBool(context, "stacking"), getBool(context, "persistent"), inflicter);
+      }catch(Exception e){
+         context.getSource().sendFailure(Component.translatable("command.borislib.condition.error", e.getMessage()));
+         return 0;
+      }
+   }
+   
    private static int conditionAddFull(CommandContext<CommandSourceStack> context){
       try{
-         Entity target = getEntity(context, "entity");
-         if(!(target instanceof LivingEntity living)){
-            context.getSource().sendFailure(Component.translatable("command.borislib.condition.not_living_entity"));
-            return 0;
-         }
-         Holder<Condition> holder = resolveCondition(getId(context, "condition"));
-         if(holder == null){
-            context.getSource().sendFailure(Component.translatable("command.borislib.condition.unknown_condition", getId(context, "condition").toString()));
-            return 0;
-         }
-         float value = getFloat(context, "value");
-         int duration = getInteger(context, "duration");
-         AttributeModifier.Operation operation = resolveOperation(getString(context, "operation"));
-         if(operation == null){
-            context.getSource().sendFailure(Component.translatable("command.borislib.condition.unknown_operation", getString(context, "operation")));
-            return 0;
-         }
-         boolean particles = getBool(context, "particles");
-         boolean stacking = getBool(context, "stacking");
-         Identifier id = getId(context, "identifier");
-         
-         ConditionInstance instance = new ConditionInstance(holder, id, duration, value, stacking, particles, operation);
-         boolean replaced = Conditions.addCondition(context.getSource().getServer(), living, instance);
-         
-         String detailKey = "command.borislib.condition.add.details_full";
-         context.getSource().sendSuccess(() -> Component.translatable(replaced ? "command.borislib.condition.add.replaced" : "command.borislib.condition.add.added",
-               holder.value().getName().withStyle(ChatFormatting.GREEN),
-               target.getDisplayName(),
-               Component.translatable(detailKey, id.toString(), value, duration, operation.name(), particles, stacking).withStyle(ChatFormatting.GRAY)), true);
-         return 1;
+         return conditionAdd(context, getBool(context, "particles"), getBool(context, "stacking"), getBool(context, "persistent"), null);
       }catch(Exception e){
          context.getSource().sendFailure(Component.translatable("command.borislib.condition.error", e.getMessage()));
          return 0;
@@ -491,37 +476,55 @@ public class BorisLibCommands {
    
    private static int conditionAddShort(CommandContext<CommandSourceStack> context){
       try{
-         Entity target = getEntity(context, "entity");
-         if(!(target instanceof LivingEntity living)){
-            context.getSource().sendFailure(Component.translatable("command.borislib.condition.not_living_entity"));
-            return 0;
-         }
-         Holder<Condition> holder = resolveCondition(getId(context, "condition"));
-         if(holder == null){
-            context.getSource().sendFailure(Component.translatable("command.borislib.condition.unknown_condition", getId(context, "condition").toString()));
-            return 0;
-         }
-         float value = getFloat(context, "value");
-         int duration = getInteger(context, "duration");
-         AttributeModifier.Operation operation = resolveOperation(getString(context, "operation"));
-         if(operation == null){
-            context.getSource().sendFailure(Component.translatable("command.borislib.condition.unknown_operation", getString(context, "operation")));
-            return 0;
-         }
-         Identifier id = getId(context, "identifier");
-         
-         ConditionInstance instance = new ConditionInstance(holder, id, duration, value, true, true, operation);
-         boolean replaced = Conditions.addCondition(context.getSource().getServer(), living, instance);
-         
-         context.getSource().sendSuccess(() -> Component.translatable(replaced ? "command.borislib.condition.add.replaced" : "command.borislib.condition.add.added",
-               holder.value().getName().withStyle(ChatFormatting.GREEN),
-               target.getDisplayName(),
-               Component.translatable("command.borislib.condition.add.details_short", id.toString(), value, duration, operation.name()).withStyle(ChatFormatting.GRAY)), true);
-         return 1;
+         return conditionAdd(context, true, true, false, null);
       }catch(Exception e){
          context.getSource().sendFailure(Component.translatable("command.borislib.condition.error", e.getMessage()));
          return 0;
       }
+   }
+   
+   private static int conditionAdd(CommandContext<CommandSourceStack> context, boolean particles, boolean stacking, boolean persistent, Entity inflicter) throws Exception {
+      Entity target = getEntity(context, "entity");
+      if(!(target instanceof LivingEntity living)){
+         context.getSource().sendFailure(Component.translatable("command.borislib.condition.not_living_entity"));
+         return 0;
+      }
+      Holder<Condition> holder = resolveCondition(getId(context, "condition"));
+      if(holder == null){
+         context.getSource().sendFailure(Component.translatable("command.borislib.condition.unknown_condition", getId(context, "condition").toString()));
+         return 0;
+      }
+      float value = getFloat(context, "value");
+      int duration = getInteger(context, "duration");
+      AttributeModifier.Operation operation = resolveOperation(getString(context, "operation"));
+      if(operation == null){
+         context.getSource().sendFailure(Component.translatable("command.borislib.condition.unknown_operation", getString(context, "operation")));
+         return 0;
+      }
+      Identifier id = getId(context, "identifier");
+      UUID inflictedByUuid = inflicter != null ? inflicter.getUUID() : null;
+      
+      ConditionInstance instance = new ConditionInstance(holder, id, duration, value, stacking, particles, persistent, operation, inflictedByUuid);
+      boolean replaced = Conditions.addCondition(context.getSource().getServer(), living, instance);
+      
+      String detailKey;
+      Object[] detailArgs;
+      if(inflicter != null){
+         detailKey = "command.borislib.condition.add.details_full_inflicter";
+         detailArgs = new Object[]{id.toString(), value, duration, operation.name(), particles, stacking, persistent, inflicter.getDisplayName()};
+      }else if(persistent || !particles || !stacking){
+         detailKey = "command.borislib.condition.add.details_full";
+         detailArgs = new Object[]{id.toString(), value, duration, operation.name(), particles, stacking, persistent};
+      }else{
+         detailKey = "command.borislib.condition.add.details_short";
+         detailArgs = new Object[]{id.toString(), value, duration, operation.name()};
+      }
+      
+      context.getSource().sendSuccess(() -> Component.translatable(replaced ? "command.borislib.condition.add.replaced" : "command.borislib.condition.add.added",
+            holder.value().getName().withStyle(ChatFormatting.GREEN),
+            target.getDisplayName(),
+            Component.translatable(detailKey, detailArgs).withStyle(ChatFormatting.GRAY)), true);
+      return 1;
    }
    
    private static int conditionRemove(CommandContext<CommandSourceStack> context){
@@ -623,12 +626,12 @@ public class BorisLibCommands {
             context.getSource().sendFailure(Component.translatable("command.borislib.condition.get_instance.not_found",
                   holder.value().getName(), id.toString(), target.getDisplayName()));
             return 0;
-         }else{
-            context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get_instance.success",
-                  holder.value().getName().withStyle(ChatFormatting.GREEN),
-                  Component.literal("[" + id + "]").withStyle(ChatFormatting.GRAY),
-                  target.getDisplayName(),
-                  Component.translatable("command.borislib.condition.get_instance.details", inst.getValue(), inst.getDuration(), inst.getTimer(), inst.getOperation().name(), inst.isStacking(), inst.hasParticles()).withStyle(ChatFormatting.YELLOW)), false);
+          }else{
+             context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get_instance.success",
+                   holder.value().getName().withStyle(ChatFormatting.GREEN),
+                   Component.literal("[" + id + "]").withStyle(ChatFormatting.GRAY),
+                   target.getDisplayName(),
+                   Component.translatable("command.borislib.condition.get_instance.details", inst.getValue(), inst.getDuration(), inst.getTimer(), inst.getOperation().name(), inst.isStacking(), inst.hasParticles(), inst.isPersistent(), inst.getInflictedBy() != null ? inst.getInflictedBy().toString() : "none").withStyle(ChatFormatting.YELLOW)), false);
             return 1;
          }
       }catch(Exception e){
@@ -674,10 +677,10 @@ public class BorisLibCommands {
                   holder.value().getName().withStyle(ChatFormatting.GREEN),
                   target.getDisplayName(),
                   Component.literal(String.valueOf(instances.size())).withStyle(ChatFormatting.GRAY)), false);
-            for(ConditionInstance inst : instances){
-               context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get_instances.entry",
-                     Component.literal(inst.getId().toString()).withStyle(ChatFormatting.AQUA),
-                     Component.translatable("command.borislib.condition.get_instance.details", inst.getValue(), inst.getDuration(), inst.getTimer(), inst.getOperation().name(), inst.isStacking(), inst.hasParticles()).withStyle(ChatFormatting.GRAY)), false);
+             for(ConditionInstance inst : instances){
+                context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get_instances.entry",
+                      Component.literal(inst.getId().toString()).withStyle(ChatFormatting.AQUA),
+                      Component.translatable("command.borislib.condition.get_instance.details", inst.getValue(), inst.getDuration(), inst.getTimer(), inst.getOperation().name(), inst.isStacking(), inst.hasParticles(), inst.isPersistent(), inst.getInflictedBy() != null ? inst.getInflictedBy().toString() : "none").withStyle(ChatFormatting.GRAY)), false);
             }
          }
          return instances.size();
