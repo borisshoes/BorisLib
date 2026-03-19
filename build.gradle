@@ -11,6 +11,10 @@ base {
 }
 
 
+loom {
+    accessWidenerPath = file("src/main/resources/borislib.accesswidener")
+}
+
 fabricApi {
     configureDataGeneration {
         client = true

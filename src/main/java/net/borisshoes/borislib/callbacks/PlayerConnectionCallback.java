@@ -2,6 +2,7 @@ package net.borisshoes.borislib.callbacks;
 
 import net.borisshoes.borislib.BorisLib;
 import net.borisshoes.borislib.datastorage.DataAccess;
+import net.borisshoes.borislib.network.MetricsBar;
 import net.borisshoes.borislib.tracker.PlayerMovementEntry;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.server.MinecraftServer;
@@ -23,19 +24,21 @@ public class PlayerConnectionCallback {
          PLAYER_MOVEMENT_TRACKER.put(player, PlayerMovementEntry.blankEntry(player));
       }
       
+      MetricsBar.addPlayerIfViewer(player);
+      
       UUID playerId = player.getUUID();
       LoginCallbackContainer container = DataAccess.getPlayer(playerId, BorisLib.LOGIN_CALLBACKS_KEY);
       
       ArrayList<LoginCallback> toBeRemoved = new ArrayList<>();
       for(LoginCallback callback : container.getCallbacks()){
          if(callback.getPlayer().equals(player.getStringUUID())){
-            callback.onLogin(handler,server);
+            callback.onLogin(handler, server);
             toBeRemoved.add(callback);
          }
       }
-      for(LoginCallback callback :toBeRemoved){
+      for(LoginCallback callback : toBeRemoved){
          container.removeCallback(callback);
-         DataAccess.setPlayer(playerId,BorisLib.LOGIN_CALLBACKS_KEY,container);
+         DataAccess.setPlayer(playerId, BorisLib.LOGIN_CALLBACKS_KEY, container);
       }
    }
    

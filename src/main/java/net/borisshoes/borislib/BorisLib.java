@@ -9,6 +9,12 @@ import net.borisshoes.borislib.config.ConfigManager;
 import net.borisshoes.borislib.config.ConfigSetting;
 import net.borisshoes.borislib.config.IConfigSetting;
 import net.borisshoes.borislib.config.values.BooleanConfigValue;
+import net.borisshoes.borislib.config.values.EnumConfigValue;
+import net.borisshoes.borislib.config.values.IntConfigValue;
+import net.borisshoes.borislib.config.values.ListConfigValue;
+import net.borisshoes.borislib.config.values.StringConfigValue;
+import net.borisshoes.borislib.network.BatchingMode;
+import net.borisshoes.borislib.network.Metrics;
 import net.borisshoes.borislib.datastorage.DataAccess;
 import net.borisshoes.borislib.datastorage.DataKey;
 import net.borisshoes.borislib.datastorage.DataRegistry;
@@ -44,6 +50,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.UUID;
 
 
@@ -80,14 +87,61 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
    public static final DataKey<LoginCallbackContainer> LOGIN_CALLBACKS_KEY = DataRegistry.register(DataKey.ofPlayer(Identifier.fromNamespaceAndPath(MOD_ID, "login_callbacks"), LoginCallbackContainer::new));
    public static final DataKey<DefaultPlayerData> PLAYER_DATA_KEY = DataRegistry.register(DataKey.ofPlayer(Identifier.fromNamespaceAndPath(MOD_ID, "playerdata"), DefaultPlayerData::new));
    
-   public static final IConfigSetting<?> PARTICLE_PACKET_BUNDLE_OPTIMIZATION = registerConfigSetting(new ConfigSetting<>(
-         new BooleanConfigValue("particlePacketBundleOptimization", false)));
    public static final IConfigSetting<?> TESTMOD_FEATURES_ENABLED = registerConfigSetting(new ConfigSetting<>(
          new BooleanConfigValue("testmodFeaturesEnabled", false)));
+   public static final IConfigSetting<?> BATCHING_ENABLED = registerConfigSetting(new ConfigSetting<>(
+         new BooleanConfigValue("batchingEnabled", true)));
+   public static final IConfigSetting<?> BATCHING_MODE = registerConfigSetting(new ConfigSetting<>(
+         new EnumConfigValue<>("batchingMode", BatchingMode.SMART_EXECUTION, BatchingMode.class)));
+   public static final IConfigSetting<?> BATCHING_MAX_BATCH_SIZE = registerConfigSetting(new ConfigSetting<>(
+         new IntConfigValue("batchingMaxBatchSize", 1024, new IntConfigValue.IntLimits(1, 4096))));
+   public static final IConfigSetting<?> BATCHING_MAX_BATCH_BYTES = registerConfigSetting(new ConfigSetting<>(
+         new IntConfigValue("batchingMaxBatchBytes", 32000, new IntConfigValue.IntLimits(512, 64000))));
+   public static final IConfigSetting<?> BATCHING_FLUSH_INTERVAL = registerConfigSetting(new ConfigSetting<>(
+         new IntConfigValue("batchingFlushInterval", 25, new IntConfigValue.IntLimits(1))));
+   public static final IConfigSetting<?> BATCHING_SAFETY_MARGIN = registerConfigSetting(new ConfigSetting<>(
+         new IntConfigValue("batchingSafetyMarginBytes", 64)));
+   public static final IConfigSetting<?> BATCHING_INSTANT_PACKETS = registerConfigSetting(new ConfigSetting<>(
+         new ListConfigValue<>("batchingInstantPackets",
+               List.of("ClientboundHurtAnimationPacket", "ClientboundDamageEventPacket", "ClientboundBlockEntityDataPacket"),
+               new StringConfigValue("", ""))));
+   public static final IConfigSetting<?> BATCHING_IGNORED_PACKETS = registerConfigSetting(new ConfigSetting<>(
+         new ListConfigValue<>("batchingIgnoredPackets", List.of(), new StringConfigValue("", ""))));
+   public static final IConfigSetting<?> BATCHING_CHAT_BYPASS = registerConfigSetting(new ConfigSetting<>(
+         new BooleanConfigValue("batchingChatPacketsBypass", true)));
+   public static final IConfigSetting<?> BATCHING_OFF_THREAD_BYPASS = registerConfigSetting(new ConfigSetting<>(
+         new BooleanConfigValue("batchingOffThreadBypass", true)));
+   public static final IConfigSetting<?> BATCHING_PACKET_COALESCING = registerConfigSetting(new ConfigSetting<>(
+         new BooleanConfigValue("batchingPacketCoalescing", true)));
+   public static final IConfigSetting<?> BATCHING_COALESCE_PACKETS = registerConfigSetting(new ConfigSetting<>(
+         new ListConfigValue<>("batchingCoalescePackets",
+               List.of("ClientboundLevelParticlesPacket", "ClientboundSoundPacket", "ClientboundSoundEntityPacket"),
+               new StringConfigValue("", ""))));
+   public static final IConfigSetting<?> BATCHING_COALESCE_BUNDLE_LIMIT = registerConfigSetting(new ConfigSetting<>(
+         new IntConfigValue("batchingCoalesceBundleLimit", 4000, new IntConfigValue.IntLimits(1, 4096))));
+   public static final IConfigSetting<?> OPT_EXPLOSIONS_ENABLED = registerConfigSetting(new ConfigSetting<>(
+         new BooleanConfigValue("optExplosionsEnabled", true)));
+   public static final IConfigSetting<?> OPT_EXPLOSIONS_THRESHOLD = registerConfigSetting(new ConfigSetting<>(
+         new IntConfigValue("optExplosionsBlockChangeThreshold", 512, new IntConfigValue.IntLimits(1))));
+   public static final IConfigSetting<?> OPT_EXPLOSIONS_LOG = registerConfigSetting(new ConfigSetting<>(
+         new BooleanConfigValue("optExplosionsLogOptimizations", false)));
+   public static final IConfigSetting<?> METRICS_ENABLED = registerConfigSetting(new ConfigSetting<>(
+         new BooleanConfigValue("metricsEnabled", true)));
+   public static final IConfigSetting<?> METRICS_UPDATE_INTERVAL = registerConfigSetting(new ConfigSetting<>(
+         new IntConfigValue("metricsUpdateInterval", 1, new IntConfigValue.IntLimits(1, 60))));
+   public static final IConfigSetting<?> METRICS_MODULE_NETWORK = registerConfigSetting(new ConfigSetting<>(
+         new BooleanConfigValue("metricsModuleNetwork", true)));
+   public static final IConfigSetting<?> METRICS_MODULE_CPU = registerConfigSetting(new ConfigSetting<>(
+         new BooleanConfigValue("metricsModuleCpu", true)));
+   public static final IConfigSetting<?> METRICS_MODULE_MEMORY = registerConfigSetting(new ConfigSetting<>(
+         new BooleanConfigValue("metricsModuleMemory", true)));
    
    @Override
    public void onInitialize(){
       CONFIG = new ConfigManager(MOD_ID, "Boris Lib", CONFIG_NAME, BorisLib.CONFIG_SETTINGS);
+      
+      // Start network optimization metrics
+      Metrics.start();
       
       Conditions.initialize();
       PolymerResourcePackUtils.addModAssets(MOD_ID);

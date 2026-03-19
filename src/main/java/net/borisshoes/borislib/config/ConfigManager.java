@@ -11,9 +11,7 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.contents.TranslatableContents;
 
 import java.io.*;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static net.borisshoes.borislib.BorisLib.LOGGER;
@@ -23,6 +21,7 @@ import static net.minecraft.commands.Commands.literal;
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class ConfigManager {
    public Set<ConfigValue> values;
+   private final Map<String, ConfigValue> nameIndex = new HashMap<>();
    private final File file;
    private final String modId;
    private final String modName;
@@ -32,8 +31,16 @@ public class ConfigManager {
       this.modName = modName;
       this.file = FabricLoader.getInstance().getConfigDir().resolve(fileName).toFile();
       this.values = configRegistry.stream().map(IConfigSetting::makeConfigValue).collect(Collectors.toCollection(HashSet::new));
+      rebuildIndex();
       this.read();
       this.save();
+   }
+   
+   private void rebuildIndex(){
+      nameIndex.clear();
+      for(ConfigValue value : values){
+         nameIndex.put(value.name, value);
+      }
    }
    
    public void read(){
@@ -57,8 +64,8 @@ public class ConfigManager {
             String valueName = configLine.substring(0, splitIndex).strip();
             String valueValue = configLine.substring(splitIndex + 1).strip();
             
-            for(ConfigValue value : this.values){
-               if(!valueName.equals(value.name)) continue;
+            ConfigValue value = nameIndex.get(valueName);
+            if(value != null){
                Object defaultValue = value.defaultValue;
                try{
                   value.setValue(value.getFromString(valueValue));
@@ -142,7 +149,8 @@ public class ConfigManager {
    
    
    public Object getValue(String name){
-      return values.stream().filter(value -> value.name.equals(name)).findFirst().map(iConfigValue -> iConfigValue.value).orElse(null);
+      ConfigValue cv = nameIndex.get(name);
+      return cv != null ? cv.value : null;
    }
    
    public Object getValue(IConfigSetting<?> setting){
