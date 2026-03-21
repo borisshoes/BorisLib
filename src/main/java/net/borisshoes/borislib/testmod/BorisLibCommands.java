@@ -39,6 +39,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 import org.apache.commons.lang3.tuple.Triple;
+import org.w3c.dom.Text;
 
 import java.util.List;
 import java.util.Locale;
@@ -770,6 +771,15 @@ public class BorisLibCommands {
       context.getSource().sendSuccess(() -> Component.empty(), false);
       context.getSource().sendSuccess(() -> Component.translatable("command.borislib.netstats.network.bandwidth", speedStr).withStyle(ChatFormatting.WHITE), false);
       context.getSource().sendSuccess(() -> Component.translatable("command.borislib.netstats.network.optimized_chunks", Metrics.optimizedChunks.get()).withStyle(ChatFormatting.YELLOW), false);
+      context.getSource().sendSuccess(() -> Component.empty(), false);
+      long wqQueued = (long) Metrics.writeQueuedPps;
+      long wqTasks = (long) Metrics.eventLoopTasksPps;
+      long wqSaved = (long) Metrics.savedTasksPps;
+      long wqTotalSaved = Metrics.totalSavedTasks.get();
+      String wqTotalStr = TextUtils.readableLong(wqTotalSaved);
+      context.getSource().sendSuccess(() -> Component.translatable("command.borislib.netstats.network.write_queue_header").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), false);
+      context.getSource().sendSuccess(() -> Component.translatable("command.borislib.netstats.network.write_queue_rate", wqQueued, wqTasks).withStyle(ChatFormatting.WHITE), false);
+      context.getSource().sendSuccess(() -> Component.translatable("command.borislib.netstats.network.write_queue_saved", wqSaved, wqTotalStr).withStyle(ChatFormatting.GREEN), false);
    }
    
    private static void sendCpuStats(CommandContext<CommandSourceStack> context){

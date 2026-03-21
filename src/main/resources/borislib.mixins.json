@@ -11,7 +11,7 @@
     "InventoryAccessor",
     "LivingEntityMixin",
     "SectionBlocksUpdatePacketAccessor",
-    "ServerCommonPacketListenerImplMxiin",
+    "ServerCommonPacketListenerImplMixin",
     "ServerGamePacketListenerImplMixin",
     "ServerPlayerMixin"
   ],

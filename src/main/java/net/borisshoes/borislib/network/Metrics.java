@@ -22,6 +22,10 @@ public class Metrics {
    public static final AtomicLong optimizedChunks = new AtomicLong(0);
    public static final AtomicLong totalBytesSent = new AtomicLong(0);
    
+   // Write queue counters — track event loop task submission savings
+   public static final AtomicLong writeQueuedCounter = new AtomicLong(0);    // packets that entered the writeQueue
+   public static final AtomicLong eventLoopTasksSubmitted = new AtomicLong(0); // actual event loop tasks submitted in flush
+   
    // Derived metrics (computed periodically)
    public static volatile double ppsLogical = 0;
    public static volatile double ppsPhysical = 0;
@@ -31,10 +35,18 @@ public class Metrics {
    public static final AtomicLong totalSavedSyscalls = new AtomicLong(0);
    public static volatile double networkSpeedKbs = 0;
    
+   // Write queue derived metrics
+   public static volatile double writeQueuedPps = 0;        // packets queued per second
+   public static volatile double eventLoopTasksPps = 0;      // event loop tasks per second
+   public static volatile double savedTasksPps = 0;          // avoided task submissions per second
+   public static final AtomicLong totalSavedTasks = new AtomicLong(0); // cumulative saved submissions
+   
    // Previous sample values for delta calculation
    private static long lastLogical = 0;
    private static long lastPhysical = 0;
    private static long lastBytes = 0;
+   private static long lastWriteQueued = 0;
+   private static long lastEventLoopTasks = 0;
    
    private static final ScheduledExecutorService metricsScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
       Thread t = new Thread(r, "borislib-metrics");
@@ -80,9 +92,23 @@ public class Metrics {
                networkSpeedKbs = (bytesDiff / 1024.0) / interval;
             }
             
-            lastLogical = currentLogical;
-            lastPhysical = currentPhysical;
-            lastBytes = currentBytes;
+             lastLogical = currentLogical;
+             lastPhysical = currentPhysical;
+             lastBytes = currentBytes;
+             
+              // Write queue metrics
+              if(isModuleWriteQueueEnabled()){
+                 long currentWQ = writeQueuedCounter.get();
+                 long currentEL = eventLoopTasksSubmitted.get();
+                 writeQueuedPps = (double) (currentWQ - lastWriteQueued) / interval;
+                 eventLoopTasksPps = (double) (currentEL - lastEventLoopTasks) / interval;
+                 savedTasksPps = Math.max(0, writeQueuedPps - eventLoopTasksPps);
+                 if(savedTasksPps > 0){
+                    totalSavedTasks.addAndGet((long) (savedTasksPps * interval));
+                 }
+                 lastWriteQueued = currentWQ;
+                 lastEventLoopTasks = currentEL;
+              }
             
             // CPU usage
             if(osBean != null && isModuleCpuEnabled()){
@@ -131,6 +157,8 @@ public class Metrics {
       physicalCounter.set(0);
       optimizedChunks.set(0);
       totalBytesSent.set(0);
+      writeQueuedCounter.set(0);
+      eventLoopTasksSubmitted.set(0);
       ppsLogical = 0;
       ppsPhysical = 0;
       cpuUsage = 0;
@@ -138,9 +166,15 @@ public class Metrics {
       savedAllocationsBytes.set(0);
       totalSavedSyscalls.set(0);
       networkSpeedKbs = 0;
+      writeQueuedPps = 0;
+      eventLoopTasksPps = 0;
+      savedTasksPps = 0;
+      totalSavedTasks.set(0);
       lastLogical = 0;
       lastPhysical = 0;
       lastBytes = 0;
+      lastWriteQueued = 0;
+      lastEventLoopTasks = 0;
    }
    
    // ─── Config helpers ─────────────────────────────────────────────────
@@ -169,6 +203,11 @@ public class Metrics {
    private static boolean isModuleMemoryEnabled(){
       if(BorisLib.CONFIG == null) return true;
       return BorisLib.CONFIG.getBoolean(BorisLib.METRICS_MODULE_MEMORY);
+   }
+   
+   private static boolean isModuleWriteQueueEnabled(){
+      if(BorisLib.CONFIG == null) return true;
+      return BorisLib.CONFIG.getBoolean(BorisLib.METRICS_MODULE_WRITE_QUEUE);
    }
 }
 

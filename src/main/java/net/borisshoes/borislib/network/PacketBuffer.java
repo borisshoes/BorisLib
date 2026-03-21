@@ -48,6 +48,14 @@ public class PacketBuffer {
    // Coalesce queue — packets queued here are wrapped into BundlePackets on flush
    private final ConcurrentLinkedQueue<PacketEntry> coalesceQueue = new ConcurrentLinkedQueue<>();
    
+   // Write queue — ALL default buffered packets are queued here instead of calling
+   // Connection.send() per packet. At flush time, ONE event loop task writes them all.
+   // On the event loop thread, Connection.send() takes the direct path (no lambda
+   // allocation, no cross-thread task scheduling). This replaces N expensive
+   // event loop task submissions with N cheap ConcurrentLinkedQueue.add() operations
+   // + 1 event loop task that writes everything.
+   private final ConcurrentLinkedQueue<PacketEntry> writeQueue = new ConcurrentLinkedQueue<>();
+   
    // Guard against re-entrant flush (explosion opt creates new packets that re-enter the pipeline)
    private boolean insideFlush = false;
    
@@ -62,6 +70,7 @@ public class PacketBuffer {
    private volatile boolean cachedExplosionLogEnabled;
    private volatile boolean cachedChatBypass;
    private volatile boolean cachedOffThreadBypass;
+   private volatile boolean cachedWriteQueue;
    private volatile boolean cachedPacketCoalescing;
    private volatile int cachedBundleLimit;
    private volatile BatchingMode cachedBatchingMode;
@@ -119,6 +128,7 @@ public class PacketBuffer {
          cachedExplosionLogEnabled = false;
          cachedChatBypass = true;
          cachedOffThreadBypass = true;
+         cachedWriteQueue = true;
          cachedPacketCoalescing = true;
          cachedBundleLimit = 4000;
          cachedBatchingMode = BatchingMode.SMART_EXECUTION;
@@ -134,6 +144,7 @@ public class PacketBuffer {
       cachedExplosionLogEnabled = BorisLib.CONFIG.getBoolean(BorisLib.OPT_EXPLOSIONS_LOG);
       cachedChatBypass = BorisLib.CONFIG.getBoolean(BorisLib.BATCHING_CHAT_BYPASS);
       cachedOffThreadBypass = BorisLib.CONFIG.getBoolean(BorisLib.BATCHING_OFF_THREAD_BYPASS);
+      cachedWriteQueue = BorisLib.CONFIG.getBoolean(BorisLib.BATCHING_WRITE_QUEUE);
       cachedPacketCoalescing = BorisLib.CONFIG.getBoolean(BorisLib.BATCHING_PACKET_COALESCING);
       cachedBundleLimit = BorisLib.CONFIG.getInt(BorisLib.BATCHING_COALESCE_BUNDLE_LIMIT);
       Object modeVal = BorisLib.CONFIG.getValue(BorisLib.BATCHING_MODE);
@@ -358,20 +369,24 @@ public class PacketBuffer {
          return;
       }
       
-      // ─── Default: BUFFER the packet (write WITHOUT flush) ────────────
-      // Call the original Connection.send() but with flush=false.
-      original.call(connection, packet, listener, false);
+      // ─── Default: QUEUE or BUFFER the packet ────────────
+      if(cachedWriteQueue){
+         // Write queue enabled: queue cheaply on the server thread instead of calling
+         // Connection.send() per packet. At flush time, ONE event loop task writes all
+         // queued packets — each write runs ON the event loop thread where Connection.send()
+         // takes the direct path (no lambda allocation, no cross-thread task scheduling).
+         writeQueue.add(new PacketEntry(packet, listener));
+         Metrics.writeQueuedCounter.incrementAndGet();
+      }else{
+         // Write queue disabled: fall back to per-packet Connection.send() with flush=false.
+         // Each call schedules a lambda on the event loop from the server thread.
+         original.call(connection, packet, listener, false);
+      }
       int count = bufferedCount.incrementAndGet();
       
-      // Count limit flush (cheap integer compare — check first)
+      // Count limit flush (cheap integer compare)
       if(count >= cachedMaxBatchSize){
          flush(FlushReason.LIMIT_COUNT);
-         return;
-      }
-      
-      // Byte limit flush (expensive Netty channel query — check only if count didn't trigger)
-      if(getPendingBytes() > (cachedMaxBatchBytes - cachedSafetyMargin)){
-         flush(FlushReason.LIMIT_BYTES);
       }
    }
    
@@ -381,31 +396,63 @@ public class PacketBuffer {
       if(insideFlush) return; // guard re-entrant flush
       insideFlush = true;
       try{
+         // Collect packets from internal queues (block optimization, coalescing, write queue)
+         List<PacketEntry> toWrite = new ArrayList<>();
+         
          // Process any pending block-update queue first
+         // (may trigger listener.send() for chunk resends, which bypass via insideFlush)
          if(!blockQueue.isEmpty()){
-            processBlockQueue();
+            processBlockQueue(toWrite);
          }
          
          // Coalesce queued packets into BundlePackets
          if(!coalesceQueue.isEmpty()){
-            processCoalesceQueue();
+            processCoalesceQueue(toWrite);
          }
          
-         long pending = getPendingBytes();
+         // Drain the general write queue (empty when write queue is disabled)
+         PacketEntry entry;
+         while((entry = writeQueue.poll()) != null){
+            toWrite.add(entry);
+         }
          
-         // Nothing to flush
-         if(bufferedCount.get() == 0 && pending == 0) return;
+         Channel channel = connectionAccess.borislib$getChannel();
          
-         // Track bytes for metrics
-         Metrics.totalBytesSent.addAndGet(pending);
-         
-         // THE ACTUAL FLUSH — one kernel syscall for the entire batch
-         connectionAccess.borislib$flushChannel();
+         if(!toWrite.isEmpty()){
+            // Queued packets need to be written — submit ONE event loop task.
+            // On the event loop thread, Connection.send() takes the direct write path —
+            // no lambda allocation, no cross-thread task scheduling per packet.
+            // The final channel.flush() also flushes any packets already in Netty's
+            // outbound buffer (from original.call() when write queue is disabled).
+            if(channel != null && channel.isOpen()){
+               channel.eventLoop().execute(() -> {
+                  if(!channel.isOpen()) return;
+                  for(PacketEntry pe : toWrite){
+                     connectionAccess.borislib$sendNoFlush(pe.packet(), pe.listener());
+                  }
+                  // Track bytes for metrics (safe to query Netty on event loop thread)
+                  if(channel.unsafe() != null && channel.unsafe().outboundBuffer() != null){
+                     Metrics.totalBytesSent.addAndGet(channel.unsafe().outboundBuffer().totalPendingWriteBytes());
+                  }
+                  // THE ACTUAL FLUSH — one kernel syscall for the entire batch
+                  channel.flush();
+               });
+               Metrics.physicalCounter.incrementAndGet();
+               Metrics.eventLoopTasksSubmitted.incrementAndGet();
+            }
+         }else if(bufferedCount.get() > 0){
+            // Write queue disabled — default packets are already in Netty's outbound buffer
+            // (written via original.call() with flush=false). Just flush the channel directly.
+            if(channel != null && channel.isOpen()){
+               Metrics.totalBytesSent.addAndGet(getPendingBytes());
+               connectionAccess.borislib$flushChannel();
+               Metrics.physicalCounter.incrementAndGet();
+            }
+         }
          
          // Reset counters
          bufferedCount.set(0);
          currentBatchBytes.set(0);
-         Metrics.physicalCounter.incrementAndGet();
       }finally{
          insideFlush = false;
       }
@@ -440,7 +487,7 @@ public class PacketBuffer {
       return 0;
    }
    
-   private void processBlockQueue(){
+   private void processBlockQueue(List<PacketEntry> toWrite){
       if(blockQueue.isEmpty()) return;
       
       // Drain into local list
@@ -453,11 +500,8 @@ public class PacketBuffer {
       
       // Need the player reference for world access
       if(!(listener instanceof ServerGamePacketListenerImpl gameListener)){
-         // Can't optimize without player — write each without flush
-         for(PacketEntry e : processingQueue){
-            connectionAccess.borislib$sendNoFlush(e.packet(), e.listener());
-            bufferedCount.incrementAndGet();
-         }
+         // Can't optimize without player — add to write batch
+         toWrite.addAll(processingQueue);
          return;
       }
       
@@ -490,33 +534,27 @@ public class PacketBuffer {
             LevelChunk chunk = gameListener.player.level().getChunk(x, z);
             
             if(chunk != null){
-               Metrics.optimizedChunks.incrementAndGet();
-               if(logOpt){
-                  LOGGER.info("Explosion optimization: replaced {} block updates in chunk [{}, {}] with full chunk resend",
-                        totalChanges, x, z);
-               }
-               
-               ServerLevel serverLevel = (ServerLevel) gameListener.player.level();
-               ClientboundLevelChunkWithLightPacket chunkPacket = new ClientboundLevelChunkWithLightPacket(
-                     chunk,
-                     serverLevel.getLightEngine(),
-                     null, null
-               );
-               // Send through the FULL pipeline (Polymer transforms the chunk data).
-               // insideFlush=true prevents our handleOutgoingPacket from re-buffering it;
-               // it will send with flush=true, which is fine for large chunk packets.
-               listener.send(chunkPacket);
+                Metrics.optimizedChunks.incrementAndGet();
+                if(logOpt){
+                   LOGGER.info("Explosion optimization: replaced {} block updates in chunk [{}, {}] with full chunk resend",
+                         totalChanges, x, z);
+                }
+                
+                ServerLevel serverLevel = (ServerLevel) gameListener.player.level();
+                ClientboundLevelChunkWithLightPacket chunkPacket = new ClientboundLevelChunkWithLightPacket(
+                      chunk,
+                      serverLevel.getLightEngine(),
+                      null, null
+                );
+                // Send through the FULL pipeline (Polymer transforms the chunk data).
+                // insideFlush=true prevents our handleOutgoingPacket from re-buffering it;
+                // it will send with flush=true, which is fine for large chunk packets.
+                listener.send(chunkPacket);
             }else{
-               for(PacketEntry e : entries){
-                  connectionAccess.borislib$sendNoFlush(e.packet(), e.listener());
-                  bufferedCount.incrementAndGet();
-               }
+                toWrite.addAll(entries);
             }
          }else{
-            for(PacketEntry e : entries){
-               connectionAccess.borislib$sendNoFlush(e.packet(), e.listener());
-               bufferedCount.incrementAndGet();
-            }
+            toWrite.addAll(entries);
          }
       }
    }
@@ -529,7 +567,7 @@ public class PacketBuffer {
     * Splits into multiple bundles if exceeding vanilla's 4096 sub-packet limit.
     */
    @SuppressWarnings("unchecked")
-   private void processCoalesceQueue(){
+   private void processCoalesceQueue(List<PacketEntry> toWrite){
       if(coalesceQueue.isEmpty()) return;
       
       // Drain queue
@@ -545,9 +583,7 @@ public class PacketBuffer {
       for(int i = 0; i < batch.size(); i += limit){
          List<Packet<? super ClientGamePacketListener>> chunk = batch.subList(i, Math.min(i + limit, batch.size()));
          ClientboundBundlePacket bundle = new ClientboundBundlePacket(chunk);
-         // Write directly to Connection (bypasses mixin), no flush
-         connectionAccess.borislib$sendNoFlush(bundle, null);
-         bufferedCount.incrementAndGet();
+         toWrite.add(new PacketEntry(bundle, null));
       }
    }
    

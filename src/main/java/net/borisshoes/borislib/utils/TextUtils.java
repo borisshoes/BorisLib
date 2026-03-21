@@ -108,6 +108,13 @@ public class TextUtils {
       return roman.toString();
    }
    
+   public static String readableLong(long value){
+      if(value >= 1_000_000_000) return String.format("%.2fB", value / 1_000_000_000.0);
+      if(value >= 1_000_000) return String.format("%.1fM", value / 1_000_000.0);
+      if(value >= 1_000) return String.format("%.1fK", value / 1_000.0);
+      return String.valueOf(value);
+   }
+   
    public static String readableInt(int num){
       return String.format("%,d", num);
    }

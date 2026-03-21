@@ -111,6 +111,8 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
          new BooleanConfigValue("batchingChatPacketsBypass", true)));
    public static final IConfigSetting<?> BATCHING_OFF_THREAD_BYPASS = registerConfigSetting(new ConfigSetting<>(
          new BooleanConfigValue("batchingOffThreadBypass", true)));
+   public static final IConfigSetting<?> BATCHING_WRITE_QUEUE = registerConfigSetting(new ConfigSetting<>(
+         new BooleanConfigValue("batchingWriteQueue", true)));
    public static final IConfigSetting<?> BATCHING_PACKET_COALESCING = registerConfigSetting(new ConfigSetting<>(
          new BooleanConfigValue("batchingPacketCoalescing", true)));
    public static final IConfigSetting<?> BATCHING_COALESCE_PACKETS = registerConfigSetting(new ConfigSetting<>(
@@ -135,6 +137,8 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
          new BooleanConfigValue("metricsModuleCpu", true)));
    public static final IConfigSetting<?> METRICS_MODULE_MEMORY = registerConfigSetting(new ConfigSetting<>(
          new BooleanConfigValue("metricsModuleMemory", true)));
+   public static final IConfigSetting<?> METRICS_MODULE_WRITE_QUEUE = registerConfigSetting(new ConfigSetting<>(
+         new BooleanConfigValue("metricsModuleWriteQueue", true)));
    
    @Override
    public void onInitialize(){

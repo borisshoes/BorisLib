@@ -21,7 +21,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ServerCommonPacketListenerImpl.class)
-public abstract class ServerCommonPacketListenerImplMxiin implements PacketBufferAccess {
+public abstract class ServerCommonPacketListenerImplMixin implements PacketBufferAccess {
    
    @Shadow
    @Final
