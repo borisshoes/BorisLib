@@ -2,6 +2,7 @@ package net.borisshoes.borislib.config;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import net.borisshoes.borislib.config.values.ListConfigValue;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -133,7 +134,10 @@ public class ConfigManager {
                   })
                   .then(argument(value.name, value.getArgumentType()).suggests(value::getSuggestions)
                         .executes(ctx -> {
-                           value.value = value.parseArgumentValue(ctx);
+                           Object parsed = value.parseArgumentValue(ctx);
+                           boolean pass = value.validate(value.parseArgumentValue(ctx), ctx);
+                           if(!pass) return 0;
+                           value.setValue(parsed);
                            ((CommandContext<CommandSourceStack>) ctx).getSource().sendSuccess(() -> MutableComponent.create(new TranslatableContents(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), true);
                            this.save();
                            return 1;
@@ -204,5 +208,110 @@ public class ConfigManager {
          LOGGER.error(e.toString());
       }
       return 0;
+   }
+   
+   public <T> List<T> getList(IConfigSetting<?> setting){
+      try{
+         Object value = this.getValue(setting.getName());
+         if(value instanceof List<?> list){
+            return (List<T>) list;
+         }
+         LOGGER.error("Config {}:{} is not a List for getList (type={})", this.modId, setting.getName(), value != null ? value.getClass().getName() : "null");
+      }catch(Exception e){
+         LOGGER.error("Failed to get List config for {}:{}", this.modId, setting.getName());
+         LOGGER.error(e.toString());
+      }
+      return List.of();
+   }
+   
+   public List<String> getStringList(IConfigSetting<?> setting){
+      try{
+         List<?> raw = getList(setting);
+         List<String> result = new ArrayList<>();
+         for(Object o : raw){
+            result.add(String.valueOf(o));
+         }
+         return result;
+      }catch(Exception e){
+         LOGGER.error("Failed to get String List config for {}:{}", this.modId, setting.getName());
+         LOGGER.error(e.toString());
+      }
+      return List.of();
+   }
+   
+   public List<Integer> getIntList(IConfigSetting<?> setting){
+      try{
+         List<?> raw = getList(setting);
+         List<Integer> result = new ArrayList<>();
+         for(Object o : raw){
+            if(o instanceof Number n){
+               result.add(n.intValue());
+            }else if(o instanceof String s){
+               try{ result.add((int) Double.parseDouble(s)); }catch(NumberFormatException ignored){}
+            }
+         }
+         return result;
+      }catch(Exception e){
+         LOGGER.error("Failed to get Integer List config for {}:{}", this.modId, setting.getName());
+         LOGGER.error(e.toString());
+      }
+      return List.of();
+   }
+   
+   public List<Double> getDoubleList(IConfigSetting<?> setting){
+      try{
+         List<?> raw = getList(setting);
+         List<Double> result = new ArrayList<>();
+         for(Object o : raw){
+            if(o instanceof Number n){
+               result.add(n.doubleValue());
+            }else if(o instanceof String s){
+               try{ result.add(Double.parseDouble(s)); }catch(NumberFormatException ignored){}
+            }
+         }
+         return result;
+      }catch(Exception e){
+         LOGGER.error("Failed to get Double List config for {}:{}", this.modId, setting.getName());
+         LOGGER.error(e.toString());
+      }
+      return List.of();
+   }
+   
+   public List<Boolean> getBooleanList(IConfigSetting<?> setting){
+      try{
+         List<?> raw = getList(setting);
+         List<Boolean> result = new ArrayList<>();
+         for(Object o : raw){
+            if(o instanceof Boolean b){
+               result.add(b);
+            }else if(o instanceof String s){
+               result.add(Boolean.parseBoolean(s));
+            }
+         }
+         return result;
+      }catch(Exception e){
+         LOGGER.error("Failed to get Boolean List config for {}:{}", this.modId, setting.getName());
+         LOGGER.error(e.toString());
+      }
+      return List.of();
+   }
+   
+   public <E extends Enum<E>> List<E> getEnumList(IConfigSetting<?> setting, Class<E> enumClass){
+      try{
+         List<?> raw = getList(setting);
+         List<E> result = new ArrayList<>();
+         for(Object o : raw){
+            if(enumClass.isInstance(o)){
+               result.add(enumClass.cast(o));
+            }else if(o instanceof String s){
+               try{ result.add(Enum.valueOf(enumClass, s.toUpperCase(Locale.ROOT))); }catch(IllegalArgumentException ignored){}
+            }
+         }
+         return result;
+      }catch(Exception e){
+         LOGGER.error("Failed to get Enum List config for {}:{}", this.modId, setting.getName());
+         LOGGER.error(e.toString());
+      }
+      return List.of();
    }
 }

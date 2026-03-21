@@ -7,17 +7,29 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.borisshoes.borislib.utils.TextUtils;
 import net.minecraft.commands.CommandSourceStack;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 public abstract class ConfigValue<T>{
    protected final T defaultValue;
    protected final String name;
    protected T value;
+   protected Consumer<T> onSet;
+   protected Validator<T> validator;
    
-   public ConfigValue(@NotNull String name, T defaultValue){
+   public ConfigValue(@NotNull String name, T defaultValue, Consumer<T> onSet, Validator<T> validator){
       this.name = name;
       this.defaultValue = defaultValue;
+      this.onSet = onSet;
+      this.validator = validator;
+   }
+   
+   public ConfigValue(@NotNull String name, T defaultValue){
+      this(name, defaultValue, null, null);
    }
    
    public String getName(){
@@ -36,6 +48,30 @@ public abstract class ConfigValue<T>{
    
    public void setValue(T value){
       this.value = value;
+      if(this.onSet != null){
+         this.onSet.accept(value);
+      }
+   }
+   
+   public boolean validate(T value, @Nullable CommandContext<CommandSourceStack> ctx){
+      if(this.validator != null){
+         boolean pass = this.validator.predicate().test(value);
+         if(!pass){
+            this.validator.onFail().accept(value, ctx);
+         }
+         return pass;
+      }
+      return true;
+   }
+   
+   public ConfigValue<T> setValidator(Validator<T> validator){
+      this.validator = validator;
+      return this;
+   }
+   
+   public ConfigValue<T> setOnSet(Consumer<T> onSet){
+      this.onSet = onSet;
+      return this;
    }
    
    public String getComment(String modId){

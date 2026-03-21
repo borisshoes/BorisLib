@@ -90,7 +90,7 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
    public static final IConfigSetting<?> TESTMOD_FEATURES_ENABLED = registerConfigSetting(new ConfigSetting<>(
          new BooleanConfigValue("testmodFeaturesEnabled", false)));
    public static final IConfigSetting<?> BATCHING_ENABLED = registerConfigSetting(new ConfigSetting<>(
-         new BooleanConfigValue("batchingEnabled", true)));
+         new BooleanConfigValue("batchingEnabled", false)));
    public static final IConfigSetting<?> BATCHING_MODE = registerConfigSetting(new ConfigSetting<>(
          new EnumConfigValue<>("batchingMode", BatchingMode.SMART_EXECUTION, BatchingMode.class)));
    public static final IConfigSetting<?> BATCHING_MAX_BATCH_SIZE = registerConfigSetting(new ConfigSetting<>(
@@ -108,13 +108,13 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
    public static final IConfigSetting<?> BATCHING_IGNORED_PACKETS = registerConfigSetting(new ConfigSetting<>(
          new ListConfigValue<>("batchingIgnoredPackets", List.of(), new StringConfigValue("", ""))));
    public static final IConfigSetting<?> BATCHING_CHAT_BYPASS = registerConfigSetting(new ConfigSetting<>(
-         new BooleanConfigValue("batchingChatPacketsBypass", true)));
+         new BooleanConfigValue("batchingChatPacketsBypass", false)));
    public static final IConfigSetting<?> BATCHING_OFF_THREAD_BYPASS = registerConfigSetting(new ConfigSetting<>(
-         new BooleanConfigValue("batchingOffThreadBypass", true)));
+         new BooleanConfigValue("batchingOffThreadBypass", false)));
    public static final IConfigSetting<?> BATCHING_WRITE_QUEUE = registerConfigSetting(new ConfigSetting<>(
-         new BooleanConfigValue("batchingWriteQueue", true)));
+         new BooleanConfigValue("batchingWriteQueue", false)));
    public static final IConfigSetting<?> BATCHING_PACKET_COALESCING = registerConfigSetting(new ConfigSetting<>(
-         new BooleanConfigValue("batchingPacketCoalescing", true)));
+         new BooleanConfigValue("batchingPacketCoalescing", false)));
    public static final IConfigSetting<?> BATCHING_COALESCE_PACKETS = registerConfigSetting(new ConfigSetting<>(
          new ListConfigValue<>("batchingCoalescePackets",
                List.of("ClientboundLevelParticlesPacket", "ClientboundSoundPacket", "ClientboundSoundEntityPacket"),
@@ -122,23 +122,23 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
    public static final IConfigSetting<?> BATCHING_COALESCE_BUNDLE_LIMIT = registerConfigSetting(new ConfigSetting<>(
          new IntConfigValue("batchingCoalesceBundleLimit", 4000, new IntConfigValue.IntLimits(1, 4096))));
    public static final IConfigSetting<?> OPT_EXPLOSIONS_ENABLED = registerConfigSetting(new ConfigSetting<>(
-         new BooleanConfigValue("optExplosionsEnabled", true)));
+         new BooleanConfigValue("optExplosionsEnabled", false)));
    public static final IConfigSetting<?> OPT_EXPLOSIONS_THRESHOLD = registerConfigSetting(new ConfigSetting<>(
          new IntConfigValue("optExplosionsBlockChangeThreshold", 512, new IntConfigValue.IntLimits(1))));
    public static final IConfigSetting<?> OPT_EXPLOSIONS_LOG = registerConfigSetting(new ConfigSetting<>(
          new BooleanConfigValue("optExplosionsLogOptimizations", false)));
    public static final IConfigSetting<?> METRICS_ENABLED = registerConfigSetting(new ConfigSetting<>(
-         new BooleanConfigValue("metricsEnabled", true)));
+         new BooleanConfigValue("metricsEnabled", false)));
    public static final IConfigSetting<?> METRICS_UPDATE_INTERVAL = registerConfigSetting(new ConfigSetting<>(
          new IntConfigValue("metricsUpdateInterval", 1, new IntConfigValue.IntLimits(1, 60))));
    public static final IConfigSetting<?> METRICS_MODULE_NETWORK = registerConfigSetting(new ConfigSetting<>(
-         new BooleanConfigValue("metricsModuleNetwork", true)));
+         new BooleanConfigValue("metricsModuleNetwork", false)));
    public static final IConfigSetting<?> METRICS_MODULE_CPU = registerConfigSetting(new ConfigSetting<>(
-         new BooleanConfigValue("metricsModuleCpu", true)));
+         new BooleanConfigValue("metricsModuleCpu", false)));
    public static final IConfigSetting<?> METRICS_MODULE_MEMORY = registerConfigSetting(new ConfigSetting<>(
-         new BooleanConfigValue("metricsModuleMemory", true)));
+         new BooleanConfigValue("metricsModuleMemory", false)));
    public static final IConfigSetting<?> METRICS_MODULE_WRITE_QUEUE = registerConfigSetting(new ConfigSetting<>(
-         new BooleanConfigValue("metricsModuleWriteQueue", true)));
+         new BooleanConfigValue("metricsModuleWriteQueue", false)));
    
    @Override
    public void onInitialize(){
