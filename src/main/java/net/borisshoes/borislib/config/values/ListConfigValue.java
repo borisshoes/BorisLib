@@ -68,6 +68,7 @@ public class ListConfigValue<G,T extends ConfigValue<G>> extends ConfigValue<Lis
    
    @Override
    public String getValueString(){
-      return this.value.stream().map(Object::toString).collect(Collectors.joining(", "));
+      List<G> v = this.value != null ? this.value : this.defaultValue;
+      return v.stream().map(Object::toString).collect(Collectors.joining(", "));
    }
 }

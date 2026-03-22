@@ -31,7 +31,7 @@ public class ConfigManager {
       this.modId = modId;
       this.modName = modName;
       this.file = FabricLoader.getInstance().getConfigDir().resolve(fileName).toFile();
-      this.values = configRegistry.stream().map(IConfigSetting::makeConfigValue).collect(Collectors.toCollection(HashSet::new));
+      this.values = configRegistry.stream().map(IConfigSetting::makeConfigValue).collect(Collectors.toCollection(LinkedHashSet::new));
       rebuildIndex();
       this.read();
       this.save();
@@ -69,7 +69,8 @@ public class ConfigManager {
             if(value != null){
                Object defaultValue = value.defaultValue;
                try{
-                  value.setValue(value.getFromString(valueValue));
+                  Object parsed = value.getFromString(valueValue);
+                  value.setValue(parsed != null ? parsed : defaultValue);
                }catch(Exception e){
                   value.setValue(defaultValue);
                }
@@ -127,21 +128,21 @@ public class ConfigManager {
                });
       }
       values.forEach(value -> {
-            LiteralArgumentBuilder<CommandSourceStack> valueArg = literal(value.name)
-                  .executes(ctx -> {
-                     ctx.getSource().sendSuccess(() -> MutableComponent.create(new TranslatableContents(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), false);
-                     return 1;
-                  })
-                  .then(argument(value.name, value.getArgumentType()).suggests(value::getSuggestions)
-                        .executes(ctx -> {
-                           Object parsed = value.parseArgumentValue(ctx);
-                           boolean pass = value.validate(value.parseArgumentValue(ctx), ctx);
-                           if(!pass) return 0;
-                           value.setValue(parsed);
-                           ((CommandContext<CommandSourceStack>) ctx).getSource().sendSuccess(() -> MutableComponent.create(new TranslatableContents(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), true);
-                           this.save();
-                           return 1;
-                        }));
+         LiteralArgumentBuilder<CommandSourceStack> valueArg = literal(value.name)
+               .executes(ctx -> {
+                  ctx.getSource().sendSuccess(() -> MutableComponent.create(new TranslatableContents(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), false);
+                  return 1;
+               })
+               .then(argument(value.name, value.getArgumentType()).suggests(value::getSuggestions)
+                     .executes(ctx -> {
+                        Object parsed = value.parseArgumentValue(ctx);
+                        boolean pass = value.validate(value.parseArgumentValue(ctx), ctx);
+                        if(!pass) return 0;
+                        value.setValue(parsed);
+                        ((CommandContext<CommandSourceStack>) ctx).getSource().sendSuccess(() -> MutableComponent.create(new TranslatableContents(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), true);
+                        this.save();
+                        return 1;
+                     }));
          if(!prefixB.isBlank()){
             root.then(literal(prefixB).then(valueArg));
          }else{
@@ -154,7 +155,8 @@ public class ConfigManager {
    
    public Object getValue(String name){
       ConfigValue cv = nameIndex.get(name);
-      return cv != null ? cv.value : null;
+      if(cv == null) return null;
+      return cv.value != null ? cv.value : cv.defaultValue;
    }
    
    public Object getValue(IConfigSetting<?> setting){
@@ -178,6 +180,23 @@ public class ConfigManager {
          LOGGER.error("Config {}:{} is not numeric for getInt (type={})", this.modId, setting.getName(), value != null ? value.getClass().getName() : "null");
       }catch(Exception e){
          LOGGER.error("Failed to get Integer config for {}:{}", this.modId, setting.getName());
+         LOGGER.error(e.toString());
+      }
+      return 0;
+   }
+   
+   public float getFloat(IConfigSetting<?> setting){
+      try{
+         Object value = this.getValue(setting.getName());
+         if(value instanceof Number number){
+            return number.floatValue();
+         }
+         if(value instanceof String s){
+            return Float.parseFloat(s);
+         }
+         LOGGER.error("Config {}:{} is not numeric for getFloat (type={})", this.modId, setting.getName(), value != null ? value.getClass().getName() : "null");
+      }catch(Exception e){
+         LOGGER.error("Failed to get Float config for {}:{}", this.modId, setting.getName());
          LOGGER.error(e.toString());
       }
       return 0;
@@ -247,7 +266,10 @@ public class ConfigManager {
             if(o instanceof Number n){
                result.add(n.intValue());
             }else if(o instanceof String s){
-               try{ result.add((int) Double.parseDouble(s)); }catch(NumberFormatException ignored){}
+               try{
+                  result.add((int) Double.parseDouble(s));
+               }catch(NumberFormatException ignored){
+               }
             }
          }
          return result;
@@ -266,12 +288,37 @@ public class ConfigManager {
             if(o instanceof Number n){
                result.add(n.doubleValue());
             }else if(o instanceof String s){
-               try{ result.add(Double.parseDouble(s)); }catch(NumberFormatException ignored){}
+               try{
+                  result.add(Double.parseDouble(s));
+               }catch(NumberFormatException ignored){
+               }
             }
          }
          return result;
       }catch(Exception e){
          LOGGER.error("Failed to get Double List config for {}:{}", this.modId, setting.getName());
+         LOGGER.error(e.toString());
+      }
+      return List.of();
+   }
+   
+   public List<Float> getFloatList(IConfigSetting<?> setting){
+      try{
+         List<?> raw = getList(setting);
+         List<Float> result = new ArrayList<>();
+         for(Object o : raw){
+            if(o instanceof Number n){
+               result.add(n.floatValue());
+            }else if(o instanceof String s){
+               try{
+                  result.add(Float.parseFloat(s));
+               }catch(NumberFormatException ignored){
+               }
+            }
+         }
+         return result;
+      }catch(Exception e){
+         LOGGER.error("Failed to get Float List config for {}:{}", this.modId, setting.getName());
          LOGGER.error(e.toString());
       }
       return List.of();
@@ -304,7 +351,10 @@ public class ConfigManager {
             if(enumClass.isInstance(o)){
                result.add(enumClass.cast(o));
             }else if(o instanceof String s){
-               try{ result.add(Enum.valueOf(enumClass, s.toUpperCase(Locale.ROOT))); }catch(IllegalArgumentException ignored){}
+               try{
+                  result.add(Enum.valueOf(enumClass, s.toUpperCase(Locale.ROOT)));
+               }catch(IllegalArgumentException ignored){
+               }
             }
          }
          return result;

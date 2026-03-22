@@ -108,9 +108,9 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
    public static final IConfigSetting<?> BATCHING_IGNORED_PACKETS = registerConfigSetting(new ConfigSetting<>(
          new ListConfigValue<>("batchingIgnoredPackets", List.of(), new StringConfigValue("", ""))));
    public static final IConfigSetting<?> BATCHING_CHAT_BYPASS = registerConfigSetting(new ConfigSetting<>(
-         new BooleanConfigValue("batchingChatPacketsBypass", false)));
+         new BooleanConfigValue("batchingChatPacketsBypass", true)));
    public static final IConfigSetting<?> BATCHING_OFF_THREAD_BYPASS = registerConfigSetting(new ConfigSetting<>(
-         new BooleanConfigValue("batchingOffThreadBypass", false)));
+         new BooleanConfigValue("batchingOffThreadBypass", true)));
    public static final IConfigSetting<?> BATCHING_WRITE_QUEUE = registerConfigSetting(new ConfigSetting<>(
          new BooleanConfigValue("batchingWriteQueue", false)));
    public static final IConfigSetting<?> BATCHING_PACKET_COALESCING = registerConfigSetting(new ConfigSetting<>(

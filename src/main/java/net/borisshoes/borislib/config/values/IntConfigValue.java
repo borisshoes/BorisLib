@@ -58,7 +58,7 @@ public class IntConfigValue extends ConfigValue<Integer> {
    
    @Override
    public String getValueString(){
-      return this.value.toString();
+      return String.valueOf(this.value != null ? this.value : this.defaultValue);
    }
    
    public static class IntLimits {

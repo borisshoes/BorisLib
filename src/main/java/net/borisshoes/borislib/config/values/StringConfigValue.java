@@ -47,6 +47,6 @@ public class StringConfigValue extends ConfigValue<String> {
    
    @Override
    public String getValueString(){
-      return this.value;
+      return this.value != null ? this.value : this.defaultValue;
    }
 }

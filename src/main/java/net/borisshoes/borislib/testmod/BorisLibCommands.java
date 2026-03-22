@@ -37,6 +37,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.phys.Vec3;
 import org.apache.commons.lang3.tuple.Triple;
 import org.w3c.dom.Text;
@@ -67,10 +68,10 @@ import static net.minecraft.commands.arguments.item.ItemArgument.item;
 public class BorisLibCommands {
    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext access, Commands.CommandSelection env){
       dispatcher.register(literal("borislib").executes(BorisLibCommands::getVersion)
-            .then(literal("player").requires(Commands.hasPermission(Commands.LEVEL_ADMINS))
+            .then(literal("player").requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                   .then(argument("player", string()).suggests(MinecraftUtils::getPlayerSuggestions)
                         .executes(context -> BorisLibCommands.playerInfo(context, getString(context, "player")))))
-            .then(literal("condition").requires(Commands.hasPermission(Commands.LEVEL_ADMINS))
+            .then(literal("condition").requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                   .then(literal("add")
                         .then(argument("entity", entity())
                               .then(argument("condition", id()).suggests(BorisLibCommands::suggestConditions)

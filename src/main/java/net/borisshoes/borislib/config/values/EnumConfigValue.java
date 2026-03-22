@@ -25,7 +25,8 @@ public class EnumConfigValue<K extends Enum<K> & StringRepresentable> extends Co
    
    @Override
    public K getFromString(String value){
-      return parseEnum(value,typeClass);
+      K parsed = parseEnum(value, typeClass);
+      return parsed != null ? parsed : this.defaultValue;
    }
    
    @Override
@@ -45,7 +46,7 @@ public class EnumConfigValue<K extends Enum<K> & StringRepresentable> extends Co
    
    @Override
    public String getValueString(){
-      return this.value.toString();
+      return String.valueOf(this.value != null ? this.value : this.defaultValue);
    }
    
    public static <K extends Enum<K> & StringRepresentable> CompletableFuture<Suggestions> getEnumSuggestions(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder, Class<K> enumClass){

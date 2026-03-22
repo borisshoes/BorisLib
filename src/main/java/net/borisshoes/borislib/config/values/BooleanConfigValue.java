@@ -48,6 +48,6 @@ public class BooleanConfigValue extends ConfigValue<Boolean> {
    
    @Override
    public String getValueString(){
-      return this.value.toString();
+      return String.valueOf(this.value != null ? this.value : this.defaultValue);
    }
 }

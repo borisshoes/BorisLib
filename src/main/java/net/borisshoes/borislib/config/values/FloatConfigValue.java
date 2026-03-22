@@ -1,7 +1,7 @@
 package net.borisshoes.borislib.config.values;
 
 import com.mojang.brigadier.arguments.ArgumentType;
-import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
@@ -12,33 +12,33 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.CompletableFuture;
 
-public class DoubleConfigValue extends ConfigValue<Double> {
-   protected final double defaultValue;
-   private final DoubleLimits limits;
+public class FloatConfigValue extends ConfigValue<Float> {
+   protected final float defaultValue;
+   private final FloatLimits limits;
    
-   public DoubleConfigValue(@NotNull String name, Double defaultValue, DoubleLimits limits){
+   public FloatConfigValue(@NotNull String name, Float defaultValue, FloatLimits limits){
       super(name, defaultValue);
       this.defaultValue = defaultValue;
       this.limits = limits;
    }
    
-   public DoubleConfigValue(@NotNull String name, Double defaultValue){
-      this(name, defaultValue, new DoubleLimits());
+   public FloatConfigValue(@NotNull String name, Float defaultValue){
+      this(name, defaultValue, new FloatLimits());
    }
    
    @Override
-   public Double getFromString(String value){
-      return Mth.clamp(Double.parseDouble(value), limits.min, limits.max);
+   public Float getFromString(String value){
+      return Mth.clamp(Float.parseFloat(value), limits.min, limits.max);
    }
    
    @Override
-   public ArgumentType<Double> getArgumentType(){
-      return DoubleArgumentType.doubleArg(limits.min, limits.max);
+   public ArgumentType<Float> getArgumentType(){
+      return FloatArgumentType.floatArg(limits.min, limits.max);
    }
    
    @Override
-   public Double parseArgumentValue(CommandContext<CommandSourceStack> ctx){
-      return DoubleArgumentType.getDouble(ctx, name);
+   public Float parseArgumentValue(CommandContext<CommandSourceStack> ctx){
+      return FloatArgumentType.getFloat(ctx, name);
    }
    
    public CompletableFuture<Suggestions> getSuggestions(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder){
@@ -50,18 +50,19 @@ public class DoubleConfigValue extends ConfigValue<Double> {
       return String.valueOf(this.value != null ? this.value : this.defaultValue);
    }
    
-   public static class DoubleLimits {
-      double min = Double.MIN_VALUE, max = Double.MAX_VALUE;
+   public static class FloatLimits {
+      float min = -Float.MAX_VALUE, max = Float.MAX_VALUE;
       
-      public DoubleLimits(){}
+      public FloatLimits(){}
       
-      public DoubleLimits(double min){
+      public FloatLimits(float min){
          this.min = min;
       }
       
-      public DoubleLimits(double min, double max){
+      public FloatLimits(float min, float max){
          this.min = min;
          this.max = max;
       }
    }
 }
+
