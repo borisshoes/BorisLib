@@ -18,6 +18,7 @@ public class LivingEntityMixin {
    @ModifyVariable(method = "hurtServer", at = @At("HEAD"), ordinal = 0, argsOnly = true)
    private float borislib$modifyHurtDamage(float original, ServerLevel serverLevel, DamageSource damageSource){
       LivingEntity hurtEntity = (LivingEntity) (Object) this;
+      if(hurtEntity.level().isClientSide()) return original;
       float vulnerable = Conditions.getConditionValue(hurtEntity.getUUID(),Conditions.VULNERABILITY);
       float fortitude = Conditions.getConditionValue(hurtEntity.getUUID(),Conditions.FORTITUDE);
       original *= vulnerable * fortitude;
@@ -31,12 +32,14 @@ public class LivingEntityMixin {
    @Inject(method = "die", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/damagesource/DamageSource;getEntity()Lnet/minecraft/world/entity/Entity;"))
    private void borislib$clearConditionsOnDeath(DamageSource damageSource, CallbackInfo ci){
       LivingEntity hurtEntity = (LivingEntity) (Object) this;
+      if(hurtEntity.level().isClientSide()) return;
       Conditions.removeAllConditions(hurtEntity.level().getServer(),hurtEntity);
    }
    
    @ModifyReturnValue(method= "canAttack(Lnet/minecraft/world/entity/LivingEntity;)Z", at=@At("RETURN"))
    private boolean borislib$canTarget(boolean original, LivingEntity target){
       LivingEntity livingEntity = (LivingEntity) (Object) this;
+      if(livingEntity.level().isClientSide()) return original;
       float nearsight = Conditions.getConditionValue(livingEntity.getUUID(),Conditions.NEARSIGHT);
       boolean outOfRange = target.distanceTo(livingEntity) > nearsight / 2.0;
       if(nearsight != Conditions.NEARSIGHT.value().getBase() && outOfRange && !livingEntity.getType().is(BorisLib.IGNORES_NEARSIGHT)){
