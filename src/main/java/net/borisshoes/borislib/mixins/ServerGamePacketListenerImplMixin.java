@@ -1,11 +1,6 @@
 package net.borisshoes.borislib.mixins;
 
 import com.llamalad7.mixinextras.sugar.Local;
-import net.borisshoes.borislib.BorisLib;
-import net.borisshoes.borislib.network.FlushReason;
-import net.borisshoes.borislib.network.MetricsBar;
-import net.borisshoes.borislib.network.PacketBuffer;
-import net.borisshoes.borislib.network.PacketBufferAccess;
 import net.borisshoes.borislib.tracker.PlayerMovementEntry;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.minecraft.server.level.ServerPlayer;
@@ -32,26 +27,6 @@ public class ServerGamePacketListenerImplMixin {
          PLAYER_MOVEMENT_TRACKER.put(player, newEntry);
       }else{
          PLAYER_MOVEMENT_TRACKER.put(player, PlayerMovementEntry.blankEntry(player));
-      }
-   }
-   
-   @Inject(method = "tick", at = @At("TAIL"))
-   private void borislib$flushOnTickEnd(CallbackInfo ci){
-      if(BorisLib.CONFIG == null || !BorisLib.CONFIG.getBoolean(BorisLib.BATCHING_ENABLED)) return;
-      PacketBuffer buffer = ((PacketBufferAccess) this).borislib$getBuffer();
-      if(buffer != null){
-         buffer.flush(FlushReason.TICK);
-      }
-   }
-   
-   @Inject(method = "onDisconnect", at = @At("HEAD"))
-   private void borislib$cleanupOnDisconnect(CallbackInfo ci){
-      PacketBuffer buffer = ((PacketBufferAccess) this).borislib$getBuffer();
-      if(buffer != null){
-         buffer.cleanup();
-      }
-      if(player != null){
-         MetricsBar.removePlayer(player);
       }
    }
 }

@@ -229,6 +229,23 @@ public class ConfigManager {
       return 0;
    }
    
+   public String getString(IConfigSetting<?> setting){
+      try{
+         Object value = this.getValue(setting.getName());
+         if(value instanceof String s){
+            return s;
+         }
+         if(value != null){
+            return String.valueOf(value);
+         }
+         LOGGER.error("Config {}:{} is null for getString", this.modId, setting.getName());
+      }catch(Exception e){
+         LOGGER.error("Failed to get String config for {}:{}", this.modId, setting.getName());
+         LOGGER.error(e.toString());
+      }
+      return "";
+   }
+   
    public <T> List<T> getList(IConfigSetting<?> setting){
       try{
          Object value = this.getValue(setting.getName());
