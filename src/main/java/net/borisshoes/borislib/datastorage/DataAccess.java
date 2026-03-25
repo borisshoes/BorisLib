@@ -152,10 +152,6 @@ public final class DataAccess {
          throw new IllegalStateException("DataAccess." + methodName + "() must be called from server-side code. " +
                "Server or playerStore is null - this usually means you're calling from a client that isn't hosting the world.");
       }
-      
-      if(!BorisLib.SERVER.isSameThread()){
-         throw new IllegalStateException("DataAccess." + methodName + "() called from non-server thread");
-      }
    }
    
    public static <T extends StorableData> Map<UUID, T> allPlayerDataFor(DataKey<T> key){

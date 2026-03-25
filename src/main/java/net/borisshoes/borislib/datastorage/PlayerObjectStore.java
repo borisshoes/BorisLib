@@ -194,9 +194,14 @@ public final class PlayerObjectStore {
    public <T extends StorableData> T getLive(UUID u, DataKey<T> key){
       Entry e = getEntry(u);
       Map<String, Object> modObjs = e.objects.computeIfAbsent(key.modId(), k -> new ConcurrentHashMap<>());
-      Object got = modObjs.get(key.key());
-      if(got != null) return (T) got;
       
+      // computeIfAbsent is atomic on ConcurrentHashMap — only one thread runs the
+      // mapping function for a given key, preventing the race where two threads both
+      // see null, one grabs the raw NBT, and the other overwrites with a blank default.
+      return (T) modObjs.computeIfAbsent(key.key(), k -> decodeOrCreate(u, e, key));
+   }
+   
+   private <T extends StorableData> Object decodeOrCreate(UUID u, Entry e, DataKey<T> key){
       // Try lazy-decode from raw NBT
       Map<String, CompoundTag> modRaw = e.raw.get(key.modId());
       if(modRaw != null){
@@ -204,7 +209,6 @@ public final class PlayerObjectStore {
          if(n != null){
             T decoded = decode(key, n, u, key.id().toString());
             if(decoded != null){
-               modObjs.put(key.key(), decoded);
                if(modRaw.isEmpty()) e.raw.remove(key.modId());
                return decoded;
             }
@@ -213,10 +217,7 @@ public final class PlayerObjectStore {
             if(modRaw.isEmpty()) e.raw.remove(key.modId());
             
             T recovered = tryRecoverFromBackup(u, e, key);
-            if(recovered != null){
-               modObjs.put(key.key(), recovered);
-               return recovered;
-            }
+            if(recovered != null) return recovered;
             BorisLib.LOGGER.warn("Could not recover key {} for player {} from backup, using default value", key.id(), u);
          }
       }
@@ -227,7 +228,6 @@ public final class PlayerObjectStore {
          BorisLib.LOGGER.warn("DataKey<{}> default factory returned null for player {}. This may cause issues.", key.id(), u);
          throw new IllegalStateException("DataKey<" + key.id() + "> default factory returned null for player " + u);
       }
-      modObjs.put(key.key(), created);
       return created;
    }
    
