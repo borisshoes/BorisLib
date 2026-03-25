@@ -2,6 +2,7 @@ package net.borisshoes.borislib.config;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import me.lucko.fabric.api.permissions.v0.Permissions;
 import net.borisshoes.borislib.config.values.ListConfigValue;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.commands.CommandSourceStack;
@@ -10,6 +11,7 @@ import net.minecraft.core.Registry;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.server.permissions.PermissionLevel;
 
 import java.io.*;
 import java.util.*;
@@ -113,14 +115,14 @@ public class ConfigManager {
    public LiteralArgumentBuilder<CommandSourceStack> generateCommand(String prefixA, String prefixB){
       LiteralArgumentBuilder<CommandSourceStack> root;
       if(!prefixB.isBlank()){
-         root = literal(prefixA).then(literal(prefixB).requires(Commands.hasPermission(Commands.LEVEL_ADMINS))
+         root = literal(prefixA).then(literal(prefixB).requires(Permissions.require(modId + ".config", PermissionLevel.GAMEMASTERS))
                .executes(ctx -> {
                   values.forEach(value ->
                         ctx.getSource().sendSuccess(() -> MutableComponent.create(new TranslatableContents(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), false));
                   return 1;
                }));
       }else{
-         root = literal(prefixA).requires(Commands.hasPermission(Commands.LEVEL_ADMINS))
+         root = literal(prefixA).requires(Permissions.require(modId + ".config", PermissionLevel.GAMEMASTERS))
                .executes(ctx -> {
                   values.forEach(value ->
                         ctx.getSource().sendSuccess(() -> MutableComponent.create(new TranslatableContents(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), false));
@@ -129,11 +131,13 @@ public class ConfigManager {
       }
       values.forEach(value -> {
          LiteralArgumentBuilder<CommandSourceStack> valueArg = literal(value.name)
+               .requires(Permissions.require(modId + ".config." + value.name.toLowerCase(Locale.ROOT) + ".get", PermissionLevel.GAMEMASTERS))
                .executes(ctx -> {
                   ctx.getSource().sendSuccess(() -> MutableComponent.create(new TranslatableContents(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), false);
                   return 1;
                })
                .then(argument(value.name, value.getArgumentType()).suggests(value::getSuggestions)
+                     .requires(Permissions.require(modId + ".config." + value.name.toLowerCase(Locale.ROOT) + ".set", PermissionLevel.GAMEMASTERS))
                      .executes(ctx -> {
                         Object parsed = value.parseArgumentValue(ctx);
                         boolean pass = value.validate(value.parseArgumentValue(ctx), ctx);

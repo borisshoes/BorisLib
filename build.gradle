@@ -28,6 +28,8 @@ repositories {
     // See https://docs.gradle.org/current/userguide/declaring_repositories.html
     // for more information about repositories.
 
+    mavenCentral()
+
     maven {
         name = "Ladysnake Mods"
         url = 'https://maven.ladysnake.org/releases'
@@ -70,6 +72,7 @@ dependencies {
     modImplementation include("eu.pb4:polymer-autohost:${project.polymer_version}")
     modImplementation include("eu.pb4:factorytools:${project.factorytools_version}")
     modImplementation include("xyz.nucleoid:server-translations-api:${project.translation_version}")
+    modImplementation include("me.lucko:fabric-permissions-api:${project.fabric_permissions_api_version}")
 }
 
 processResources {
