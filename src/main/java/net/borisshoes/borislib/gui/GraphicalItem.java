@@ -3,6 +3,8 @@ package net.borisshoes.borislib.gui;
 import eu.pb4.polymer.core.api.item.PolymerItem;
 import eu.pb4.polymer.resourcepack.api.PolymerResourcePackUtils;
 import net.borisshoes.borislib.BorisLib;
+import net.fabricmc.fabric.api.networking.v1.context.PacketContext;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -15,7 +17,6 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.DyedItemColor;
 import net.minecraft.world.item.component.TooltipDisplay;
 import org.jetbrains.annotations.Nullable;
-import xyz.nucleoid.packettweaker.PacketContext;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -149,8 +150,9 @@ public class GraphicalItem extends Item implements PolymerItem {
       super(settings.setId(ResourceKey.create(Registries.ITEM, Identifier.fromNamespaceAndPath(MOD_ID,"graphical_item"))));
    }
    
+   
    @Override
-   public @Nullable Identifier getPolymerItemModel(ItemStack stack, PacketContext context){
+   public @Nullable Identifier getPolymerItemModel(ItemStack stack, PacketContext context, HolderLookup.Provider lookup){
       String id = BORISLIB_ITEM_DATA.getStringProperty(stack,GRAPHICS_TAG);
       Identifier identifier = Identifier.tryParse(id);
       GraphicElement elem = BorisLib.GRAPHIC_ITEM_REGISTRY.getValue(identifier);
@@ -173,7 +175,7 @@ public class GraphicalItem extends Item implements PolymerItem {
       if(elem == null || itemStack == null) return Items.BARRIER;
       if(!elem.dyeable() || !itemStack.has(DataComponents.DYED_COLOR)) return elem.replacement();
       
-      if(PolymerResourcePackUtils.hasMainPack(context.getPlayer())){
+      if(PolymerResourcePackUtils.hasMainPack(context)){
          return Items.LEATHER_CHESTPLATE;
       }else{
          return getItemFromColor(elem.replacement(), itemStack.get(DataComponents.DYED_COLOR).rgb());

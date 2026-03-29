@@ -22,7 +22,7 @@ public class DecayCondition extends Condition{
    
    @Override
    public boolean canApply(LivingEntity entity){
-      return !entity.getType().is(BorisLib.IGNORES_DECAY);
+      return !entity.is(BorisLib.IGNORES_DECAY);
    }
    
    @Override

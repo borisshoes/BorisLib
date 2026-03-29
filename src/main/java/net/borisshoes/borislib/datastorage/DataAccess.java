@@ -6,8 +6,10 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.storage.LevelResource;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,13 +21,82 @@ public final class DataAccess {
    private static volatile PlayerObjectStore playerStore;
    private static final Set<UUID> DIRTY_PLAYERS = ConcurrentHashMap.newKeySet();
    
+   // Legacy dimension folder names used in Minecraft 1.21.x and earlier
+   private static final Map<ResourceKey<Level>, String> LEGACY_DIMENSION_FOLDERS = Map.of(
+         Level.OVERWORLD, ".",        // overworld data was at worldRoot/data/
+         Level.NETHER, "DIM-1",       // nether data was at worldRoot/DIM-1/data/
+         Level.END, "DIM1"            // end data was at worldRoot/DIM1/data/
+   );
+   
    public static void onServerStarted(MinecraftServer server){
       try{
          Path root = server.getWorldPath(LevelResource.ROOT);
+         
+         // Migrate legacy saved data files from 1.21.x flat paths to 26.1 namespaced/dimension paths.
+         // Must run BEFORE any data access so SavedDataStorage finds files at the correct new locations.
+         migrateLegacySavedData(root);
+         
          playerStore = new PlayerObjectStore(root);
          BorisLib.LOGGER.info("BorisLib data storage initialized at {}", root);
       }catch(Exception e){
          BorisLib.LOGGER.error("Failed to initialize BorisLib data storage: {}", e.getMessage());
+      }
+   }
+   
+   /**
+    * Fallback migration for BorisLib saved data files from the 1.21.x directory layout to 26.1.
+    * <p>
+    * The primary migration is handled by {@code DimensionStorageFileFixMixin} which hooks into
+    * Minecraft's file-fix system during world upgrade. This fallback catches edge cases where
+    * the mixin didn't fire (e.g., interrupted upgrade, mod installed after upgrade).
+    * <p>
+    * Only handles vanilla dimensions (overworld, nether, end). Modded dimensions require the
+    * dimension mod to handle its own folder restructuring — same limitation as vanilla's
+    * {@code DimensionStorageFileFix}.
+    */
+   private static void migrateLegacySavedData(Path worldRoot){
+      String[] fileIds = {GlobalState.FILE_ID, WorldState.FILE_ID};
+      
+      for(var entry : LEGACY_DIMENSION_FOLDERS.entrySet()){
+         ResourceKey<Level> dimension = entry.getKey();
+         String legacyFolder = entry.getValue();
+         
+         // Old path: worldRoot/<legacyFolder>/data/<name>.dat
+         Path oldDataDir = legacyFolder.equals(".")
+               ? worldRoot.resolve("data")
+               : worldRoot.resolve(legacyFolder).resolve("data");
+         
+         // New path: worldRoot/dimensions/<ns>/<name>/data/<ns>/<name>.dat
+         // DimensionType.getStorageFolder gives us: worldRoot/dimensions/<ns>/<name>
+         Path newDimensionDir = DimensionType.getStorageFolder(dimension, worldRoot);
+         Path newDataDir = newDimensionDir.resolve("data");
+         
+         for(String fileId : fileIds){
+            // Skip GlobalState for non-overworld dimensions (it's only stored in overworld)
+            if(fileId.equals(GlobalState.FILE_ID) && dimension != Level.OVERWORLD) continue;
+            
+            String fileName = fileId + ".dat";
+            Path oldFile = oldDataDir.resolve(fileName);
+            // Identifier.parse(fileId) defaults to "minecraft:" namespace
+            Path newFile = newDataDir.resolve("minecraft").resolve(fileName);
+            
+            if(Files.exists(oldFile) && !Files.exists(newFile)){
+               try{
+                  Files.createDirectories(newFile.getParent());
+                  Files.move(oldFile, newFile);
+                  BorisLib.LOGGER.info("Migrated legacy saved data for {}: {} -> {}", dimension.identifier(), oldFile, newFile);
+               }catch(Exception e){
+                  BorisLib.LOGGER.error("Failed to migrate saved data for {}: {} -> {}: {}", dimension.identifier(), oldFile, newFile, e.getMessage());
+                  // Try copy as fallback (move may fail across filesystems)
+                  try{
+                     Files.copy(oldFile, newFile);
+                     BorisLib.LOGGER.info("Copied legacy saved data as fallback for {}: {} -> {}", dimension.identifier(), oldFile, newFile);
+                  }catch(Exception e2){
+                     BorisLib.LOGGER.error("Failed to copy saved data for {}: {}", dimension.identifier(), e2.getMessage());
+                  }
+               }
+            }
+         }
       }
    }
    

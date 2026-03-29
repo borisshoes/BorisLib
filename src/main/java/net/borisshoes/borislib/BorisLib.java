@@ -91,7 +91,7 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
       Conditions.initialize();
       PolymerResourcePackUtils.addModAssets(MOD_ID);
       
-      ServerTickEvents.END_WORLD_TICK.register(WorldTickCallback::onWorldTick);
+      ServerTickEvents.END_LEVEL_TICK.register(WorldTickCallback::onWorldTick);
       ServerTickEvents.END_SERVER_TICK.register(ServerTickCallback::onTick);
       ServerPlayConnectionEvents.JOIN.register(PlayerConnectionCallback::onPlayerJoin);
       ServerPlayConnectionEvents.DISCONNECT.register(PlayerConnectionCallback::onPlayerLeave);

@@ -20,12 +20,12 @@ public class FeebleCondition extends Condition{
    
    @Override
    public boolean canApply(LivingEntity entity){
-      return !entity.getType().is(BorisLib.IGNORES_FEEBLE);
+      return !entity.is(BorisLib.IGNORES_FEEBLE);
    }
    
    @Override
    public void onTick(MinecraftServer server, LivingEntity entity, float value, boolean particles){
-      if(particles && entity.level() instanceof ServerLevel level && level.random.nextFloat() < 0.1){
+      if(particles && entity.level() instanceof ServerLevel level && level.getRandom().nextFloat() < 0.1){
          double width = entity.getBbWidth();
          double height = entity.getBbHeight();
          level.sendParticles(PARTICLE, entity.getX() + (entity.getRandom().nextDouble() - 0.5) * width, entity.getY() + entity.getRandom().nextDouble() * height, entity.getZ() + (entity.getRandom().nextDouble() - 0.5) * width, 1, 0.1, 0.15, 0.1, 0.01);

@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version "${loom_version}"
+    id "net.fabricmc.fabric-loom" version "${loom_version}"
     id 'maven-publish'
 }
 
@@ -56,23 +56,22 @@ repositories {
 dependencies {
     // To change the versions see the gradle.properties file
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings loom.officialMojangMappings()
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
-    modImplementation include("eu.pb4:sgui:${project.sgui_version}")
+    include(implementation("eu.pb4:sgui:${project.sgui_version}"))
 
-    modImplementation include("eu.pb4:polymer-core:${project.polymer_version}")
-    modImplementation include("eu.pb4:polymer-blocks:${project.polymer_version}")
-    modImplementation include("eu.pb4:polymer-resource-pack:${project.polymer_version}")
-    modImplementation include("eu.pb4:polymer-resource-pack-extras:${project.polymer_version}")
-    modImplementation include("eu.pb4:polymer-virtual-entity:${project.polymer_version}")
-    modImplementation include("eu.pb4:polymer-networking:${project.polymer_version}")
-    modImplementation include("eu.pb4:polymer-autohost:${project.polymer_version}")
-    modImplementation include("eu.pb4:factorytools:${project.factorytools_version}")
-    modImplementation include("xyz.nucleoid:server-translations-api:${project.translation_version}")
-    modImplementation include("me.lucko:fabric-permissions-api:${project.fabric_permissions_api_version}")
+    include(implementation("eu.pb4:polymer-core:${project.polymer_version}"))
+    include(implementation("eu.pb4:polymer-blocks:${project.polymer_version}"))
+    include(implementation("eu.pb4:polymer-resource-pack:${project.polymer_version}"))
+    include(implementation("eu.pb4:polymer-resource-pack-extras:${project.polymer_version}"))
+    include(implementation("eu.pb4:polymer-virtual-entity:${project.polymer_version}"))
+    include(implementation("eu.pb4:polymer-networking:${project.polymer_version}"))
+    include(implementation("eu.pb4:polymer-autohost:${project.polymer_version}"))
+    include(implementation("eu.pb4:factorytools:${project.factorytools_version}"))
+    include(implementation("xyz.nucleoid:server-translations-api:${project.translation_version}"))
+    include(implementation("me.lucko:fabric-permissions-api:${project.fabric_permissions_api_version}"))
 }
 
 processResources {
@@ -88,7 +87,7 @@ processResources {
     }
 }
 
-def targetJavaVersion = 21
+def targetJavaVersion = 25
 tasks.withType(JavaCompile).configureEach {
     // ensure that the encoding is set to UTF-8, no matter what the system default is
     // this fixes some edge cases with special characters not displaying correctly

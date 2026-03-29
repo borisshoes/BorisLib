@@ -43,6 +43,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentInstance;
@@ -325,10 +326,10 @@ public class MinecraftUtils {
       return true;
    }
    
-   public static List<ItemStack> getMatchingItemsFromContainerComp(ItemStack container, Item item){
+   public static List<ItemStackTemplate> getMatchingItemsFromContainerComp(ItemStack container, Item item){
       ItemContainerContents containerItems = container.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY);
-      ArrayList<ItemStack> items = new ArrayList<>();
-      for(ItemStack stack : containerItems.nonEmptyItems()){
+      ArrayList<ItemStackTemplate> items = new ArrayList<>();
+      for(ItemStackTemplate stack : containerItems.nonEmptyItems()){
          if(stack.is(item)){
             items.add(stack);
          }
@@ -350,7 +351,7 @@ public class MinecraftUtils {
    }
    
    public static Tuple<ItemContainerContents, ItemStack> tryAddStackToContainerComp(ItemContainerContents container, int size, ItemStack stack){
-      List<ItemStack> beltList = new ArrayList<>(container.stream().toList());
+      List<ItemStack> beltList = new ArrayList<>(container.allItemsCopyStream().toList());
       
       // Fill up existing slots first
       for(ItemStack existingStack : beltList){

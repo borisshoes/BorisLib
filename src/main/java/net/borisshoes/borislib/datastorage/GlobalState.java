@@ -7,6 +7,7 @@ import net.borisshoes.borislib.BorisLib;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.util.datafix.DataFixTypes;
@@ -68,7 +69,10 @@ public final class GlobalState extends SavedData {
          }
    );
    
-   public static final SavedDataType<GlobalState> TYPE = new SavedDataType<>(FILE_ID, GlobalState::new, CODEC, DataFixTypes.LEVEL);
+   // Use SAVED_DATA_COMMAND_STORAGE to prevent DFU from mangling custom mod data during Minecraft version upgrades.
+   // LEVEL's schema applies level.dat-specific fixes that strip unrecognized keys, causing data loss.
+   // SAVED_DATA_COMMAND_STORAGE uses a permissive schema designed for arbitrary compound data.
+   public static final SavedDataType<GlobalState> TYPE = new SavedDataType<>(Identifier.parse(FILE_ID), GlobalState::new, CODEC, DataFixTypes.SAVED_DATA_COMMAND_STORAGE);
    
    public static GlobalState get(ServerLevel ow){
       return ow.getDataStorage().computeIfAbsent(TYPE);

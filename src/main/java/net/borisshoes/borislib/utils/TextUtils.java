@@ -50,7 +50,7 @@ public class TextUtils {
          }
       }
       text.append(suffix);
-      player.displayClientMessage(text,true);
+      player.sendSystemMessage(text,true);
    }
    
    public static String camelToSnake(String str){

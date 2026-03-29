@@ -42,7 +42,7 @@ public class LivingEntityMixin {
       if(livingEntity.level().isClientSide()) return original;
       float nearsight = Conditions.getConditionValue(livingEntity.getUUID(),Conditions.NEARSIGHT);
       boolean outOfRange = target.distanceTo(livingEntity) > nearsight / 2.0;
-      if(nearsight != Conditions.NEARSIGHT.value().getBase() && outOfRange && !livingEntity.getType().is(BorisLib.IGNORES_NEARSIGHT)){
+      if(nearsight != Conditions.NEARSIGHT.value().getBase() && outOfRange && !livingEntity.is(BorisLib.IGNORES_NEARSIGHT)){
          return false;
       }
       return original;
