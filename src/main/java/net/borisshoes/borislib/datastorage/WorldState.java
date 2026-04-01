@@ -33,38 +33,38 @@ public final class WorldState extends SavedData {
    public static final Codec<WorldState> CODEC = Codec.PASSTHROUGH.xmap(
          dynamic -> {
             WorldState s = new WorldState();
-            try {
+            try{
                Tag tag = dynamic.getValue() instanceof Tag t ? t : null;
                if(tag instanceof CompoundTag root){
                   for(String modId : root.keySet()){
-                     try {
+                     try{
                         if(root.get(modId) instanceof CompoundTag modTag){
                            Map<String, CompoundTag> inner = new HashMap<>();
                            for(String key : modTag.keySet()){
-                              try {
+                              try{
                                  if(modTag.get(key) instanceof CompoundTag keyTag){
                                     inner.put(key, keyTag);
                                  }
-                              } catch (Exception e) {
+                              }catch(Exception e){
                                  BorisLib.LOGGER.warn("Failed to parse world data key {}:{}: {}", modId, key, e.getMessage());
                               }
                            }
                            s.data.put(modId, inner);
                         }
-                     } catch (Exception e) {
+                     }catch(Exception e){
                         BorisLib.LOGGER.warn("Failed to parse world data for mod {}: {}", modId, e.getMessage());
                      }
                   }
                }
-            } catch (Exception e) {
+            }catch(Exception e){
                BorisLib.LOGGER.error("Failed to parse world state data: {}", e.getMessage());
             }
             return s;
          },
          state -> {
-            try {
+            try{
                return new Dynamic<>(NbtOps.INSTANCE, state.save());
-            } catch (Exception e) {
+            }catch(Exception e){
                BorisLib.LOGGER.error("Failed to encode world state: {}", e.getMessage());
                return new Dynamic<>(NbtOps.INSTANCE, new CompoundTag());
             }
@@ -87,26 +87,26 @@ public final class WorldState extends SavedData {
       // Encode all live objects
       for(var modEntry : objects.entrySet()){
          String modId = modEntry.getKey();
-         try {
+         try{
             CompoundTag modTag = new CompoundTag();
             for(var kv : modEntry.getValue().entrySet()){
                String key = kv.getKey();
                Object value = kv.getValue();
-               try {
+               try{
                   if(value instanceof StorableData storable){
                      CompoundTag encoded = encode(storable, modId + ":" + key);
                      if(encoded != null && !encoded.isEmpty()){
                         modTag.put(key, encoded);
-                     } else {
+                     }else{
                         BorisLib.LOGGER.warn("Skipping save for world key {}:{} - encoded data is empty/invalid", modId, key);
                      }
                   }
-               } catch (Exception e) {
+               }catch(Exception e){
                   BorisLib.LOGGER.error("Failed to encode world key {}:{}: {}", modId, key, e.getMessage());
                }
             }
             if(!modTag.isEmpty()) tag.put(modId, modTag);
-         } catch (Exception e) {
+         }catch(Exception e){
             BorisLib.LOGGER.error("Failed to save world data for mod {}: {}", modId, e.getMessage());
          }
       }
@@ -114,7 +114,7 @@ public final class WorldState extends SavedData {
       // Copy raw data we never decoded
       for(var modEntry : data.entrySet()){
          String modId = modEntry.getKey();
-         try {
+         try{
             CompoundTag modTag = tag.getCompoundOrEmpty(modId);
             if(modTag.isEmpty()){
                modTag = new CompoundTag();
@@ -125,7 +125,7 @@ public final class WorldState extends SavedData {
                }
             }
             if(!modTag.isEmpty()) tag.put(modId, modTag);
-         } catch (Exception e) {
+         }catch(Exception e){
             BorisLib.LOGGER.error("Failed to copy raw world data for mod {}: {}", modId, e.getMessage());
          }
       }

@@ -14,7 +14,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-public abstract class ConfigValue<T>{
+public abstract class ConfigValue<T> {
    protected final T defaultValue;
    protected final String name;
    protected T value;
@@ -75,14 +75,14 @@ public abstract class ConfigValue<T>{
    }
    
    public String getComment(String modId){
-      return getTranslation(this.name,modId,"comment");
+      return getTranslation(this.name, modId, "comment");
    }
    
    public static String getTranslation(String name, String modId, String suffix){
-      return "command."+modId+"."+TextUtils.camelToSnake(name)+"."+suffix;
+      return "command." + modId + "." + TextUtils.camelToSnake(name) + "." + suffix;
    }
    
    public static String getErrorTranslation(String modId){
-      return "command."+modId+".error";
+      return "command." + modId + ".error";
    }
 }

@@ -11,11 +11,11 @@ import net.minecraft.world.entity.LivingEntity;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
-public class MightCondition extends Condition{
+public class MightCondition extends Condition {
    private static final SimpleParticleType PARTICLE = ParticleTypes.TRIAL_SPAWNER_DETECTED_PLAYER;
    
    protected MightCondition(){
-      super(Identifier.fromNamespaceAndPath(MOD_ID,"might"), MobEffectCategory.BENEFICIAL, 1.0f, 1.0f, Float.MAX_VALUE);
+      super(Identifier.fromNamespaceAndPath(MOD_ID, "might"), MobEffectCategory.BENEFICIAL, 1.0f, 1.0f, Float.MAX_VALUE);
    }
    
    @Override
@@ -38,5 +38,6 @@ public class MightCondition extends Condition{
    }
    
    @Override
-   public void onRemove(MinecraftServer server, LivingEntity entity, float value, boolean particles){}
+   public void onRemove(MinecraftServer server, LivingEntity entity, float value, boolean particles){
+   }
 }

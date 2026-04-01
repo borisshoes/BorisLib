@@ -74,6 +74,7 @@ public class MinecraftUtils {
    
    /**
     * Returns the first item in the registry that matches the given tag.
+    *
     * @param tag The TagKey to search for
     * @return The first matching Item, or null if no items match the tag
     */
@@ -84,7 +85,7 @@ public class MinecraftUtils {
             .orElse(null);
    }
    
-   public static CompletableFuture<Suggestions> getPlayerSuggestions(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
+   public static CompletableFuture<Suggestions> getPlayerSuggestions(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder){
       String start = builder.getRemaining().toLowerCase(Locale.ROOT);
       Set<String> items = new HashSet<>();
       context.getSource().getOnlinePlayerNames().forEach(name -> items.add(name.toLowerCase(Locale.ROOT)));
@@ -106,13 +107,13 @@ public class MinecraftUtils {
    
    public static MutableComponent getAtlasedTexture(Item item){
       Identifier id = BuiltInRegistries.ITEM.getResourceKey(item).get().identifier();
-      Identifier newId = Identifier.fromNamespaceAndPath(id.getNamespace(),"item/"+id.getPath());
+      Identifier newId = Identifier.fromNamespaceAndPath(id.getNamespace(), "item/" + id.getPath());
       return Component.object(new AtlasSprite(AtlasIds.ITEMS, newId));
    }
    
    public static MutableComponent getAtlasedTexture(Block block){
       Identifier id = BuiltInRegistries.BLOCK.getResourceKey(block).get().identifier();
-      Identifier newId = Identifier.fromNamespaceAndPath(id.getNamespace(),"block/"+id.getPath());
+      Identifier newId = Identifier.fromNamespaceAndPath(id.getNamespace(), "block/" + id.getPath());
       return Component.object(new AtlasSprite(AtlasIds.BLOCKS, newId));
    }
    
@@ -178,7 +179,7 @@ public class MinecraftUtils {
       return world.getBlockCollisions(entity, floorProbe).iterator().hasNext();
    }
    
-   public static boolean isSpaceClearFor(Entity entity, Level world, Vec3 targetPos, boolean checkFluid) {
+   public static boolean isSpaceClearFor(Entity entity, Level world, Vec3 targetPos, boolean checkFluid){
       Vec3 delta = targetPos.subtract(entity.position());
       AABB targetBox = entity.getBoundingBox().move(delta);
       return world.noCollision(entity, targetBox, checkFluid);
@@ -216,7 +217,7 @@ public class MinecraftUtils {
       AttributeModifier existing = entityAttributeInstance.getModifier(id);
       if(existing != null){
          double current = existing.amount();
-         double newAmount = current-amount;
+         double newAmount = current - amount;
          entityAttributeInstance.removeModifier(id);
          if(newAmount > 0.01){
             AttributeModifier modifier = new AttributeModifier(id, newAmount, AttributeModifier.Operation.ADD_VALUE);
@@ -234,7 +235,7 @@ public class MinecraftUtils {
       if(existing != null){
          double current = existing.amount();
          entityAttributeInstance.removeModifier(id);
-         modifier = new AttributeModifier(id, amount+current, AttributeModifier.Operation.ADD_VALUE);
+         modifier = new AttributeModifier(id, amount + current, AttributeModifier.Operation.ADD_VALUE);
       }
       entityAttributeInstance.addPermanentModifier(modifier);
    }
@@ -247,7 +248,7 @@ public class MinecraftUtils {
    
    public static Holder<Enchantment> getEnchantment(ResourceKey<Enchantment> key){
       if(BorisLib.SERVER == null){
-         LOGGER.log(WARN,"Attempted to access Enchantment "+key.toString()+" before DRM is available");
+         LOGGER.log(WARN, "Attempted to access Enchantment " + key.toString() + " before DRM is available");
          return null;
       }
       Optional<Holder.Reference<Enchantment>> opt = BorisLib.SERVER.registryAccess().lookupOrThrow(Registries.ENCHANTMENT).get(key);
@@ -263,19 +264,19 @@ public class MinecraftUtils {
       ItemEnchantments.Mutable builder = new ItemEnchantments.Mutable(ItemEnchantments.EMPTY);
       
       for(EnchantmentInstance entry : entries){
-         builder.upgrade(entry.enchantment(),entry.level());
+         builder.upgrade(entry.enchantment(), entry.level());
       }
       
       return builder.toImmutable();
    }
    
    public static void giveStacks(Player player, ItemStack... stacks){
-      returnItems(new SimpleContainer(stacks),player);
+      returnItems(new SimpleContainer(stacks), player);
    }
    
    public static void returnItems(Container inv, Player player){
       if(inv == null) return;
-      for(int i = 0; i<inv.getContainerSize(); i++){
+      for(int i = 0; i < inv.getContainerSize(); i++){
          ItemStack stack = inv.getItem(i).copy();
          if(!stack.isEmpty()){
             inv.setItem(0, ItemStack.EMPTY);
@@ -317,11 +318,11 @@ public class MinecraftUtils {
             }
          }
       }
-      if(remaining > 0)return false;
+      if(remaining > 0) return false;
       
       for(int i = 0; i < slots.length; i++){
          if(slots[i] <= 0) continue;
-         inv.removeItem(i,slots[i]);
+         inv.removeItem(i, slots[i]);
       }
       return true;
    }
@@ -338,7 +339,7 @@ public class MinecraftUtils {
    }
    
    public static void attributeEffect(LivingEntity livingEntity, Holder<Attribute> attribute, double value, AttributeModifier.Operation operation, Identifier identifier, boolean remove){
-      boolean hasMod = livingEntity.getAttributes().hasModifier(attribute,identifier);
+      boolean hasMod = livingEntity.getAttributes().hasModifier(attribute, identifier);
       if(hasMod && remove){ // Remove the modifier
          HashMultimap<Holder<Attribute>, AttributeModifier> map = HashMultimap.create();
          map.put(attribute, new AttributeModifier(identifier, value, operation));
@@ -362,7 +363,7 @@ public class MinecraftUtils {
                && existingStack.isStackable()
                && existingStack.getCount() < existingStack.getMaxStackSize();
          if(!canCombine) continue;
-         int toAdd = Math.min(existingStack.getMaxStackSize() - existingStack.getCount(),curCount);
+         int toAdd = Math.min(existingStack.getMaxStackSize() - existingStack.getCount(), curCount);
          existingStack.grow(toAdd);
          stack.setCount(curCount - toAdd);
       }
@@ -381,23 +382,23 @@ public class MinecraftUtils {
             }
          }
       }
-      return new Tuple<>(ItemContainerContents.fromItems(beltList),stack);
+      return new Tuple<>(ItemContainerContents.fromItems(beltList), stack);
    }
    
    public static LasercastResult lasercast(Level world, Vec3 startPos, Vec3 direction, double distance, boolean blockedByShields, Entity entity){
       Vec3 rayEnd = startPos.add(direction.scale(distance));
-      BlockHitResult raycast = world.clip(new ClipContext(startPos,rayEnd, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity));
+      BlockHitResult raycast = world.clip(new ClipContext(startPos, rayEnd, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity));
       EntityHitResult entityHit;
       Set<Entity> hitSet = new HashSet<>();
       List<Entity> hits = new ArrayList<>();
-      AABB box = new AABB(startPos,raycast.getLocation());
+      AABB box = new AABB(startPos, raycast.getLocation());
       box = box.inflate(2);
       // Primary hitscan check with iteration limit to prevent infinite loops
       // The loop finds entities one at a time (closest first) by excluding already-found entities
       int maxIterations = 1000;
       int iterations = 0;
       do{
-         entityHit = ProjectileUtil.getEntityHitResult(entity,startPos,raycast.getLocation(),box, e -> e instanceof LivingEntity && !e.isSpectator() && !hitSet.contains(e),distance*2);
+         entityHit = ProjectileUtil.getEntityHitResult(entity, startPos, raycast.getLocation(), box, e -> e instanceof LivingEntity && !e.isSpectator() && !hitSet.contains(e), distance * 2);
          if(entityHit != null && entityHit.getType() == HitResult.Type.ENTITY){
             Entity hitEntity = entityHit.getEntity();
             if(!hitSet.add(hitEntity)){
@@ -414,10 +415,10 @@ public class MinecraftUtils {
       }
       
       // Secondary hitscan check to add lenience
-      List<Entity> hits2 = world.getEntities(entity, box, (e)-> e instanceof LivingEntity && !e.isSpectator() && !hitSet.contains(e) && MathUtils.hitboxRaycast(e,startPos,raycast.getLocation()));
+      List<Entity> hits2 = world.getEntities(entity, box, (e) -> e instanceof LivingEntity && !e.isSpectator() && !hitSet.contains(e) && MathUtils.hitboxRaycast(e, startPos, raycast.getLocation()));
       hits.addAll(hits2);
       hitSet.addAll(hits2);
-      hits.sort(Comparator.comparingDouble(e->e.distanceTo(entity)));
+      hits.sort(Comparator.comparingDouble(e -> e.distanceTo(entity)));
       
       if(!blockedByShields){
          return new LasercastResult(startPos, raycast.getLocation(), direction, hits);
@@ -431,7 +432,7 @@ public class MinecraftUtils {
             double dp = hitPlayer.getForward().normalize().dot(direction.normalize());
             blocked = dp < -0.6;
             if(blocked){
-               SoundUtils.playSound(world,hitPlayer.blockPosition(), SoundEvents.SHIELD_BLOCK, SoundSource.PLAYERS,1f,1f);
+               SoundUtils.playSound(world, hitPlayer.blockPosition(), SoundEvents.SHIELD_BLOCK, SoundSource.PLAYERS, 1f, 1f);
                endPoint = startPos.add(direction.normalize().scale(direction.normalize().dot(hitPlayer.position().subtract(startPos)))).subtract(direction.normalize());
             }
          }
@@ -441,15 +442,16 @@ public class MinecraftUtils {
          }
       }
       
-      return new LasercastResult(startPos,endPoint,direction,hits3);
+      return new LasercastResult(startPos, endPoint, direction, hits3);
    }
    
-   public record LasercastResult(Vec3 startPos, Vec3 endPos, Vec3 direction, List<Entity> sortedHits){}
+   public record LasercastResult(Vec3 startPos, Vec3 endPos, Vec3 direction, List<Entity> sortedHits) {
+   }
    
    public static ServerPlayer getRequestedPlayer(MinecraftServer server, NameAndId playerEntry){
       ServerPlayer requestedPlayer = server.getPlayerList().getPlayerByName(playerEntry.name());
       
-      if (requestedPlayer == null) {
+      if(requestedPlayer == null){
          requestedPlayer = new ServerPlayer(server, server.overworld(), new GameProfile(playerEntry.id(), playerEntry.name()), ClientInformation.createDefault());
          Optional<ValueInput> readViewOpt = server
                .getPlayerList()
@@ -457,11 +459,11 @@ public class MinecraftUtils {
                .map(playerData -> TagValueInput.create(new ProblemReporter.ScopedCollector(LogUtils.getLogger()), server.registryAccess(), playerData));
          readViewOpt.ifPresent(requestedPlayer::load);
          
-         if (readViewOpt.isPresent()) {
+         if(readViewOpt.isPresent()){
             ValueInput readView = readViewOpt.get();
             Optional<String> dimension = readView.getString("Dimension");
             
-            if (dimension.isPresent()) {
+            if(dimension.isPresent()){
                ServerLevel world = server.getLevel(ResourceKey.create(Registries.DIMENSION, Identifier.tryParse(dimension.get())));
                if(world != null) ((EntityAccessor) requestedPlayer).callSetLevel(world);
             }

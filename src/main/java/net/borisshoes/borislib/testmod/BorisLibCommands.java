@@ -125,7 +125,7 @@ public class BorisLibCommands {
                               .then(argument("condition", id()).suggests(BorisLibCommands::suggestConditions)
                                     .executes(BorisLibCommands::conditionGetInstances)))))
             .then(literal("testmod").requires(source -> Permissions.require(MOD_ID + ".testmod", PermissionLevel.GAMEMASTERS).test(source)
-                  && BorisLib.CONFIG != null && BorisLib.CONFIG.getBoolean(BorisLib.TESTMOD_FEATURES_ENABLED))
+                        && BorisLib.CONFIG != null && BorisLib.CONFIG.getBoolean(BorisLib.TESTMOD_FEATURES_ENABLED))
                   .then(literal("worldcallback")
                         .requires(Permissions.require(MOD_ID + ".testmod.worldcallback", PermissionLevel.GAMEMASTERS))
                         .then(argument("ticks", integer(0))
@@ -184,7 +184,7 @@ public class BorisLibCommands {
                   .executes(BorisLibCommands::reloadConfig))
       );
       
-      dispatcher.register(BorisLib.CONFIG.generateCommand("borislib","config"));
+      dispatcher.register(BorisLib.CONFIG.generateCommand("borislib", "config"));
    }
    
    private static int readTimestamp(CommandContext<CommandSourceStack> context){
@@ -360,10 +360,10 @@ public class BorisLibCommands {
          ServerPlayer onlinePlayer = context.getSource().getServer().getPlayerList().getPlayerByName(playerArg);
          if(onlinePlayer != null){
             uuid = onlinePlayer.getUUID();
-         } else {
+         }else{
             // Look through our stored player data for a matching username
-            Map<UUID,DefaultPlayerData> allPlayerData = DataAccess.allPlayerDataFor(BorisLib.PLAYER_DATA_KEY);
-            for(Map.Entry<UUID,DefaultPlayerData> entry : allPlayerData.entrySet()){
+            Map<UUID, DefaultPlayerData> allPlayerData = DataAccess.allPlayerDataFor(BorisLib.PLAYER_DATA_KEY);
+            for(Map.Entry<UUID, DefaultPlayerData> entry : allPlayerData.entrySet()){
                DefaultPlayerData data = entry.getValue();
                if(playerArg.equalsIgnoreCase(data.getUsername()) || data.getKnownUsernames().stream().anyMatch(name -> name.equalsIgnoreCase(playerArg))){
                   uuid = entry.getKey();
@@ -378,7 +378,7 @@ public class BorisLibCommands {
          return 0;
       }
       
-      try {
+      try{
          DefaultPlayerData data = DataAccess.getPlayer(uuid, BorisLib.PLAYER_DATA_KEY);
          context.getSource().sendSuccess(() -> Component.literal("=== DefaultPlayerData ===").withStyle(ChatFormatting.GOLD), false);
          
@@ -402,7 +402,7 @@ public class BorisLibCommands {
          }
          
          return 1;
-      } catch (Exception e) {
+      }catch(Exception e){
          context.getSource().sendFailure(Component.literal("Error retrieving player data: " + e.getMessage()));
          BorisLib.LOGGER.error("Error in playerInfo command: {}", e.getMessage());
          return 0;
@@ -468,7 +468,8 @@ public class BorisLibCommands {
                if(s.toLowerCase(Locale.ROOT).startsWith(start)) builder.suggest(s);
             }
          }
-      }catch(Exception ignored){}
+      }catch(Exception ignored){
+      }
       return builder.buildFuture();
    }
    
@@ -517,7 +518,7 @@ public class BorisLibCommands {
       }
    }
    
-   private static int conditionAdd(CommandContext<CommandSourceStack> context, boolean particles, boolean stacking, boolean persistent, Entity inflicter) throws Exception {
+   private static int conditionAdd(CommandContext<CommandSourceStack> context, boolean particles, boolean stacking, boolean persistent, Entity inflicter) throws Exception{
       Entity target = getEntity(context, "entity");
       if(!(target instanceof LivingEntity living)){
          context.getSource().sendFailure(Component.translatable("command.borislib.condition.not_living_entity"));
@@ -627,7 +628,7 @@ public class BorisLibCommands {
             context.getSource().sendFailure(Component.translatable("command.borislib.condition.unknown_condition", getId(context, "condition").toString()));
             return 0;
          }
-         Triple<Float,Boolean,Boolean> stats = Conditions.getPrevalingCondition(target.getUUID(), holder);
+         Triple<Float, Boolean, Boolean> stats = Conditions.getPrevalingCondition(target.getUUID(), holder);
          if(stats == null){
             context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get.not_active",
                   holder.value().getName().withStyle(ChatFormatting.GREEN),
@@ -660,12 +661,12 @@ public class BorisLibCommands {
             context.getSource().sendFailure(Component.translatable("command.borislib.condition.get_instance.not_found",
                   holder.value().getName(), id.toString(), target.getDisplayName()));
             return 0;
-          }else{
-             context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get_instance.success",
-                   holder.value().getName().withStyle(ChatFormatting.GREEN),
-                   Component.literal("[" + id + "]").withStyle(ChatFormatting.GRAY),
-                   target.getDisplayName(),
-                   Component.translatable("command.borislib.condition.get_instance.details", inst.getValue(), inst.getDuration(), inst.getTimer(), inst.getOperation().name(), inst.isStacking(), inst.hasParticles(), inst.isPersistent(), inst.getInflictedBy() != null ? inst.getInflictedBy().toString() : "none").withStyle(ChatFormatting.YELLOW)), false);
+         }else{
+            context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get_instance.success",
+                  holder.value().getName().withStyle(ChatFormatting.GREEN),
+                  Component.literal("[" + id + "]").withStyle(ChatFormatting.GRAY),
+                  target.getDisplayName(),
+                  Component.translatable("command.borislib.condition.get_instance.details", inst.getValue(), inst.getDuration(), inst.getTimer(), inst.getOperation().name(), inst.isStacking(), inst.hasParticles(), inst.isPersistent(), inst.getInflictedBy() != null ? inst.getInflictedBy().toString() : "none").withStyle(ChatFormatting.YELLOW)), false);
             return 1;
          }
       }catch(Exception e){
@@ -711,10 +712,10 @@ public class BorisLibCommands {
                   holder.value().getName().withStyle(ChatFormatting.GREEN),
                   target.getDisplayName(),
                   Component.literal(String.valueOf(instances.size())).withStyle(ChatFormatting.GRAY)), false);
-             for(ConditionInstance inst : instances){
-                context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get_instances.entry",
-                      Component.literal(inst.getId().toString()).withStyle(ChatFormatting.AQUA),
-                      Component.translatable("command.borislib.condition.get_instance.details", inst.getValue(), inst.getDuration(), inst.getTimer(), inst.getOperation().name(), inst.isStacking(), inst.hasParticles(), inst.isPersistent(), inst.getInflictedBy() != null ? inst.getInflictedBy().toString() : "none").withStyle(ChatFormatting.GRAY)), false);
+            for(ConditionInstance inst : instances){
+               context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get_instances.entry",
+                     Component.literal(inst.getId().toString()).withStyle(ChatFormatting.AQUA),
+                     Component.translatable("command.borislib.condition.get_instance.details", inst.getValue(), inst.getDuration(), inst.getTimer(), inst.getOperation().name(), inst.isStacking(), inst.hasParticles(), inst.isPersistent(), inst.getInflictedBy() != null ? inst.getInflictedBy().toString() : "none").withStyle(ChatFormatting.GRAY)), false);
             }
          }
          return instances.size();

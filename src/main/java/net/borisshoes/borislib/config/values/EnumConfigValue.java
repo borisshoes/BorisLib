@@ -37,11 +37,11 @@ public class EnumConfigValue<K extends Enum<K> & StringRepresentable> extends Co
    @Override
    public K parseArgumentValue(CommandContext<CommandSourceStack> ctx){
       String parsedString = StringArgumentType.getString(ctx, name);
-      return K.valueOf(this.typeClass,parsedString);
+      return K.valueOf(this.typeClass, parsedString);
    }
    
    public CompletableFuture<Suggestions> getSuggestions(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder){
-      return getEnumSuggestions(context,builder,typeClass);
+      return getEnumSuggestions(context, builder, typeClass);
    }
    
    @Override

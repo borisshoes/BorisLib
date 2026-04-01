@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
-public class ListConfigValue<G,T extends ConfigValue<G>> extends ConfigValue<List<G>> {
+public class ListConfigValue<G, T extends ConfigValue<G>> extends ConfigValue<List<G>> {
    protected final List<G> defaultValue;
    private final T configType;
    
@@ -26,13 +26,13 @@ public class ListConfigValue<G,T extends ConfigValue<G>> extends ConfigValue<Lis
    
    @Override
    public List<G> getFromString(String value){
-      try {
+      try{
          value = value.trim();
-         if (value.startsWith("[") && value.endsWith("]")) {
+         if(value.startsWith("[") && value.endsWith("]")){
             value = value.substring(1, value.length() - 1).trim();
          }
          ArrayList<G> list = new ArrayList<>();
-         if (value.isEmpty()) {
+         if(value.isEmpty()){
             return list;
          }
          
@@ -45,7 +45,7 @@ public class ListConfigValue<G,T extends ConfigValue<G>> extends ConfigValue<Lis
          }
          
          return list;
-      } catch (Exception e) {
+      }catch(Exception e){
          return defaultValue;
       }
    }

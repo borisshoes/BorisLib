@@ -20,7 +20,8 @@ public class PagedGui<T> extends PagedGuiBase {
    private List<T> itemList;
    private List<T> filteredSortedList;
    
-   private TriConsumer<T, Integer, ClickType> elemClickFunction = (item, index, clickType) -> {};
+   private TriConsumer<T, Integer, ClickType> elemClickFunction = (item, index, clickType) -> {
+   };
    private BiFunction<T, Integer, GuiElementBuilder> itemElemBuilder = (item, index) -> new GuiElementBuilder(ItemStack.EMPTY);
    
    public PagedGui(MenuType<?> type, ServerPlayer player, List<T> items){
@@ -44,7 +45,7 @@ public class PagedGui<T> extends PagedGuiBase {
             if(clickType.isLeft && clickType.shift){
                this.curSort = this.curSort.getStaticDefault();
             }else{
-               this.curSort = curSort.cycle(curSort,clickType.isRight);
+               this.curSort = curSort.cycle(curSort, clickType.isRight);
             }
             buildPage();
          }
@@ -54,7 +55,7 @@ public class PagedGui<T> extends PagedGuiBase {
             if(clickType.isLeft && clickType.shift){
                this.curFilter = this.curFilter.getStaticDefault();
             }else{
-               this.curFilter = curFilter.cycle(curFilter,clickType.isRight);
+               this.curFilter = curFilter.cycle(curFilter, clickType.isRight);
             }
             buildPage();
          }
@@ -62,19 +63,19 @@ public class PagedGui<T> extends PagedGuiBase {
    }
    
    public int numPages(){
-      return Math.max(1,(int) (Math.ceil((float)filteredSortedList.size()/(this.paneWidth*this.paneHeight))));
+      return Math.max(1, (int) (Math.ceil((float) filteredSortedList.size() / (this.paneWidth * this.paneHeight))));
    }
    
    public void buildPage(){
       updateFilteredSorted();
       int numPages = numPages();
-      pageNum = Math.clamp(pageNum,1,Math.max(1,numPages));
-      List<T> pageItems = AlgoUtils.listToPage(filteredSortedList,pageNum,pageSize());
+      pageNum = Math.clamp(pageNum, 1, Math.max(1, numPages));
+      List<T> pageItems = AlgoUtils.listToPage(filteredSortedList, pageNum, pageSize());
       
-      if(sortInd >= 0 && curSort != null) setSlot(sortInd,createSortItem());
-      if(filterInd >= 0 && curFilter != null) setSlot(filterInd,createFilterItem());
-      if(nextInd >= 0 && numPages > 1) setSlot(nextInd,createNextPageItem());
-      if(prevInd >= 0 && numPages > 1) setSlot(prevInd,createPrevPageItem());
+      if(sortInd >= 0 && curSort != null) setSlot(sortInd, createSortItem());
+      if(filterInd >= 0 && curFilter != null) setSlot(filterInd, createFilterItem());
+      if(nextInd >= 0 && numPages > 1) setSlot(nextInd, createNextPageItem());
+      if(prevInd >= 0 && numPages > 1) setSlot(prevInd, createPrevPageItem());
       
       int pageIndex = 0;
       for(int paneY = 0; paneY < paneHeight; paneY++){
@@ -87,7 +88,7 @@ public class PagedGui<T> extends PagedGuiBase {
                builder.setCallback(clickType -> elemClickFunction.accept(item, finalPageIndex, clickType));
                setSlot(guiIndex, builder);
             }else{
-               setSlot(guiIndex,blankItem);
+               setSlot(guiIndex, blankItem);
             }
             pageIndex++;
          }

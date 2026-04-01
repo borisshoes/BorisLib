@@ -13,7 +13,7 @@ import net.minecraft.world.entity.LivingEntity;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
-public class DecayCondition extends Condition{
+public class DecayCondition extends Condition {
    private static final ColorParticleOption PARTICLE = ColorParticleOption.create(ParticleTypes.ENTITY_EFFECT, 0x40581E);
    
    protected DecayCondition(){
@@ -52,5 +52,6 @@ public class DecayCondition extends Condition{
    }
    
    @Override
-   public void onRemove(MinecraftServer server, LivingEntity entity, float value, boolean particles){}
+   public void onRemove(MinecraftServer server, LivingEntity entity, float value, boolean particles){
+   }
 }

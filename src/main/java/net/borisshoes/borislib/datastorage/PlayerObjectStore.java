@@ -44,11 +44,59 @@ public final class PlayerObjectStore {
    }
    
    public PlayerObjectStore(Path worldRoot){
-      this.dir = worldRoot.resolve("data").resolve(MOD_ID).resolve("players");
+      this.dir = worldRoot.resolve("players").resolve(MOD_ID);
       try{
          Files.createDirectories(dir);
       }catch(Exception ignored){
       
+      }
+      
+      // Migrate from old path (world/data/borislib/players/) to new path (world/players/borislib/)
+      Path oldDir = worldRoot.resolve("data").resolve(MOD_ID).resolve("players");
+      if(Files.isDirectory(oldDir)){
+         try(var stream = Files.list(oldDir)){
+            stream.filter(p -> p.toString().endsWith(".dat") || p.toString().endsWith(".dat_old"))
+                  .forEach(oldFile -> {
+                     Path newFile = dir.resolve(oldFile.getFileName());
+                     if(!Files.exists(newFile)){
+                        try{
+                           Files.move(oldFile, newFile, StandardCopyOption.REPLACE_EXISTING);
+                           BorisLib.LOGGER.info("Migrated player data file: {} -> {}", oldFile, newFile);
+                        }catch(Exception e){
+                           BorisLib.LOGGER.error("Failed to migrate player data file: {} -> {}: {}", oldFile, newFile, e.getMessage());
+                           try{
+                              Files.copy(oldFile, newFile);
+                              BorisLib.LOGGER.info("Copied player data file as fallback: {} -> {}", oldFile, newFile);
+                           }catch(Exception e2){
+                              BorisLib.LOGGER.error("Failed to copy player data file: {}", e2.getMessage());
+                           }
+                        }
+                     }
+                  });
+            
+            // Try to clean up old directory structure if empty
+            try{
+               Path dataBorislib = worldRoot.resolve("data").resolve(MOD_ID);
+               deleteIfEmptyRecursive(oldDir);
+               deleteIfEmptyRecursive(dataBorislib);
+            }catch(Exception ignored2){
+            }
+         }catch(Exception e){
+            BorisLib.LOGGER.error("Failed to list old player data directory for migration: {}", e.getMessage());
+         }
+      }
+   }
+   
+   private static void deleteIfEmptyRecursive(Path dir){
+      try{
+         if(Files.isDirectory(dir)){
+            try(var entries = Files.list(dir)){
+               if(entries.findAny().isEmpty()){
+                  Files.delete(dir);
+               }
+            }
+         }
+      }catch(Exception ignored){
       }
    }
    
@@ -355,6 +403,32 @@ public final class PlayerObjectStore {
          copy.put(u, Map.copyOf(m));
       });
       return copy;
+   }
+   
+   /**
+    * Lists all player UUIDs that have data files on disk.
+    * Used by allPlayerDataFor to discover offline players that aren't in the cache.
+    */
+   public java.util.Set<UUID> listAllStoredUuids(){
+      java.util.Set<UUID> uuids = new java.util.HashSet<>(cache.keySet());
+      if(Files.isDirectory(dir)){
+         try(var stream = Files.list(dir)){
+            stream.filter(p -> p.toString().endsWith(".dat"))
+                  .forEach(p -> {
+                     String name = p.getFileName().toString();
+                     // Strip ".dat" suffix to get UUID string
+                     String uuidStr = name.substring(0, name.length() - 4);
+                     try{
+                        uuids.add(UUID.fromString(uuidStr));
+                     }catch(IllegalArgumentException ignored){
+                        // Not a valid UUID filename, skip
+                     }
+                  });
+         }catch(Exception e){
+            BorisLib.LOGGER.warn("Failed to list player data directory: {}", e.getMessage());
+         }
+      }
+      return uuids;
    }
    
    /**

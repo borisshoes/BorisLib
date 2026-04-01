@@ -114,8 +114,9 @@ public class ConditionData implements StorableData {
             
             // Tick active conditions
             for(Holder<Condition> cond : afterConds){
-               Triple<Float,Boolean,Boolean> stats = Conditions.getPrevalingCondition(entityId, cond);
-               if(stats != null && stats.getLeft() != cond.value().getBase()) cond.value().onTick(server, entity, stats.getLeft(), stats.getRight());
+               Triple<Float, Boolean, Boolean> stats = Conditions.getPrevalingCondition(entityId, cond);
+               if(stats != null && stats.getLeft() != cond.value().getBase())
+                  cond.value().onTick(server, entity, stats.getLeft(), stats.getRight());
             }
             
             // Fire onRemove for condition types that are no longer present

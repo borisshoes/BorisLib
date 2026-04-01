@@ -42,12 +42,13 @@ public abstract class Event {
       this.removalMark = true;
    }
    
-   public void onExpiry(){}
+   public void onExpiry(){
+   }
    
    public static <T extends Event> List<T> getEventsOfType(Class<T> eventType){
       List<T> filteredEvents = new ArrayList<>();
-      for (Event event : RECENT_EVENTS) {
-         if (eventType.isInstance(event)) {
+      for(Event event : RECENT_EVENTS){
+         if(eventType.isInstance(event)){
             filteredEvents.add(eventType.cast(event));
          }
       }

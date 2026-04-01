@@ -4,7 +4,7 @@ import net.borisshoes.borislib.utils.TextUtils;
 
 import java.util.Objects;
 
-public record ConfigSetting<T>(ConfigValue<T> setting) implements IConfigSetting<T>{
+public record ConfigSetting<T>(ConfigValue<T> setting) implements IConfigSetting<T> {
    public ConfigSetting(ConfigValue<T> setting){
       this.setting = Objects.requireNonNull(setting);
    }

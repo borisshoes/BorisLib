@@ -25,9 +25,9 @@ public class RepeatTimer extends TickTimerCallback {
       
       if(ticks > 1){
          if(world != null){
-            BorisLib.addTickTimerCallback(world, new RepeatTimer(interval,ticks-1, task, world));
+            BorisLib.addTickTimerCallback(world, new RepeatTimer(interval, ticks - 1, task, world));
          }else{
-            BorisLib.addTickTimerCallback(new RepeatTimer(interval, ticks-1, task, null));
+            BorisLib.addTickTimerCallback(new RepeatTimer(interval, ticks - 1, task, null));
          }
       }
    }

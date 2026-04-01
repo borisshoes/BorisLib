@@ -38,42 +38,42 @@ public class TextUtils {
       MutableComponent text = Component.literal("").append(prefix);
       int value = (int) (percentage * 100);
       char[] unicodeChars = {'▁', '▂', '▃', '▅', '▆', '▇', '▌'};
-      for (int i = 0; i < numBars; i++) {
+      for(int i = 0; i < numBars; i++){
          int segmentValue = value - (i * numBars);
-         if (segmentValue <= 0) {
+         if(segmentValue <= 0){
             text.append(Component.literal(String.valueOf(unicodeChars[0])).withStyle(barStyle));
-         } else if (segmentValue >= numBars) {
+         }else if(segmentValue >= numBars){
             text.append(Component.literal(String.valueOf(unicodeChars[unicodeChars.length - 1])).withStyle(barStyle));
-         } else {
+         }else{
             int charIndex = (int) ((double) segmentValue / numBars * (unicodeChars.length - 1));
             text.append(Component.literal(String.valueOf(unicodeChars[charIndex])).withStyle(barStyle));
          }
       }
       text.append(suffix);
-      player.sendSystemMessage(text,true);
+      player.sendSystemMessage(text, true);
    }
    
    public static String camelToSnake(String str){
       return str.replaceAll("([a-z])([A-Z]+)", "$1_$2").toLowerCase(Locale.ROOT);
    }
    
-   public static final ArrayList<Tuple<ChatFormatting,Integer>> COLOR_MAP = new ArrayList<>(Arrays.asList(
-         new Tuple<>(ChatFormatting.BLACK,0x000000),
-         new Tuple<>(ChatFormatting.DARK_BLUE,0x0000AA),
-         new Tuple<>(ChatFormatting.DARK_GREEN,0x00AA00),
-         new Tuple<>(ChatFormatting.DARK_AQUA,0x00AAAA),
-         new Tuple<>(ChatFormatting.DARK_RED,0xAA0000),
-         new Tuple<>(ChatFormatting.DARK_PURPLE,0xAA00AA),
-         new Tuple<>(ChatFormatting.GOLD,0xFFAA00),
-         new Tuple<>(ChatFormatting.GRAY,0xAAAAAA),
-         new Tuple<>(ChatFormatting.DARK_GRAY,0x555555),
-         new Tuple<>(ChatFormatting.BLUE,0x5555FF),
-         new Tuple<>(ChatFormatting.GREEN,0x55FF55),
-         new Tuple<>(ChatFormatting.AQUA,0x55FFFF),
-         new Tuple<>(ChatFormatting.RED,0xFF5555),
-         new Tuple<>(ChatFormatting.LIGHT_PURPLE,0xFF55FF),
-         new Tuple<>(ChatFormatting.YELLOW,0xFFFF55),
-         new Tuple<>(ChatFormatting.WHITE,0xFFFFFF)
+   public static final ArrayList<Tuple<ChatFormatting, Integer>> COLOR_MAP = new ArrayList<>(Arrays.asList(
+         new Tuple<>(ChatFormatting.BLACK, 0x000000),
+         new Tuple<>(ChatFormatting.DARK_BLUE, 0x0000AA),
+         new Tuple<>(ChatFormatting.DARK_GREEN, 0x00AA00),
+         new Tuple<>(ChatFormatting.DARK_AQUA, 0x00AAAA),
+         new Tuple<>(ChatFormatting.DARK_RED, 0xAA0000),
+         new Tuple<>(ChatFormatting.DARK_PURPLE, 0xAA00AA),
+         new Tuple<>(ChatFormatting.GOLD, 0xFFAA00),
+         new Tuple<>(ChatFormatting.GRAY, 0xAAAAAA),
+         new Tuple<>(ChatFormatting.DARK_GRAY, 0x555555),
+         new Tuple<>(ChatFormatting.BLUE, 0x5555FF),
+         new Tuple<>(ChatFormatting.GREEN, 0x55FF55),
+         new Tuple<>(ChatFormatting.AQUA, 0x55FFFF),
+         new Tuple<>(ChatFormatting.RED, 0xFF5555),
+         new Tuple<>(ChatFormatting.LIGHT_PURPLE, 0xFF55FF),
+         new Tuple<>(ChatFormatting.YELLOW, 0xFFFF55),
+         new Tuple<>(ChatFormatting.WHITE, 0xFFFFFF)
    ));
    
    public static ChatFormatting getClosestFormatting(int colorRGB){
@@ -81,10 +81,10 @@ public class TextUtils {
       double cDist = Integer.MAX_VALUE;
       for(Tuple<ChatFormatting, Integer> pair : COLOR_MAP){
          int repColor = pair.getB();
-         double rDist = (((repColor>>16)&0xFF)-((colorRGB>>16)&0xFF))*0.30;
-         double gDist = (((repColor>>8)&0xFF)-((colorRGB>>8)&0xFF))*0.59;
-         double bDist = ((repColor&0xFF)-(colorRGB&0xFF))*0.11;
-         double dist = rDist*rDist + gDist*gDist + bDist*bDist;
+         double rDist = (((repColor >> 16) & 0xFF) - ((colorRGB >> 16) & 0xFF)) * 0.30;
+         double gDist = (((repColor >> 8) & 0xFF) - ((colorRGB >> 8) & 0xFF)) * 0.59;
+         double bDist = ((repColor & 0xFF) - (colorRGB & 0xFF)) * 0.11;
+         double dist = rDist * rDist + gDist * gDist + bDist * bDist;
          if(dist < cDist){
             cDist = dist;
             closest = pair.getA();
@@ -94,13 +94,11 @@ public class TextUtils {
    }
    
    public static String intToRoman(int num){
-      int[] values = {1000,900,500,400,100,90,50,40,10,9,5,4,1};
-      String[] romanLetters = {"M","CM","D","CD","C","XC","L","XL","X","IX","V","IV","I"};
+      int[] values = {1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1};
+      String[] romanLetters = {"M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"};
       StringBuilder roman = new StringBuilder();
-      for(int i=0;i<values.length;i++)
-      {
-         while(num >= values[i])
-         {
+      for(int i = 0; i < values.length; i++){
+         while(num >= values[i]){
             num = num - values[i];
             roman.append(romanLetters[i]);
          }
@@ -120,11 +118,11 @@ public class TextUtils {
    }
    
    public static String readableDouble(double num){
-      return readableDouble(num,2);
+      return readableDouble(num, 2);
    }
    
    public static String readableDouble(double num, int decimalPlaces){
-      return String.format("%,0"+(decimalPlaces+1)+"."+decimalPlaces+"f", num);
+      return String.format("%,0" + (decimalPlaces + 1) + "." + decimalPlaces + "f", num);
    }
    
    public static MutableComponent removeItalics(Component text){
@@ -143,21 +141,21 @@ public class TextUtils {
       Matcher matcher = pattern.matcher(input);
       int lastEnd = 0;
       
-      while (matcher.find()){
+      while(matcher.find()){
          if(!input.substring(lastEnd, matcher.start()).isEmpty())
-            matchList.add("["+input.substring(lastEnd,matcher.start())+"](f)");
+            matchList.add("[" + input.substring(lastEnd, matcher.start()) + "](f)");
          matchList.add(matcher.group());
          lastEnd = matcher.end();
       }
       // Add the remaining part of the string
       if(!input.substring(lastEnd).isEmpty())
-         matchList.add("["+input.substring(lastEnd)+"](f)");
+         matchList.add("[" + input.substring(lastEnd) + "](f)");
       
-      for (String str : matchList){
+      for(String str : matchList){
          matcher = pattern.matcher(str);
          
          // Find and print all matches
-         while (matcher.find()){
+         while(matcher.find()){
             String content = matcher.group(1);
             String formatCode = matcher.group(2);
             
@@ -268,7 +266,7 @@ public class TextUtils {
          String contentString = plainTextContent.text();
          
          if(!contentString.isEmpty()){
-            codes.add(textToCodeHelper(contentString,parentColor.getName(),parentItalic, parentBold, parentUnderlined, parentStrikethrough, parentObfuscated));
+            codes.add(textToCodeHelper(contentString, parentColor.getName(), parentItalic, parentBold, parentUnderlined, parentStrikethrough, parentObfuscated));
          }
       }
       
@@ -289,7 +287,7 @@ public class TextUtils {
                      color = formatting;
                   }
                }
-               codes.add(textToCodeHelper(contentString,color.getName(),
+               codes.add(textToCodeHelper(contentString, color.getName(),
                      siblingStyle.isItalic() || parentItalic,
                      siblingStyle.isBold() || parentBold,
                      siblingStyle.isUnderlined() || parentUnderlined,
@@ -306,17 +304,17 @@ public class TextUtils {
       }else{
          String finalCode = "Component.literal(\"\")";
          for(String code : codes){
-            finalCode += "\n\t.append("+code.replace(";","")+")";
+            finalCode += "\n\t.append(" + code.replace(";", "") + ")";
          }
          return finalCode + ";";
       }
    }
    
    private static String textToCodeHelper(String content, String color, boolean italic, boolean bold, boolean underlined, boolean strikethrough, boolean obfuscated){
-      String code = "Component.literal(\""+content+"\")";
+      String code = "Component.literal(\"" + content + "\")";
       
       code += ".withStyle(";
-      code += "ChatFormatting."+color.toUpperCase(Locale.ROOT)+",";
+      code += "ChatFormatting." + color.toUpperCase(Locale.ROOT) + ",";
       if(italic){
          code += "ChatFormatting.ITALIC,";
       }
@@ -332,7 +330,7 @@ public class TextUtils {
       if(obfuscated){
          code += "ChatFormatting.OBFUSCATED,";
       }
-      code = code.substring(0,code.length()-1) + ")";
+      code = code.substring(0, code.length() - 1) + ")";
       code += ";";
       return code;
    }

@@ -64,7 +64,8 @@ public class IntConfigValue extends ConfigValue<Integer> {
    public static class IntLimits {
       int min = Integer.MIN_VALUE, max = Integer.MAX_VALUE;
       
-      public IntLimits(){}
+      public IntLimits(){
+      }
       
       public IntLimits(int min){
          this.min = min;

@@ -128,7 +128,8 @@ public class Conditions {
                return false;
             }
             if(entity instanceof ServerPlayer player){
-               if(inflictedEntity instanceof ServerPlayer otherPlayer && !otherPlayer.canHarmPlayer(player)) return false;
+               if(inflictedEntity instanceof ServerPlayer otherPlayer && !otherPlayer.canHarmPlayer(player))
+                  return false;
             }
          }
       }

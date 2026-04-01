@@ -26,7 +26,7 @@ public class PagedMultiGui extends PagedGuiBase {
       GuiMode<T> mode = new GuiMode<>(items, elemBuilder, elemClickFunction, defaultSort, defaultFilter);
       modes.add(mode);
       if(currentModeInd == -1){
-         currentModeInd = modes.size()-1;
+         currentModeInd = modes.size() - 1;
          regenPageFunctions();
       }
       return this;
@@ -56,7 +56,7 @@ public class PagedMultiGui extends PagedGuiBase {
             if(clickType.isLeft && clickType.shift){
                curMode.setCurSort(curMode.getCurSort().getStaticDefault());
             }else{
-               curMode.setCurSort(curMode.getCurSort().cycle(curMode.getCurSort(),clickType.isRight));
+               curMode.setCurSort(curMode.getCurSort().cycle(curMode.getCurSort(), clickType.isRight));
             }
             buildPage();
          }
@@ -66,7 +66,7 @@ public class PagedMultiGui extends PagedGuiBase {
             if(clickType.isLeft && clickType.shift){
                curMode.setCurFilter(curMode.getCurFilter().getStaticDefault());
             }else{
-               curMode.setCurFilter(curMode.getCurFilter().cycle(curMode.getCurFilter(),clickType.isRight));
+               curMode.setCurFilter(curMode.getCurFilter().cycle(curMode.getCurFilter(), clickType.isRight));
             }
             buildPage();
          }
@@ -85,7 +85,7 @@ public class PagedMultiGui extends PagedGuiBase {
    @Override
    public int numPages(){
       GuiMode<?> curMode = getCurrentMode();
-      return Math.max(1,(int) (Math.ceil((float)curMode.getFilteredItems().size()/(this.paneWidth*this.paneHeight))));
+      return Math.max(1, (int) (Math.ceil((float) curMode.getFilteredItems().size() / (this.paneWidth * this.paneHeight))));
    }
    
    protected GuiElementBuilder createSortItem(){
@@ -108,6 +108,7 @@ public class PagedMultiGui extends PagedGuiBase {
       sortBuilt.setCallback(this.cycleSortFunction);
       return sortBuilt;
    }
+   
    protected GuiElementBuilder createFilterItem(){
       GuiMode<?> curMode = getCurrentMode();
       GuiElementBuilder filterBuilt = GuiElementBuilder.from(GraphicalItem.with(GraphicalItem.FILTER)).hideDefaultTooltip();
@@ -163,27 +164,27 @@ public class PagedMultiGui extends PagedGuiBase {
       
       public void buildPage(PagedMultiGui gui){
          int numPages = gui.numPages();
-         this.pageNum = Math.clamp(this.pageNum,1,Math.max(1,numPages));
+         this.pageNum = Math.clamp(this.pageNum, 1, Math.max(1, numPages));
          gui.pageNum = this.pageNum;
          
-         if(gui.sortInd >= 0 && curSort != null) gui.setSlot(gui.sortInd,gui.createSortItem());
-         if(gui.filterInd >= 0 && curFilter != null) gui.setSlot(gui.filterInd,gui.createFilterItem());
-         if(gui.nextInd >= 0 && numPages > 1) gui.setSlot(gui.nextInd,gui.createNextPageItem());
-         if(gui.prevInd >= 0 && numPages > 1) gui.setSlot(gui.prevInd,gui.createPrevPageItem());
+         if(gui.sortInd >= 0 && curSort != null) gui.setSlot(gui.sortInd, gui.createSortItem());
+         if(gui.filterInd >= 0 && curFilter != null) gui.setSlot(gui.filterInd, gui.createFilterItem());
+         if(gui.nextInd >= 0 && numPages > 1) gui.setSlot(gui.nextInd, gui.createNextPageItem());
+         if(gui.prevInd >= 0 && numPages > 1) gui.setSlot(gui.prevInd, gui.createPrevPageItem());
          
-         List<T> pageItems = AlgoUtils.listToPage(getFilteredItems(),pageNum,gui.pageSize());
+         List<T> pageItems = AlgoUtils.listToPage(getFilteredItems(), pageNum, gui.pageSize());
          int pageIndex = 0;
          for(int paneY = 0; paneY < gui.paneHeight; paneY++){
             for(int paneX = 0; paneX < gui.paneWidth; paneX++){
                int guiIndex = gui.paneStartInd + (pageIndex / gui.paneWidth) * gui.width + (pageIndex % gui.paneWidth);
                if(pageIndex < pageItems.size()){
                   T item = pageItems.get(pageIndex);
-                  GuiElementBuilder builder = getElemBuilder().apply(item,pageIndex);
+                  GuiElementBuilder builder = getElemBuilder().apply(item, pageIndex);
                   final int finalPageIndex = pageIndex;
                   builder.setCallback(clickType -> getElemClickFunction().accept(item, finalPageIndex, clickType));
                   gui.setSlot(guiIndex, builder);
                }else{
-                  gui.setSlot(guiIndex,gui.blankItem);
+                  gui.setSlot(guiIndex, gui.blankItem);
                }
                pageIndex++;
             }

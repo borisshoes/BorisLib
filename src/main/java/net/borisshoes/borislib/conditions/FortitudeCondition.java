@@ -10,11 +10,11 @@ import net.minecraft.world.entity.LivingEntity;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
-public class FortitudeCondition extends Condition{
+public class FortitudeCondition extends Condition {
    private static final SimpleParticleType PARTICLE = ParticleTypes.FALLING_OBSIDIAN_TEAR;
    
    protected FortitudeCondition(){
-      super(Identifier.fromNamespaceAndPath(MOD_ID,"fortitude"), MobEffectCategory.BENEFICIAL, 1.0f, 0.0f, 1.0f, true);
+      super(Identifier.fromNamespaceAndPath(MOD_ID, "fortitude"), MobEffectCategory.BENEFICIAL, 1.0f, 0.0f, 1.0f, true);
    }
    
    @Override

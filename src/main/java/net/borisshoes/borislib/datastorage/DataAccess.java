@@ -229,21 +229,23 @@ public final class DataAccess {
       ensureServerSide("allPlayerDataFor");
       Map<UUID, T> out = new HashMap<>();
       
-      // Always include online players (force-decode into live objects)
+      // Discover ALL player UUIDs: online players + cached + on-disk files
+      Set<UUID> allUuids = playerStore.listAllStoredUuids();
       for(ServerPlayer sp : BorisLib.SERVER.getPlayerList().getPlayers()){
-         out.put(sp.getUUID(), playerStore.getLive(sp.getUUID(), key));
+         allUuids.add(sp.getUUID());
       }
       
-      // Include any additional cached offline players (objects snapshot)
-      playerStore.snapshotAllObjects().forEach((uuid, mods) -> {
-         if(out.containsKey(uuid)) return;
-         Map<String, Object> tg = mods.get(key.modId());
-         if(tg != null){
-            @SuppressWarnings("unchecked")
-            T v = (T) tg.get(key.key());
-            if(v != null) out.put(uuid, v);
+      // Load data for every known player
+      for(UUID uuid : allUuids){
+         try{
+            T value = playerStore.getLive(uuid, key);
+            if(value != null){
+               out.put(uuid, value);
+            }
+         }catch(Exception e){
+            BorisLib.LOGGER.warn("Failed to load data for key {} player {}: {}", key.id(), uuid, e.getMessage());
          }
-      });
+      }
       
       return out;
    }

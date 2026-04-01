@@ -15,18 +15,19 @@ public class WorldTickCallback {
    public static void onWorldTick(ServerLevel world){
       try{
          // Tick Timer Callbacks
-         if(world.getServer().tickRateManager().runsNormally()) WORLD_TIMER_CALLBACKS.removeIf(tickTimers(world)::contains);
+         if(world.getServer().tickRateManager().runsNormally())
+            WORLD_TIMER_CALLBACKS.removeIf(tickTimers(world)::contains);
          
       }catch(Exception e){
-         LOGGER.log(Level.ERROR,e);
+         LOGGER.log(Level.ERROR, e);
       }
    }
    
    @NotNull
    private static ArrayList<Tuple<ServerLevel, TickTimerCallback>> tickTimers(ServerLevel serverWorld){
-      ArrayList<Tuple<ServerLevel,TickTimerCallback>> toRemove = new ArrayList<>();
+      ArrayList<Tuple<ServerLevel, TickTimerCallback>> toRemove = new ArrayList<>();
       for(int i = 0; i < WORLD_TIMER_CALLBACKS.size(); i++){
-         Tuple<ServerLevel,TickTimerCallback> pair = WORLD_TIMER_CALLBACKS.get(i);
+         Tuple<ServerLevel, TickTimerCallback> pair = WORLD_TIMER_CALLBACKS.get(i);
          TickTimerCallback t = pair.getB();
          if(pair.getA().dimension() == serverWorld.dimension()){
             if(t.decreaseTimer() == 0){

@@ -12,7 +12,8 @@ import net.minecraft.server.network.ServerGamePacketListenerImpl;
 
 public abstract class LoginCallback {
    public static final Codec<LoginCallback> LOGIN_CALLBACK_CODEC = new Codec<>() {
-      @Override public <T> DataResult<T> encode(LoginCallback input, DynamicOps<T> ops, T prefix) {
+      @Override
+      public <T> DataResult<T> encode(LoginCallback input, DynamicOps<T> ops, T prefix){
          Identifier id = input.getId();
          String uuid = input.getPlayer() == null ? "" : input.getPlayer();
          CompoundTag data = input.getData() == null ? new CompoundTag() : input.getData();
@@ -22,17 +23,23 @@ public abstract class LoginCallback {
          mb.add("data", CompoundTag.CODEC.encodeStart(ops, data).result().orElseGet(ops::empty));
          return mb.build(prefix);
       }
-      @Override public <T> DataResult<Pair<LoginCallback, T>> decode(DynamicOps<T> ops, T input) {
+      
+      @Override
+      public <T> DataResult<Pair<LoginCallback, T>> decode(DynamicOps<T> ops, T input){
          return ops.getMap(input).flatMap(map -> {
             T idEl = map.get("id");
             T uuidEl = map.get("uuid");
             T dataEl = map.get("data");
-            if (idEl == null || dataEl == null) return DataResult.error(() -> "Missing id or data");
+            if(idEl == null || dataEl == null) return DataResult.error(() -> "Missing id or data");
             return ops.getStringValue(idEl).flatMap(idStr -> {
                final Identifier id;
-               try { id = Identifier.parse(idStr); } catch (Exception e) { return DataResult.error(() -> "Bad id: " + idStr); }
+               try{
+                  id = Identifier.parse(idStr);
+               }catch(Exception e){
+                  return DataResult.error(() -> "Bad id: " + idStr);
+               }
                LoginCallback cb = BorisLib.createCallback(id);
-               if (cb == null) return DataResult.error(() -> "Unregistered callback id: " + id);
+               if(cb == null) return DataResult.error(() -> "Unregistered callback id: " + id);
                String uuid = uuidEl == null ? "" : ops.getStringValue(uuidEl).result().orElse("");
                return CompoundTag.CODEC.decode(ops, dataEl).map(p -> {
                   cb.setPlayer(uuid);
@@ -64,7 +71,9 @@ public abstract class LoginCallback {
    
    public abstract LoginCallback makeNew();
    
-   public void setPlayer(String playerUUID){ this.playerUUID = playerUUID;}
+   public void setPlayer(String playerUUID){
+      this.playerUUID = playerUUID;
+   }
    
    public Identifier getId(){
       return id;

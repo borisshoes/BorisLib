@@ -53,7 +53,8 @@ public class FloatConfigValue extends ConfigValue<Float> {
    public static class FloatLimits {
       float min = -Float.MAX_VALUE, max = Float.MAX_VALUE;
       
-      public FloatLimits(){}
+      public FloatLimits(){
+      }
       
       public FloatLimits(float min){
          this.min = min;

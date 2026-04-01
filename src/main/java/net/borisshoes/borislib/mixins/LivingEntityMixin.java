@@ -19,12 +19,12 @@ public class LivingEntityMixin {
    private float borislib$modifyHurtDamage(float original, ServerLevel serverLevel, DamageSource damageSource){
       LivingEntity hurtEntity = (LivingEntity) (Object) this;
       if(hurtEntity.level().isClientSide()) return original;
-      float vulnerable = Conditions.getConditionValue(hurtEntity.getUUID(),Conditions.VULNERABILITY);
-      float fortitude = Conditions.getConditionValue(hurtEntity.getUUID(),Conditions.FORTITUDE);
+      float vulnerable = Conditions.getConditionValue(hurtEntity.getUUID(), Conditions.VULNERABILITY);
+      float fortitude = Conditions.getConditionValue(hurtEntity.getUUID(), Conditions.FORTITUDE);
       original *= vulnerable * fortitude;
       if(!(damageSource.isDirect() && damageSource.getDirectEntity() instanceof LivingEntity dealer)) return original;
-      float might = Conditions.getConditionValue(dealer.getUUID(),Conditions.MIGHT);
-      float feeble = Conditions.getConditionValue(dealer.getUUID(),Conditions.FEEBLE);
+      float might = Conditions.getConditionValue(dealer.getUUID(), Conditions.MIGHT);
+      float feeble = Conditions.getConditionValue(dealer.getUUID(), Conditions.FEEBLE);
       original *= might * feeble;
       return original;
    }
@@ -33,14 +33,14 @@ public class LivingEntityMixin {
    private void borislib$clearConditionsOnDeath(DamageSource damageSource, CallbackInfo ci){
       LivingEntity hurtEntity = (LivingEntity) (Object) this;
       if(hurtEntity.level().isClientSide()) return;
-      Conditions.removeAllConditions(hurtEntity.level().getServer(),hurtEntity);
+      Conditions.removeAllConditions(hurtEntity.level().getServer(), hurtEntity);
    }
    
-   @ModifyReturnValue(method= "canAttack(Lnet/minecraft/world/entity/LivingEntity;)Z", at=@At("RETURN"))
+   @ModifyReturnValue(method = "canAttack(Lnet/minecraft/world/entity/LivingEntity;)Z", at = @At("RETURN"))
    private boolean borislib$canTarget(boolean original, LivingEntity target){
       LivingEntity livingEntity = (LivingEntity) (Object) this;
       if(livingEntity.level().isClientSide()) return original;
-      float nearsight = Conditions.getConditionValue(livingEntity.getUUID(),Conditions.NEARSIGHT);
+      float nearsight = Conditions.getConditionValue(livingEntity.getUUID(), Conditions.NEARSIGHT);
       boolean outOfRange = target.distanceTo(livingEntity) > nearsight / 2.0;
       if(nearsight != Conditions.NEARSIGHT.value().getBase() && outOfRange && !livingEntity.is(BorisLib.IGNORES_NEARSIGHT)){
          return false;

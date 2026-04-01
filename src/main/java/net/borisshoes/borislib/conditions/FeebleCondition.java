@@ -11,11 +11,11 @@ import net.minecraft.world.entity.LivingEntity;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
-public class FeebleCondition extends Condition{
+public class FeebleCondition extends Condition {
    private static final SimpleParticleType PARTICLE = ParticleTypes.FALLING_HONEY;
    
    protected FeebleCondition(){
-      super(Identifier.fromNamespaceAndPath(MOD_ID,"feeble"), MobEffectCategory.HARMFUL, 1.0f, 0.0f, 1.0f, true);
+      super(Identifier.fromNamespaceAndPath(MOD_ID, "feeble"), MobEffectCategory.HARMFUL, 1.0f, 0.0f, 1.0f, true);
    }
    
    @Override
@@ -43,5 +43,6 @@ public class FeebleCondition extends Condition{
    }
    
    @Override
-   public void onRemove(MinecraftServer server, LivingEntity entity, float value, boolean particles){}
+   public void onRemove(MinecraftServer server, LivingEntity entity, float value, boolean particles){
+   }
 }

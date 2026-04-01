@@ -43,22 +43,22 @@ public abstract class PagedGuiBase extends SimpleGui {
          this.paneStartInd = width + 1;
          this.sortInd = 0;
          this.filterInd = width - 1;
-         this.nextInd = width*height - 1;
-         this.prevInd = width*(height-1);
+         this.nextInd = width * height - 1;
+         this.prevInd = width * (height - 1);
       }
    }
    
    public abstract int numPages();
    
    public int pageSize(){
-      return this.paneWidth*this.paneHeight;
+      return this.paneWidth * this.paneHeight;
    }
    
    public abstract void buildPage();
    
    protected GuiElementBuilder createNextPageItem(){
       GuiElementBuilder nextPage = GuiElementBuilder.from(GraphicalItem.with(GraphicalItem.RIGHT_ARROW));
-      nextPage.setName(Component.translatable("gui.borislib.next_page_title",pageNum,numPages()).withColor(primaryTextColor));
+      nextPage.setName(Component.translatable("gui.borislib.next_page_title", pageNum, numPages()).withColor(primaryTextColor));
       nextPage.addLoreLine(Component.translatable("text.borislib.two_elements",
             Component.translatable("gui.borislib.click").withColor(action1TextColor),
             Component.translatable("gui.borislib.next_page_sub").withColor(secondaryTextColor)));
@@ -68,7 +68,7 @@ public abstract class PagedGuiBase extends SimpleGui {
    
    protected GuiElementBuilder createPrevPageItem(){
       GuiElementBuilder prevPage = GuiElementBuilder.from(GraphicalItem.with(GraphicalItem.LEFT_ARROW));
-      prevPage.setName(Component.translatable("gui.borislib.prev_page_title",pageNum,numPages()).withColor(primaryTextColor));
+      prevPage.setName(Component.translatable("gui.borislib.prev_page_title", pageNum, numPages()).withColor(primaryTextColor));
       prevPage.addLoreLine(Component.translatable("text.borislib.two_elements",
             Component.translatable("gui.borislib.click").withColor(action1TextColor),
             Component.translatable("gui.borislib.prev_page_sub").withColor(secondaryTextColor)));

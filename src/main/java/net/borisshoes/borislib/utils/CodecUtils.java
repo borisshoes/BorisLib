@@ -23,9 +23,9 @@ public class CodecUtils {
    public static final Codec<List<String>> STRING_LIST = Codec.STRING.listOf();
    public static final Codec<String[]> STRING_ARRAY = STRING_LIST.xmap(l -> l.toArray(String[]::new), Arrays::asList);
    public static final Codec<UUID> UUID_CODEC = Codec.STRING.comapFlatMap(s -> {
-      try {
+      try{
          return DataResult.success(UUID.fromString(s));
-      } catch (IllegalArgumentException e) {
+      }catch(IllegalArgumentException e){
          return DataResult.error(() -> "Invalid UUID: " + s);
       }
    }, UUID::toString);
@@ -44,24 +44,24 @@ public class CodecUtils {
    );
    
    public static void readBigInventory(ValueInput view, NonNullList<ItemStack> stacks){
-      for (ItemStackWithSlot stackWithSlot : view.listOrEmpty("Items", BIG_STACK_CODEC)) {
-         if (stackWithSlot.isValidInContainer(stacks.size())) {
+      for(ItemStackWithSlot stackWithSlot : view.listOrEmpty("Items", BIG_STACK_CODEC)){
+         if(stackWithSlot.isValidInContainer(stacks.size())){
             stacks.set(stackWithSlot.slot(), stackWithSlot.stack());
          }
       }
    }
    
-   public static void writeBigInventory(ValueOutput view, NonNullList<ItemStack> stacks, boolean setIfEmpty) {
+   public static void writeBigInventory(ValueOutput view, NonNullList<ItemStack> stacks, boolean setIfEmpty){
       ValueOutput.TypedOutputList<ItemStackWithSlot> listAppender = view.list("Items", BIG_STACK_CODEC);
       
-      for (int i = 0; i < stacks.size(); i++) {
+      for(int i = 0; i < stacks.size(); i++){
          ItemStack itemStack = stacks.get(i);
-         if (!itemStack.isEmpty()) {
+         if(!itemStack.isEmpty()){
             listAppender.add(new ItemStackWithSlot(i, itemStack));
          }
       }
       
-      if (listAppender.isEmpty() && !setIfEmpty) {
+      if(listAppender.isEmpty() && !setIfEmpty){
          view.discard("Items");
       }
    }

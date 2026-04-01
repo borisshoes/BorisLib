@@ -30,7 +30,7 @@ public class ServerTickCallback {
          
          RECENT_EVENTS.removeIf(Event::isExpired);
       }catch(Exception e){
-         LOGGER.log(Level.ERROR,e);
+         LOGGER.log(Level.ERROR, e);
       }
    }
    

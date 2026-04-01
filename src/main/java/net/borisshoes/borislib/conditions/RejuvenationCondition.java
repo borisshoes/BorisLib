@@ -10,11 +10,11 @@ import net.minecraft.world.entity.LivingEntity;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
-public class RejuvenationCondition extends Condition{
+public class RejuvenationCondition extends Condition {
    private static final SimpleParticleType PARTICLE = ParticleTypes.HEART;
    
    protected RejuvenationCondition(){
-      super(Identifier.fromNamespaceAndPath(MOD_ID,"rejuvenation"), MobEffectCategory.BENEFICIAL, 0.0f, 0.0f, Float.MAX_VALUE);
+      super(Identifier.fromNamespaceAndPath(MOD_ID, "rejuvenation"), MobEffectCategory.BENEFICIAL, 0.0f, 0.0f, Float.MAX_VALUE);
    }
    
    @Override
@@ -41,5 +41,6 @@ public class RejuvenationCondition extends Condition{
    }
    
    @Override
-   public void onRemove(MinecraftServer server, LivingEntity entity, float value, boolean particles){}
+   public void onRemove(MinecraftServer server, LivingEntity entity, float value, boolean particles){
+   }
 }

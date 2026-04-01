@@ -127,17 +127,17 @@ public class GraphicalItem extends Item implements PolymerItem {
    
    public static final Map<DyeColor, Map<Item, Item>> COLORED_ITEMS = buildColoredItemsMap();
    
-   private static Map<DyeColor, Map<Item, Item>> buildColoredItemsMap() {
+   private static Map<DyeColor, Map<Item, Item>> buildColoredItemsMap(){
       Map<DyeColor, Map<Item, Item>> result = new HashMap<>();
-      for (DyeColor color : DyeColor.values()) {
+      for(DyeColor color : DyeColor.values()){
          Map<Item, Item> colorMap = new HashMap<>();
          String colorName = color.getSerializedName();
-         for (Map.Entry<Item, String> entry : COLORABLE_ITEM_PATTERNS.entrySet()) {
+         for(Map.Entry<Item, String> entry : COLORABLE_ITEM_PATTERNS.entrySet()){
             Item baseItem = entry.getKey();
             String pattern = entry.getValue();
             Identifier coloredId = Identifier.fromNamespaceAndPath("minecraft", colorName + "_" + pattern);
             Item coloredItem = BuiltInRegistries.ITEM.getValue(coloredId);
-            if (coloredItem != Items.AIR) {
+            if(coloredItem != Items.AIR){
                colorMap.put(baseItem, coloredItem);
             }
          }
@@ -147,13 +147,13 @@ public class GraphicalItem extends Item implements PolymerItem {
    }
    
    public GraphicalItem(Item.Properties settings){
-      super(settings.setId(ResourceKey.create(Registries.ITEM, Identifier.fromNamespaceAndPath(MOD_ID,"graphical_item"))));
+      super(settings.setId(ResourceKey.create(Registries.ITEM, Identifier.fromNamespaceAndPath(MOD_ID, "graphical_item"))));
    }
    
    
    @Override
    public @Nullable Identifier getPolymerItemModel(ItemStack stack, PacketContext context, HolderLookup.Provider lookup){
-      String id = BORISLIB_ITEM_DATA.getStringProperty(stack,GRAPHICS_TAG);
+      String id = BORISLIB_ITEM_DATA.getStringProperty(stack, GRAPHICS_TAG);
       Identifier identifier = Identifier.tryParse(id);
       GraphicElement elem = BorisLib.GRAPHIC_ITEM_REGISTRY.getValue(identifier);
       if(elem == null){
@@ -161,15 +161,15 @@ public class GraphicalItem extends Item implements PolymerItem {
       }
       
       if(PolymerResourcePackUtils.hasMainPack(context)){
-         return Identifier.fromNamespaceAndPath(elem.id().getNamespace(),"gui/"+elem.id().getPath());
+         return Identifier.fromNamespaceAndPath(elem.id().getNamespace(), "gui/" + elem.id().getPath());
       }else{
-         return BuiltInRegistries.ITEM.getResourceKey(getPolymerItem(stack,context)).get().identifier();
+         return BuiltInRegistries.ITEM.getResourceKey(getPolymerItem(stack, context)).get().identifier();
       }
    }
    
    @Override
    public Item getPolymerItem(ItemStack itemStack, PacketContext context){
-      String id = BORISLIB_ITEM_DATA.getStringProperty(itemStack,GRAPHICS_TAG);
+      String id = BORISLIB_ITEM_DATA.getStringProperty(itemStack, GRAPHICS_TAG);
       Identifier identifier = Identifier.tryParse(id);
       GraphicElement elem = BorisLib.GRAPHIC_ITEM_REGISTRY.getValue(identifier);
       if(elem == null || itemStack == null) return Items.BARRIER;
@@ -188,10 +188,10 @@ public class GraphicalItem extends Item implements PolymerItem {
       
       for(Map.Entry<DyeColor, Integer> entry : DYE_COLOR_RGB.entrySet()){
          int repColor = entry.getValue();
-         double rDist = (((repColor>>16)&0xFF)-((colorRGB>>16)&0xFF))*0.30;
-         double gDist = (((repColor>>8)&0xFF)-((colorRGB>>8)&0xFF))*0.59;
-         double bDist = ((repColor&0xFF)-(colorRGB&0xFF))*0.11;
-         double dist = rDist*rDist + gDist*gDist + bDist*bDist;
+         double rDist = (((repColor >> 16) & 0xFF) - ((colorRGB >> 16) & 0xFF)) * 0.30;
+         double gDist = (((repColor >> 8) & 0xFF) - ((colorRGB >> 8) & 0xFF)) * 0.59;
+         double bDist = ((repColor & 0xFF) - (colorRGB & 0xFF)) * 0.11;
+         double dist = rDist * rDist + gDist * gDist + bDist * bDist;
          if(dist < closestDist){
             closestDist = dist;
             closestColor = entry.getKey();
@@ -207,20 +207,20 @@ public class GraphicalItem extends Item implements PolymerItem {
    
    public static ItemStack with(GraphicElement id){
       ItemStack stack = new ItemStack(BorisLib.GRAPHICAL_ITEM);
-      BORISLIB_ITEM_DATA.putProperty(stack,GRAPHICS_TAG,id.id().toString());
+      BORISLIB_ITEM_DATA.putProperty(stack, GRAPHICS_TAG, id.id().toString());
       return stack;
    }
    
    public static ItemStack withColor(GraphicElement id, int color){
       ItemStack stack = new ItemStack(BorisLib.GRAPHICAL_ITEM);
-      BORISLIB_ITEM_DATA.putProperty(stack,GRAPHICS_TAG,id.id().toString());
+      BORISLIB_ITEM_DATA.putProperty(stack, GRAPHICS_TAG, id.id().toString());
       stack.set(DataComponents.DYED_COLOR, new DyedItemColor(color));
-      stack.set(DataComponents.TOOLTIP_DISPLAY, TooltipDisplay.DEFAULT.withHidden(DataComponents.DYED_COLOR,true));
+      stack.set(DataComponents.TOOLTIP_DISPLAY, TooltipDisplay.DEFAULT.withHidden(DataComponents.DYED_COLOR, true));
       return stack;
    }
    
    // These are not quite working yet with how client-sided bundles are ;-;
-   
+
 //   public static ItemStack getItemBlack(ItemStack shownItem, boolean selected, int selectionColor){
 //      ItemStack stack = with(BLACK);
 //      CustomModelDataComponent custom = new CustomModelDataComponent(List.of(),List.of(),List.of("selected"),List.of(selectionColor));
@@ -244,6 +244,6 @@ public class GraphicalItem extends Item implements PolymerItem {
 //   }
    
    
-   
-   public record GraphicElement(Identifier id, Item replacement, boolean dyeable){}
+   public record GraphicElement(Identifier id, Item replacement, boolean dyeable) {
+   }
 }

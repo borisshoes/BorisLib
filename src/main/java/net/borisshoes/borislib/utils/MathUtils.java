@@ -170,12 +170,12 @@ public class MathUtils {
    }
    
    public static boolean inCone(Vec3 center, Vec3 direction, double range, double closeWidth, double farWidth, Vec3 targetPos){
-      final double angle = 2*Math.atan2((.5*(farWidth-closeWidth)),range);
-      final double ha = angle/2;
-      final double ri = closeWidth / (2*Math.sin(ha)); // Cone characteristics from given parameters
-      final double ro = farWidth / (2*Math.sin(ha));
+      final double angle = 2 * Math.atan2((.5 * (farWidth - closeWidth)), range);
+      final double ha = angle / 2;
+      final double ri = closeWidth / (2 * Math.sin(ha)); // Cone characteristics from given parameters
+      final double ro = farWidth / (2 * Math.sin(ha));
       // Delicious trigonometry and linear algebra at its finest
-      Vec3 origin = center.add(direction.scale(-ri*Math.cos(ha)));
+      Vec3 origin = center.add(direction.scale(-ri * Math.cos(ha)));
       Vec3 u = center.subtract(origin).normalize();           // Linear algebra black magic stuff which
       Vec3 uvr = targetPos.subtract(origin).normalize();      // finds the angle between cone axis and target
       double targetAngle = Math.acos(uvr.dot(u));
@@ -204,12 +204,14 @@ public class MathUtils {
       double y = random.nextGaussian();
       double z = random.nextGaussian();
       
-      double mag = Math.sqrt(x*x + y*y + z*z);
-      x /= mag; y /= mag; z /= mag;
+      double mag = Math.sqrt(x * x + y * y + z * z);
+      x /= mag;
+      y /= mag;
+      z /= mag;
       
-      double r = range* Math.cbrt(random.nextDouble());
+      double r = range * Math.cbrt(random.nextDouble());
       
-      return new Vec3(x*r,y*r,z*r).add(center);
+      return new Vec3(x * r, y * r, z * r).add(center);
    }
    
    public static Vec3 randomSpherePoint(Vec3 center, double maxRange, double minRange){
@@ -218,32 +220,34 @@ public class MathUtils {
       double y = random.nextGaussian();
       double z = random.nextGaussian();
       
-      double mag = Math.sqrt(x*x + y*y + z*z);
-      x /= mag; y /= mag; z /= mag;
+      double mag = Math.sqrt(x * x + y * y + z * z);
+      x /= mag;
+      y /= mag;
+      z /= mag;
       
-      double r = maxRange*Math.cbrt(random.nextDouble(minRange / maxRange,1));
+      double r = maxRange * Math.cbrt(random.nextDouble(minRange / maxRange, 1));
       
-      return new Vec3(x*r,y*r,z*r).add(center);
+      return new Vec3(x * r, y * r, z * r).add(center);
    }
    
    public static Vec3 rotatePoint(Vec3 point, Vec3 direction, float roll){
       float pitch = (float) -Math.toDegrees(Math.asin(direction.y));
       float yaw = (float) -Math.toDegrees(Math.atan2(direction.x, direction.z));
-      Quaternionf rotQuat1 = new Quaternionf().fromAxisAngleDeg(new Vector3f(0,1,0),-yaw-90);
-      float sideAxisAngle = -(yaw+90) * ((float) Math.PI / 180);
+      Quaternionf rotQuat1 = new Quaternionf().fromAxisAngleDeg(new Vector3f(0, 1, 0), -yaw - 90);
+      float sideAxisAngle = -(yaw + 90) * ((float) Math.PI / 180);
       Vector3f sideAxis = new Vector3f((float) Math.sin(sideAxisAngle), 0, (float) Math.cos(sideAxisAngle));
-      Quaternionf rotQuat2 = new Quaternionf().fromAxisAngleDeg(sideAxis,-pitch);
-      Quaternionf rotQuat3 = new Quaternionf().fromAxisAngleDeg(direction.toVector3f(),roll);
+      Quaternionf rotQuat2 = new Quaternionf().fromAxisAngleDeg(sideAxis, -pitch);
+      Quaternionf rotQuat3 = new Quaternionf().fromAxisAngleDeg(direction.toVector3f(), roll);
       Quaternionf rotQuat = rotQuat3.mul(rotQuat2.mul(rotQuat1));
       return new Vec3(rotQuat.transform(point.toVector3f()));
    }
    
    public static Vec3 rotatePoint(Vec3 point, float yaw, float pitch, float roll){
-      Quaternionf rotQuat1 = new Quaternionf().fromAxisAngleDeg(new Vector3f(0,1,0),-yaw-90);
-      float sideAxisAngle = -(yaw+90) * ((float) Math.PI / 180);
+      Quaternionf rotQuat1 = new Quaternionf().fromAxisAngleDeg(new Vector3f(0, 1, 0), -yaw - 90);
+      float sideAxisAngle = -(yaw + 90) * ((float) Math.PI / 180);
       Vector3f sideAxis = new Vector3f((float) Math.sin(sideAxisAngle), 0, (float) Math.cos(sideAxisAngle));
-      Quaternionf rotQuat2 = new Quaternionf().fromAxisAngleDeg(sideAxis,-pitch);
-      Quaternionf rotQuat3 = new Quaternionf().fromAxisAngleDeg(Vec3.directionFromRotation(pitch,yaw).toVector3f(),roll);
+      Quaternionf rotQuat2 = new Quaternionf().fromAxisAngleDeg(sideAxis, -pitch);
+      Quaternionf rotQuat3 = new Quaternionf().fromAxisAngleDeg(Vec3.directionFromRotation(pitch, yaw).toVector3f(), roll);
       Quaternionf rotQuat = rotQuat3.mul(rotQuat2.mul(rotQuat1));
       return new Vec3(rotQuat.transform(point.toVector3f()));
    }
@@ -257,7 +261,7 @@ public class MathUtils {
       Vec3 t2 = trace.scale(i);
       while(t2.length() < len){
          Vec3 t3 = start.add(t2);
-         AABB hitBox = new AABB(t3.x-range,t3.y-range,t3.z-range,t3.x+range,t3.y+range,t3.z+range);
+         AABB hitBox = new AABB(t3.x - range, t3.y - range, t3.z - range, t3.x + range, t3.y + range, t3.z + range);
          if(entityBox.intersects(hitBox)){
             return true;
          }

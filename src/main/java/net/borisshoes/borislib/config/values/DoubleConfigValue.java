@@ -53,7 +53,8 @@ public class DoubleConfigValue extends ConfigValue<Double> {
    public static class DoubleLimits {
       double min = Double.MIN_VALUE, max = Double.MAX_VALUE;
       
-      public DoubleLimits(){}
+      public DoubleLimits(){
+      }
       
       public DoubleLimits(double min){
          this.min = min;

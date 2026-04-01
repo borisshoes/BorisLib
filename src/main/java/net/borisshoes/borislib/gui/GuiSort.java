@@ -8,7 +8,7 @@ public abstract class GuiSort<A> extends GuiFilterSort<A> {
    private final Comparator<A> comparator;
    
    public GuiSort(String key, int color, Comparator<A> comparator){
-      super(key,color);
+      super(key, color);
       this.comparator = comparator;
    }
    
@@ -23,6 +23,6 @@ public abstract class GuiSort<A> extends GuiFilterSort<A> {
    }
    
    public <B extends GuiSort<A>> B cycle(B sort, boolean backwards){
-      return super.cycle(sort,backwards);
+      return super.cycle(sort, backwards);
    }
 }

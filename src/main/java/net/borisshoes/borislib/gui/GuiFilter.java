@@ -19,6 +19,6 @@ public abstract class GuiFilter<A> extends GuiFilterSort<A> {
    }
    
    public <B extends GuiFilter<A>> B cycle(B sort, boolean backwards){
-      return super.cycle(sort,backwards);
+      return super.cycle(sort, backwards);
    }
 }

@@ -41,11 +41,11 @@ public class TestGui extends PagedGui<Item> {
          return builder;
       });
       
-      blankItem(GuiElementBuilder.from(GraphicalItem.withColor(GraphicalItem.PAGE_BG,pageColor)));
+      blankItem(GuiElementBuilder.from(GraphicalItem.withColor(GraphicalItem.PAGE_BG, pageColor)));
       
       elemClickFunction((item, index, clickType) -> {
          if(clickType.isRight){
-            MinecraftUtils.removeItems(player,item,1);
+            MinecraftUtils.removeItems(player, item, 1);
          }else{
             player.handleExtraItemsCreatedOnUse(new ItemStack(item));
          }
@@ -60,7 +60,7 @@ public class TestGui extends PagedGui<Item> {
             itemGroup.buildContents(new CreativeModeTab.ItemDisplayParameters(player.level().enabledFeatures(), true, player.registryAccess()));
             if(itemGroup.hasAnyItems()){
                random.setSeed(itemGroup.hashCode());
-               new ItemFilter(itemGroup.getDisplayName().getString(),random.nextInt(0xffffff),item -> itemGroup.contains(item.getDefaultInstance()));
+               new ItemFilter(itemGroup.getDisplayName().getString(), random.nextInt(0xffffff), item -> itemGroup.contains(item.getDefaultInstance()));
             }
          }
          hasRegistered = true;

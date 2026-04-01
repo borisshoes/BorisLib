@@ -4,7 +4,7 @@ import net.minecraft.network.chat.Component;
 
 import java.util.List;
 
-public abstract class GuiFilterSort<A>{
+public abstract class GuiFilterSort<A> {
    private final String key;
    private final int color;
    
@@ -33,7 +33,7 @@ public abstract class GuiFilterSort<A>{
    protected <B extends GuiFilterSort<A>> B cycle(B sort, boolean backwards){
       List<? extends GuiFilterSort<A>> list = getList();
       int idx = list.indexOf(sort);
-      if (idx == -1) {
+      if(idx == -1){
          return (B) list.getFirst();
       }
       int shift = backwards ? -1 : 1;
