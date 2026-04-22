@@ -111,13 +111,22 @@ public final class DataAccess {
    
    public static <T extends StorableData> T getGlobal(DataKey<T> key){
       ensureServerSide("getGlobal");
-      GlobalState s = GlobalState.get(BorisLib.SERVER.overworld());
+      ServerLevel overworld = BorisLib.SERVER.overworld();
+      GlobalState s = GlobalState.get(overworld);
       return s.getLive(key);
    }
    
    public static <T extends StorableData> T getWorld(ResourceKey<Level> wk, DataKey<T> key){
       ensureServerSide("getWorld");
+      if(wk == null){
+         BorisLib.LOGGER.error("DataAccess.getWorld() received null world key for data key {}", key == null ? "<null>" : key.id());
+         throw new IllegalArgumentException("DataAccess.getWorld() received null world key");
+      }
       ServerLevel w = BorisLib.SERVER.getLevel(wk);
+      if(w == null){
+         BorisLib.LOGGER.error("DataAccess.getWorld() could not resolve loaded ServerLevel for dimension {} while accessing data key {}", wk.identifier(), key == null ? "<null>" : key.id());
+         throw new IllegalStateException("DataAccess.getWorld() could not resolve loaded ServerLevel for dimension " + wk.identifier() + ". Ensure the dimension is registered and loaded before accessing world data.");
+      }
       WorldState s = WorldState.get(w);
       return s.getLive(wk, key);
    }
@@ -131,12 +140,17 @@ public final class DataAccess {
    
    public static <T extends StorableData> void setGlobal(DataKey<T> key, T value){
       ensureServerSide("setGlobal");
-      GlobalState s = GlobalState.get(BorisLib.SERVER.overworld());
+      ServerLevel overworld = BorisLib.SERVER.overworld();
+      GlobalState s = GlobalState.get(overworld);
       s.setLive(key, value);
    }
    
    public static <T extends StorableData> void setWorld(ServerLevel w, DataKey<T> key, T value){
       ensureServerSide("setWorld");
+      if(w == null){
+         BorisLib.LOGGER.error("DataAccess.setWorld() received null ServerLevel while writing data key {}", key == null ? "<null>" : key.id());
+         throw new IllegalArgumentException("DataAccess.setWorld() received null ServerLevel. Ensure the dimension is loaded before writing world data.");
+      }
       WorldState s = WorldState.get(w);
       s.setLive(w.dimension(), key, value);
    }
