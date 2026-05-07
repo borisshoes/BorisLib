@@ -391,6 +391,22 @@ public class MinecraftUtils {
       }
    }
    
+   public static void updateAttributeEffect(LivingEntity livingEntity, Holder<Attribute> attribute, double value, AttributeModifier.Operation operation, Identifier identifier, boolean upsert){
+      boolean hasMod = livingEntity.getAttributes().hasModifier(attribute, identifier);
+      if(!hasMod){
+         if(upsert) attributeEffect(livingEntity,attribute,value,operation,identifier,false);
+         return;
+      }
+      double curMod = livingEntity.getAttributes().getModifierValue(attribute,identifier);
+      if(curMod == value) return;
+      HashMultimap<Holder<Attribute>, AttributeModifier> map = HashMultimap.create();
+      map.put(attribute, new AttributeModifier(identifier, value, operation));
+      livingEntity.getAttributes().removeAttributeModifiers(map);
+      map.clear();
+      map.put(attribute, new AttributeModifier(identifier, value, operation));
+      livingEntity.getAttributes().addTransientAttributeModifiers(map);
+   }
+   
    public static Tuple<ItemContainerContents, ItemStack> tryAddStackToContainerComp(ItemContainerContents container, int size, ItemStack stack){
       List<ItemStack> beltList = new ArrayList<>(container.allItemsCopyStream().toList());
       

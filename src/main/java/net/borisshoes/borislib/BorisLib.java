@@ -22,6 +22,7 @@ import net.borisshoes.borislib.utils.ItemModDataHandler;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -98,6 +99,7 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
       ServerLifecycleEvents.SERVER_STARTED.register(DataAccess::onServerStarted);
       ServerLifecycleEvents.SERVER_STOPPED.register(DataAccess::onServerStop);
       ServerLifecycleEvents.AFTER_SAVE.register(DataAccess::onServerSave);
+      ServerLivingEntityEvents.AFTER_DEATH.register(Conditions::entityDied);
       CommandRegistrationCallback.EVENT.register(BorisLibCommands::register);
       
       LOGGER.info("BorisLib ready and waiting!");

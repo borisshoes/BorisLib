@@ -13,6 +13,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -24,12 +25,14 @@ import java.util.List;
 import java.util.UUID;
 
 public class Conditions {
+   public static final Holder<Condition> CELERITY = BorisLib.registerCondition(new CelerityCondition());
    public static final Holder<Condition> DECAY = BorisLib.registerCondition(new DecayCondition());
    public static final Holder<Condition> FEEBLE = BorisLib.registerCondition(new FeebleCondition());
    public static final Holder<Condition> FORTITUDE = BorisLib.registerCondition(new FortitudeCondition());
    public static final Holder<Condition> MIGHT = BorisLib.registerCondition(new MightCondition());
    public static final Holder<Condition> REJUVENATION = BorisLib.registerCondition(new RejuvenationCondition());
    public static final Holder<Condition> NEARSIGHT = BorisLib.registerCondition(new NearsightCondition());
+   public static final Holder<Condition> TORPOR = BorisLib.registerCondition(new TorporCondition());
    public static final Holder<Condition> VULNERABILITY = BorisLib.registerCondition(new VulnerabilityCondition());
    
    /**
@@ -212,5 +215,9 @@ public class Conditions {
          }
       }
       return result;
+   }
+   
+   public static void entityDied(LivingEntity entity, DamageSource damageSource){
+      removeAllConditions(entity.level().getServer(),entity);
    }
 }
