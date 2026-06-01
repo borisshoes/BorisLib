@@ -13,13 +13,16 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.Map;
@@ -54,16 +57,21 @@ public class NearsightCondition extends Condition {
          
          if(entity instanceof ServerPlayer player && server != null && server.getTickCount() % 5 == 0){
             double[] boxThicknesses = calculateBoxes(value);
-            int boxCount = boxThicknesses.length;
+            int normalBoxCount = boxThicknesses.length;
+            double cameraCoverDistance = player.getAttributeValue(Attributes.CAMERA_DISTANCE) + 2.0;
+            int extraBoxCount = calculateExtraBoxCount(value, cameraCoverDistance);
+            int boxCount = normalBoxCount + extraBoxCount;
             int requiredElements = boxCount * 6; // 6 directions per layer
+            float viewRange = (float) Math.max(10.0, cameraCoverDistance + 2.0);
             
             final double eyeY = entity.getEyeHeight(entity.getPose());
             final double thinThickness = 0.01;
             
             NearsightElementHolder holder = ACTIVE_HOLDERS.get(player.getUUID());
             
-            // If no holder exists, the element count changed, the value changed, or the player reference is stale (reconnect), rebuild from scratch
-            if(holder == null || holder.getElements().size() != requiredElements || holder.getValue() != value || holder.getPlayer() != player){
+            // If no holder exists, the element count changed, the value changed, the player reference is stale (reconnect),
+            // or the player changed dimension, rebuild from scratch so Polymer respawns the virtual entities in the new world.
+            if(holder == null || holder.getElements().size() != requiredElements || holder.getValue() != value || holder.getPlayer() != player || !holder.getLevelKey().equals(level.dimension())){
                if(holder != null){
                   holder.setAttachment(null);
                   holder.destroy();
@@ -72,7 +80,7 @@ public class NearsightCondition extends Condition {
                holder = new NearsightElementHolder(player, value);
                for(int i = 0; i < requiredElements; i++){
                   ItemDisplayElement element = ItemDisplayElementUtil.createSimple();
-                  element.setViewRange(10.0f);
+                  element.setViewRange(viewRange);
                   element.setDisplaySize(1024, 1024);
                   holder.addElement(element);
                }
@@ -99,18 +107,20 @@ public class NearsightCondition extends Condition {
             
             int elementIdx = 0;
             for(int i = 0; i < boxCount; i++){
-               final double dist = value - boxThicknesses[i];
+               final boolean isExtraBox = i >= normalBoxCount;
+               final double dist = isExtraBox ? calculateExtraBoxDistance(value, cameraCoverDistance, i - normalBoxCount, extraBoxCount) : value - boxThicknesses[i];
                final double layerSize = 2 * dist;
-               final boolean isOutermost = (i == boxCount - 1);
+               final boolean isSolid = isExtraBox || i == normalBoxCount - 1;
                
                for(Direction dir : Direction.values()){
                   ItemDisplayElement element = (ItemDisplayElement) holder.getElements().get(elementIdx++);
+                  element.setViewRange(viewRange);
                   if(PolymerResourcePackUtils.hasMainPack(player)){
                      ItemStack stack = new ItemStack(Items.TRIAL_KEY);
-                     stack.set(DataComponents.ITEM_MODEL, isOutermost ? SOLID_ID : TRANSPARENT_ID);
+                     stack.set(DataComponents.ITEM_MODEL, isSolid ? SOLID_ID : TRANSPARENT_ID);
                      element.setItem(stack);
                   }else{
-                     element.setItem(isOutermost ? new ItemStack(Items.BLACK_CONCRETE) : new ItemStack(Items.TINTED_GLASS));
+                     element.setItem(isSolid ? new ItemStack(Items.BLACK_CONCRETE) : new ItemStack(Items.TINTED_GLASS));
                   }
                   
                   if(animateIn){
@@ -200,14 +210,27 @@ public class NearsightCondition extends Condition {
       return boxes;
    }
    
+   private int calculateExtraBoxCount(float value, double cameraCoverDistance){
+      if(value >= cameraCoverDistance){
+         return 0;
+      }
+      return Math.max(1, (int) Math.ceil(cameraCoverDistance - value));
+   }
+   
+   private double calculateExtraBoxDistance(float value, double cameraCoverDistance, int extraIndex, int extraBoxCount){
+      return value + (cameraCoverDistance - value) * (extraIndex + 1) / extraBoxCount;
+   }
+   
    private static class NearsightElementHolder extends ElementHolder {
       private final ServerPlayer player;
+      private final ResourceKey<Level> levelKey;
       private final float value;
       private int lifeTime;
       private boolean isNew;
       
       private NearsightElementHolder(ServerPlayer player, float value){
          this.player = player;
+         this.levelKey = player.level().dimension();
          this.lifeTime = 10;
          this.value = value;
          this.isNew = true;
@@ -233,6 +256,10 @@ public class NearsightCondition extends Condition {
          return player;
       }
       
+      public ResourceKey<Level> getLevelKey(){
+         return levelKey;
+      }
+      
       @Override
       protected void onTick(){
          super.onTick();
@@ -251,7 +278,7 @@ public class NearsightCondition extends Condition {
          }
          
          if(lifeTime-- <= 0 || player.isDeadOrDying() || player.hasDisconnected()){
-            ACTIVE_HOLDERS.remove(player.getUUID());
+            ACTIVE_HOLDERS.remove(player.getUUID(), this);
             setAttachment(null);
             destroy();
          }
