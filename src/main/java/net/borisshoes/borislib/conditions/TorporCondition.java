@@ -12,6 +12,16 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
+/**
+ * Built-in harmful {@link Condition} that decreases the affected entity's
+ * {@link net.minecraft.world.entity.ai.attributes.Attributes#MOVEMENT_SPEED} attribute.
+ *
+ * <p>The prevailing value is applied as a negative base-multiplier modifier
+ * ({@link AttributeModifier.Operation#ADD_MULTIPLIED_BASE}); a value of {@code 0.5} therefore slows the
+ * entity by 50% of its base speed.</p>
+ *
+ * <p>Range: {@code [0, +∞)}; base {@code 0}.</p>
+ */
 public class TorporCondition extends Condition{
    private static final DustParticleOptions PARTICLE = new DustParticleOptions(0x495F68, 0.75f);
    

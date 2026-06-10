@@ -13,6 +13,14 @@ import net.minecraft.world.entity.LivingEntity;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
+/**
+ * Built-in harmful {@link Condition} that deals damage-over-time using a wither-style damage type.
+ *
+ * <p>The prevailing value is the amount of damage applied per tick interval. Entities tagged
+ * {@link net.borisshoes.borislib.BorisLib#IGNORES_DECAY} are immune.</p>
+ *
+ * <p>Range: {@code [0, +∞)}; base {@code 0}.</p>
+ */
 public class DecayCondition extends Condition {
    private static final ColorParticleOption PARTICLE = ColorParticleOption.create(ParticleTypes.ENTITY_EFFECT, 0x40581E);
    

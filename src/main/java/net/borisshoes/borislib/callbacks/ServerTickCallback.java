@@ -14,7 +14,28 @@ import static net.borisshoes.borislib.BorisLib.LOGGER;
 import static net.borisshoes.borislib.BorisLib.SERVER_TIMER_CALLBACKS;
 import static net.borisshoes.borislib.events.Event.RECENT_EVENTS;
 
+/**
+ * Server-wide tick hook that drives the global pieces of BorisLib: server-level
+ * {@link net.borisshoes.borislib.timers.TickTimerCallback}s, the {@link Event} queue, and the
+ * condition tick loop.
+ *
+ * <p>Wired up by BorisLib during init and called by the Fabric server-tick event.</p>
+ */
 public class ServerTickCallback {
+   /**
+    * Per-server-tick entry point.
+    *
+    * <p>Order of work:</p>
+    * <ol>
+    *    <li>Tick every server-scoped {@link net.borisshoes.borislib.timers.TickTimerCallback}, firing and
+    *        removing the ones that reach zero (skipped if tickrate is paused).</li>
+    *    <li>Tick every {@link Event} in {@link Event#RECENT_EVENTS}.</li>
+    *    <li>Tick all conditions for all entities via {@link ConditionData#tick(MinecraftServer)}.</li>
+    *    <li>Drop expired events.</li>
+    * </ol>
+    *
+    * @param server the server instance being ticked
+    */
    public static void onTick(MinecraftServer server){
       try{
          // Tick Timer Callbacks
@@ -34,6 +55,7 @@ public class ServerTickCallback {
       }
    }
    
+   /** Decrements every queued server-tick timer and returns those that fired this tick (for removal). */
    @NotNull
    private static ArrayList<TickTimerCallback> tickTimers(){
       ArrayList<TickTimerCallback> toRemove = new ArrayList<>();

@@ -24,12 +24,22 @@ import java.util.Map;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
+/**
+ * Per-dimension {@link SavedData} holder that backs every WORLD-scoped {@link DataKey} for every mod that
+ * registers one with BorisLib. Acts exactly like {@link GlobalState} but is attached per
+ * {@link ServerLevel} rather than once per server.
+ *
+ * <p>End users should normally interact with this class through {@link DataAccess#getWorld} /
+ * {@link DataAccess#setWorld}.</p>
+ */
 public final class WorldState extends SavedData {
+   /** SavedData file id (without extension) used by Minecraft's storage layer. */
    public static final String FILE_ID = MOD_ID + "_world";
    private final Map<String, Map<String, CompoundTag>> data = new HashMap<>();
    private final Map<String, Map<String, Object>> objects = new HashMap<>();
    
    // Codec that reads and writes the raw compound structure
+   /** Pass-through codec that round-trips the entire world-state map as raw NBT. */
    public static final Codec<WorldState> CODEC = Codec.PASSTHROUGH.xmap(
          dynamic -> {
             WorldState s = new WorldState();
@@ -74,8 +84,16 @@ public final class WorldState extends SavedData {
    // Use SAVED_DATA_COMMAND_STORAGE to prevent DFU from mangling custom mod data during Minecraft version upgrades.
    // LEVEL's schema applies level.dat-specific fixes that strip unrecognized keys, causing data loss.
    // SAVED_DATA_COMMAND_STORAGE uses a permissive schema designed for arbitrary compound data.
+   /** Registered {@link SavedDataType} used by Minecraft's SavedDataStorage. */
    public static final SavedDataType<WorldState> TYPE = new SavedDataType<>(Identifier.parse(FILE_ID), WorldState::new, CODEC, DataFixTypes.SAVED_DATA_COMMAND_STORAGE);
    
+   /**
+    * Looks up (or lazily creates) the {@code WorldState} attached to a given dimension.
+    *
+    * @param w the {@link ServerLevel} to fetch the state for
+    * @return the {@code WorldState} for that dimension
+    * @throws IllegalArgumentException if {@code w} is null
+    */
    public static WorldState get(ServerLevel w){
       if(w == null){
          throw new IllegalArgumentException("WorldState.get() received null ServerLevel. Ensure the dimension is loaded before accessing world data.");
@@ -83,6 +101,12 @@ public final class WorldState extends SavedData {
       return w.getDataStorage().computeIfAbsent(TYPE);
    }
    
+   /**
+    * Re-encodes every live {@link StorableData} object plus all undecoded raw entries into a single
+    * {@link CompoundTag} suitable for {@code SavedData} to persist.
+    *
+    * @return the encoded compound tag
+    */
    // Custom save implementation that encodes our data
    public CompoundTag save(){
       CompoundTag tag = new CompoundTag();
@@ -135,6 +159,16 @@ public final class WorldState extends SavedData {
       return tag;
    }
    
+   /**
+    * Reads or lazily decodes the value for a WORLD-scoped {@link DataKey}, falling back to the key's
+    * default factory when no stored value is available.
+    *
+    * @param worldKey the dimension this state belongs to (passed to the default factory if needed)
+    * @param key      the registered world key
+    * @param <T>      the data type
+    * @return the live value (never {@code null})
+    * @throws IllegalStateException if the default factory returns {@code null}
+    */
    @SuppressWarnings("unchecked")
    public <T extends StorableData> T getLive(ResourceKey<Level> worldKey, DataKey<T> key){
       Map<String, Object> modObjs = objects.computeIfAbsent(key.modId(), k -> new HashMap<>());
@@ -176,6 +210,15 @@ public final class WorldState extends SavedData {
       return created;
    }
    
+   /**
+    * Replaces the live value associated with the given key in this world. Passing {@code null} substitutes
+    * the key's default-factory value.
+    *
+    * @param worldKey the dimension being written to
+    * @param key      the registered world key
+    * @param value    the new value (or {@code null} to reset to default)
+    * @param <T>      the data type
+    */
    public <T extends StorableData> void setLive(ResourceKey<Level> worldKey, DataKey<T> key, T value){
       T toStore = value != null ? value : key.makeDefaultWorld(worldKey);
       if(toStore == null){
@@ -192,6 +235,7 @@ public final class WorldState extends SavedData {
       setDirty();
    }
    
+   /** @return the raw, undecoded NBT map (mod id → key → tag). For diagnostic / migration use only. */
    public Map<String, Map<String, CompoundTag>> map(){
       return data;
    }
@@ -236,4 +280,3 @@ public final class WorldState extends SavedData {
       }
    }
 }
-

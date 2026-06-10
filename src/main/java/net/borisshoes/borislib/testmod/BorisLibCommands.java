@@ -8,12 +8,20 @@ import me.lucko.fabric.api.permissions.v0.Permissions;
 import net.borisshoes.borislib.BorisLib;
 import net.borisshoes.borislib.callbacks.ItemReturnTimerCallback;
 import net.borisshoes.borislib.conditions.*;
+import net.borisshoes.borislib.sequences.CameraKeyframe;
+import net.borisshoes.borislib.sequences.CameraPath;
+import net.borisshoes.borislib.sequences.CutsceneSequence;
+import net.borisshoes.borislib.sequences.IFrameSequence;
+import net.borisshoes.borislib.sequences.InterpolationType;
+import net.borisshoes.borislib.sequences.RespawnGhostSequence;
+import net.borisshoes.borislib.sequences.SequenceManager;
 import net.borisshoes.borislib.datastorage.DataAccess;
 import net.borisshoes.borislib.datastorage.DefaultPlayerData;
 import net.borisshoes.borislib.gui.GuiHelper;
 import net.borisshoes.borislib.timers.GenericTimer;
 import net.borisshoes.borislib.timers.RepeatTimer;
 import net.borisshoes.borislib.utils.AlgoUtils;
+import net.borisshoes.borislib.utils.MathUtils;
 import net.borisshoes.borislib.utils.MinecraftUtils;
 import net.borisshoes.borislib.utils.ParticleEffectUtils;
 import net.borisshoes.borislib.utils.TextUtils;
@@ -22,9 +30,11 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.ParticleArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.particles.DustParticleOptions;
+import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.commands.AttributeCommand;
@@ -140,6 +150,13 @@ public class BorisLibCommands {
                   .then(literal("particlestress")
                         .requires(Permissions.require(MOD_ID + ".testmod.particlestress", PermissionLevel.GAMEMASTERS))
                         .executes(BorisLibCommands::particleStress))
+                  .then(literal("particledensity")
+                        .requires(Permissions.require(MOD_ID + ".testmod.particledensity", PermissionLevel.GAMEMASTERS))
+                        .then(argument("particle_type", ParticleArgument.particle(access))
+                              .then(argument("radius", floatArg(0.1f))
+                                    .then(argument("count", integer(1))
+                                          .then(argument("duration", integer(1))
+                                                .executes(context -> BorisLibCommands.particleDensity(context, ParticleArgument.getParticle(context, "particle_type"), getFloat(context, "radius"), getInteger(context, "count"), getInteger(context, "duration"))))))))
                   .then(literal("returnitem")
                         .requires(Permissions.require(MOD_ID + ".testmod.returnitem", PermissionLevel.GAMEMASTERS))
                         .then(argument("item", item(access))
@@ -178,6 +195,45 @@ public class BorisLibCommands {
                         .then(literal("read")
                               .requires(Permissions.require(MOD_ID + ".testmod.timestamp.read", PermissionLevel.GAMEMASTERS))
                               .executes(BorisLibCommands::readTimestamp)))
+                  .then(literal("sequence")
+                        .requires(Permissions.require(MOD_ID + ".testmod.sequence", PermissionLevel.GAMEMASTERS))
+                        .then(literal("cancel")
+                              .requires(Permissions.require(MOD_ID + ".testmod.sequence.cancel", PermissionLevel.GAMEMASTERS))
+                              .executes(BorisLibCommands::sequenceCancel))
+                        .then(literal("cutscene")
+                              .requires(Permissions.require(MOD_ID + ".testmod.sequence.cutscene", PermissionLevel.GAMEMASTERS))
+                              .then(argument("mannequin", bool())
+                                    .then(argument("interpolation", word()).suggests(BorisLibCommands::suggestInterpTypes)
+                                          .then(argument("duration", integer(20, 1200))
+                                                .executes(context -> BorisLibCommands.sequenceCutscene(
+                                                      context,
+                                                      getBool(context, "mannequin"),
+                                                      getString(context, "interpolation"),
+                                                      getInteger(context, "duration")))))))
+                        .then(literal("iframe")
+                              .requires(Permissions.require(MOD_ID + ".testmod.sequence.iframe", PermissionLevel.GAMEMASTERS))
+                              .then(argument("immune", bool())
+                                    .then(argument("freeze", bool())
+                                          .then(argument("path", bool())
+                                                .then(argument("lockCamera", bool())
+                                                      .then(argument("duration", integer(10, 1200))
+                                                            .executes(context -> BorisLibCommands.sequenceIFrame(
+                                                                  context,
+                                                                  getBool(context, "immune"),
+                                                                  getBool(context, "freeze"),
+                                                                  getBool(context, "path"),
+                                                                  getBool(context, "lockCamera"),
+                                                                   getInteger(context, "duration")))))))))
+                        .then(literal("ghost")
+                              .requires(Permissions.require(MOD_ID + ".testmod.sequence.ghost", PermissionLevel.GAMEMASTERS))
+                              .then(argument("anchor", bool())
+                                    .then(argument("range", floatArg(1f))
+                                          .then(argument("duration", integer(20, 6000))
+                                                .executes(context -> BorisLibCommands.sequenceGhost(
+                                                      context,
+                                                      getBool(context, "anchor"),
+                                                      getFloat(context, "range"),
+                                                      getInteger(context, "duration"))))))))
             )
             .then(literal("reload")
                   .requires(Permissions.require(MOD_ID + ".reload", PermissionLevel.GAMEMASTERS))
@@ -309,6 +365,21 @@ public class BorisLibCommands {
       }, world));
       
       context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.particlestress_started").withStyle(ChatFormatting.GREEN), true);
+      return 1;
+   }
+   
+   private static int particleDensity(CommandContext<CommandSourceStack> context, ParticleOptions particleType, float radius, int count, int duration){
+      ServerLevel world = context.getSource().getLevel();
+      Vec3 center = context.getSource().getPosition();
+      
+      BorisLib.addTickTimerCallback(world, new RepeatTimer(1, duration, () -> {
+         for(int i = 0; i < count; i++){
+            Vec3 point = MathUtils.randomSpherePoint(center, radius);
+            world.sendParticles(particleType, point.x, point.y, point.z, 1, 0, 0, 0, 0);
+         }
+      }, world));
+      
+      context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.particledensity_started", count, radius, duration).withStyle(ChatFormatting.GREEN), true);
       return 1;
    }
    
@@ -732,5 +803,190 @@ public class BorisLibCommands {
       }
       context.getSource().sendSuccess(() -> Component.translatable("command.borislib.reload.success").withStyle(ChatFormatting.GREEN), true);
       return 1;
+   }
+   
+   // ═══════════════════════ sequence testmod suggest helpers ═════════════════════
+   
+   private static CompletableFuture<Suggestions> suggestInterpTypes(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder){
+      String start = builder.getRemaining().toLowerCase(Locale.ROOT);
+      for(InterpolationType type : InterpolationType.values()){
+         String s = type.name();
+         if(s.toLowerCase(Locale.ROOT).startsWith(start)) builder.suggest(s);
+      }
+      return builder.buildFuture();
+   }
+   
+   // ═══════════════════════════ sequence testmod handlers ═══════════════════════
+   
+   /** Cancel any active sequence on the calling player and restore their state. */
+   private static int sequenceCancel(CommandContext<CommandSourceStack> context){
+      if(!context.getSource().isPlayer()){
+         context.getSource().sendFailure(Component.translatable("text.borislib.must_be_executed_by_player"));
+         return -1;
+      }
+      ServerPlayer player = context.getSource().getPlayer();
+      if(!SequenceManager.isInSequence(player.getUUID())){
+         context.getSource().sendSuccess(() -> Component.literal("No active sequence to cancel.").withStyle(ChatFormatting.YELLOW), false);
+         return 0;
+      }
+      SequenceManager.cancel(player);
+      context.getSource().sendSuccess(() -> Component.literal("Sequence cancelled and state restored.").withStyle(ChatFormatting.GREEN), false);
+      return 1;
+   }
+   
+   /**
+    * Starts a cinematic cutscene that sweeps the camera in a full circle around the player.
+    *
+    * <p>The player is always put into spectator mode (they become the camera).
+    * When {@code mannequin=true}, an ArmorStand carrying the player's current equipment
+    * is spawned at the player's original position as a visual body stand-in.
+    *
+    * <p>The camera orbits at a radius of 7 blocks, with a height that undulates via
+    * {@code sin(2 * angle)} so the sweep rises and dips twice per revolution.
+    * The camera always faces inward toward the player's torso.
+    */
+   private static int sequenceCutscene(CommandContext<CommandSourceStack> context, boolean spawnMannequin, String interpStr, int durationTicks){
+      if(!context.getSource().isPlayer()){
+         context.getSource().sendFailure(Component.translatable("text.borislib.must_be_executed_by_player"));
+         return -1;
+      }
+      ServerPlayer player = context.getSource().getPlayer();
+      
+      InterpolationType interp;
+      try{
+         interp = InterpolationType.valueOf(interpStr.toUpperCase(Locale.ROOT));
+      }catch(IllegalArgumentException e){
+         context.getSource().sendFailure(Component.literal("Unknown interpolation '" + interpStr + "'. Valid values: LINEAR, EASE_IN, EASE_OUT, EASE_IN_OUT, CUBIC, STEP"));
+         return 0;
+      }
+      
+      // Focus point: player torso (eye-height minus a bit so the camera aims at the body center).
+      Vec3 focus = player.position().add(0, 1.0, 0);
+      double radius = 7.0;
+      
+      // 9 keyframes spaced evenly around a full 360° circle (i=0 and i=8 share the start angle,
+      // creating a clean closed loop).  Height undulates with sin(2*angle) to add visual interest.
+      CameraPath.Builder pathBuilder = CameraPath.builder();
+      int segments = 8;
+      for(int i = 0; i <= segments; i++){
+         double t       = (double) i / segments;
+         double angle   = 2.0 * Math.PI * t;
+         double camX    = focus.x + radius * Math.cos(angle);
+         double camZ    = focus.z + radius * Math.sin(angle);
+         double camY    = focus.y + 3.0 + 2.0 * Math.sin(angle * 2.0); // undulating height
+         
+         // Yaw: face inward toward the focus point.
+         double dx = focus.x - camX;
+         double dz = focus.z - camZ;
+         float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+         
+         // Pitch: tilt down to keep focus in frame (positive = look down in MC).
+         double horizDist = Math.sqrt(dx * dx + dz * dz);
+         float pitch = (float) Math.toDegrees(Math.atan2(camY - focus.y, horizDist));
+         
+         CameraKeyframe.Builder kf = CameraKeyframe.at(t).pos(camX, camY, camZ).rot(yaw, pitch);
+         if(i > 0) kf.interp(interp);
+         pathBuilder.add(kf.build());
+      }
+      
+      CutsceneSequence sequence = new CutsceneSequence(player.getUUID(), pathBuilder.build(), durationTicks, spawnMannequin);
+      boolean started = SequenceManager.start(player, sequence);
+      
+      if(started){
+         final String mannequinDesc = spawnMannequin ? "mannequin stand-in" : "no body (pure spectator)";
+         final InterpolationType finalInterp = interp;
+         context.getSource().sendSuccess(() -> Component.literal(
+               "[Cutscene] Started — " + mannequinDesc + ", interp: " + finalInterp.name() + ", " + durationTicks + " ticks"
+         ).withStyle(ChatFormatting.GREEN), false);
+         return 1;
+      }else{
+         context.getSource().sendFailure(Component.literal("Failed to start cutscene sequence."));
+         return 0;
+      }
+   }
+   
+   /**
+    * Starts an IFrame (invincibility-frame) sequence.
+    *
+    * <p>When {@code path=true} AND {@code freeze=true}, the player is driven along a
+    * sample "forward leap" arc — up 4 blocks, forward 6 blocks — to mimic a dash or
+    * burrow ability. When {@code path=false}, the player is pinned at their current position.
+    * When {@code freeze=false}, the player can move freely (path is ignored in this case).
+    * When {@code lockCamera=true}, the path's yaw/pitch values drive the camera rotation
+    * (look is locked). When {@code lockCamera=false} (default), the player has free-look
+    * and position syncs use relative rotation to avoid jitter.
+    */
+   private static int sequenceIFrame(CommandContext<CommandSourceStack> context, boolean immune, boolean freeze, boolean hasPath, boolean lockCamera, int durationTicks){
+      if(!context.getSource().isPlayer()){
+         context.getSource().sendFailure(Component.translatable("text.borislib.must_be_executed_by_player"));
+         return -1;
+      }
+      ServerPlayer player = context.getSource().getPlayer();
+      
+      CameraPath movementPath = null;
+      if(hasPath && freeze){
+         // Build a forward-leap arc: up 4 blocks at peak, landing 6 blocks ahead.
+         Vec3 start = player.position();
+         double yawRad = Math.toRadians(player.getYRot());
+         double fwdX = -Math.sin(yawRad); // MC: forward direction from yaw
+         double fwdZ =  Math.cos(yawRad);
+         
+         movementPath = CameraPath.builder()
+               .add(CameraKeyframe.at(0.00).pos(start.x,             start.y,       start.z            ).rot(0, 0).build())
+               .add(CameraKeyframe.at(0.35).pos(start.x + fwdX*2,   start.y + 4.0, start.z + fwdZ*2   ).rot(0, 0).interp(InterpolationType.EASE_IN).build())
+               .add(CameraKeyframe.at(0.60).pos(start.x + fwdX*4.5, start.y + 1.5, start.z + fwdZ*4.5 ).rot(0, 0).interp(InterpolationType.LINEAR).build())
+               .add(CameraKeyframe.at(1.00).pos(start.x + fwdX*6,   start.y,       start.z + fwdZ*6   ).rot(0, 0).interp(InterpolationType.EASE_OUT).build())
+               .build();
+      }
+      
+      IFrameSequence sequence = new IFrameSequence(player.getUUID(), durationTicks, immune, freeze, lockCamera, movementPath);
+      boolean started = SequenceManager.start(player, sequence);
+      
+      if(started){
+         final String desc = (immune ? "immune" : "vulnerable")
+               + ", " + (freeze ? "position frozen" : "free movement")
+               + (hasPath && freeze ? " + leap path" : hasPath ? " (path ignored — freeze=false)" : "")
+               + (lockCamera && hasPath && freeze ? ", camera locked" : ", free-look");
+         context.getSource().sendSuccess(() -> Component.literal("[IFrame] Started — " + desc + ", " + durationTicks + " ticks").withStyle(ChatFormatting.GREEN), false);
+         return 1;
+      }else{
+         context.getSource().sendFailure(Component.literal("Failed to start iframe sequence."));
+         return 0;
+      }
+   }
+   
+   /**
+    * Starts a RespawnGhost spectator sequence.
+    *
+    * <p>When {@code anchor=true} the ghost is tethered near the player's current position
+    * with the given max {@code range} in blocks. When {@code anchor=false} the ghost can
+    * fly freely anywhere in the world.
+    *
+    * <p>Note: start this sequence AFTER a respawn event if you want the snapshot restore
+    * to return the player to their respawn point (not their pre-ghost position).
+    */
+   private static int sequenceGhost(CommandContext<CommandSourceStack> context, boolean anchor, float range, int durationTicks){
+      if(!context.getSource().isPlayer()){
+         context.getSource().sendFailure(Component.translatable("text.borislib.must_be_executed_by_player"));
+         return -1;
+      }
+      ServerPlayer player = context.getSource().getPlayer();
+      
+      Vec3 anchorPos = anchor ? player.position() : null;
+      double maxRange = anchor ? range : -1.0;
+      
+      RespawnGhostSequence sequence = new RespawnGhostSequence(player.getUUID(), durationTicks, anchorPos, maxRange);
+      boolean started = SequenceManager.start(player, sequence);
+      
+      if(started){
+         String anchorDesc = anchor
+               ? "anchored at current position, range " + range + " blocks"
+               : "free roam (no anchor)";
+         context.getSource().sendSuccess(() -> Component.literal("[Ghost] Started — " + anchorDesc + ", " + durationTicks + " ticks").withStyle(ChatFormatting.GREEN), false);
+         return 1;
+      }else{
+         context.getSource().sendFailure(Component.literal("Failed to start ghost sequence."));
+         return 0;
+      }
    }
 }

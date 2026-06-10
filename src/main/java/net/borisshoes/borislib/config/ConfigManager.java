@@ -21,6 +21,42 @@ import static net.borisshoes.borislib.BorisLib.LOGGER;
 import static net.minecraft.commands.Commands.argument;
 import static net.minecraft.commands.Commands.literal;
 
+/**
+ * Manages configuration file I/O and command generation for a mod's settings.
+ *
+ * <p>This class handles:
+ * <ul>
+ *   <li><b>File persistence</b> — Automatic reading/writing of config files</li>
+ *   <li><b>Command generation</b> — Creates commands for viewing and modifying settings</li>
+ *   <li><b>Type-safe access</b> — Provides getters for all primitive and collection types</li>
+ *   <li><b>Validation</b> — Runs validators when settings are modified via commands</li>
+ *   <li><b>Translation support</b> — Integrates with Minecraft's translation system</li>
+ * </ul>
+ *
+ * <h3>Example Usage:</h3>
+ * <pre>{@code
+ * // Create manager
+ * ConfigManager config = new ConfigManager(
+ *     "mymod",
+ *     "My Mod",
+ *     "mymod.properties",
+ *     MyModConfig.SETTINGS
+ * );
+ *
+ * // Generate commands
+ * CommandRegistrationCallback.EVENT.register((dispatcher, access, env) -> {
+ *     dispatcher.register(config.generateCommand("mymod", "config"));
+ * });
+ *
+ * // Access values
+ * int maxPower = config.getInt(MyModConfig.MAX_POWER);
+ * boolean enabled = config.getBoolean(MyModConfig.ENABLE_FEATURE);
+ * }</pre>
+ *
+ * @see ConfigValue Base class for config values
+ * @see IConfigSetting Interface for config settings
+ * @see Validator For value validation
+ */
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class ConfigManager {
    public Set<ConfigValue> values;
@@ -29,6 +65,17 @@ public class ConfigManager {
    private final String modId;
    private final String modName;
    
+   /**
+    * Creates a new config manager.
+    *
+    * <p>The manager immediately reads the config file (creating it with defaults if it doesn't exist)
+    * and saves it back to ensure the file is up-to-date with all registered settings.
+    *
+    * @param modId the mod identifier (used for permissions and translations)
+    * @param modName the display name of the mod (used in config file header)
+    * @param fileName the config file name (relative to config directory)
+    * @param configRegistry the registry containing all {@link IConfigSetting} instances
+    */
    public ConfigManager(String modId, String modName, String fileName, Registry<IConfigSetting<?>> configRegistry){
       this.modId = modId;
       this.modName = modName;
@@ -46,6 +93,13 @@ public class ConfigManager {
       }
    }
    
+   /**
+    * Reads the config file from disk, parsing all settings.
+    *
+    * <p>Settings not found in the file are reset to their default values.
+    * If the file doesn't exist, all settings are initialized with defaults.
+    * Parsing errors for individual settings are logged but don't prevent other settings from loading.
+    */
    public void read(){
       try(BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(file)))){
          LOGGER.debug("Reading {} config...", modName);
@@ -91,6 +145,13 @@ public class ConfigManager {
       }
    }
    
+   /**
+    * Saves all settings to the config file.
+    *
+    * <p>The file includes a timestamp header and comments (from translation keys) for each setting.
+    * This method is automatically called after the config manager is created and whenever a
+    * setting is modified via command.
+    */
    public void save(){
       LOGGER.debug("Updating {} config...", modName);
       try(BufferedWriter output = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))){
@@ -112,6 +173,31 @@ public class ConfigManager {
       }
    }
    
+   /**
+    * Generates a command tree for viewing and modifying all config settings.
+    *
+    * <p>The generated commands support:
+    * <ul>
+    *   <li>Viewing all settings: {@code /<prefixA> [<prefixB>]}</li>
+    *   <li>Viewing specific setting: {@code /<prefixA> [<prefixB>] <settingName>}</li>
+    *   <li>Modifying setting: {@code /<prefixA> [<prefixB>] <settingName> <value>}</li>
+    *   <li>Tab completion for setting names and values</li>
+    *   <li>Permission checks via Fabric Permissions API</li>
+    * </ul>
+    *
+    * <h3>Example:</h3>
+    * <pre>{@code
+    * // Generates commands like:
+    * // /mymod config              - List all settings
+    * // /mymod config maxPower     - View maxPower value
+    * // /mymod config maxPower 200 - Set maxPower to 200
+    * dispatcher.register(config.generateCommand("mymod", "config"));
+    * }</pre>
+    *
+    * @param prefixA the first command literal (usually mod ID)
+    * @param prefixB the second command literal (usually "config", can be empty)
+    * @return the root command node to register
+    */
    public LiteralArgumentBuilder<CommandSourceStack> generateCommand(String prefixA, String prefixB){
       LiteralArgumentBuilder<CommandSourceStack> root;
       if(!prefixB.isBlank()){
@@ -157,12 +243,24 @@ public class ConfigManager {
    }
    
    
+   /**
+    * Gets the raw value of a setting by name.
+    *
+    * @param name the setting name
+    * @return the value object, or {@code null} if the setting doesn't exist
+    */
    public Object getValue(String name){
       ConfigValue cv = nameIndex.get(name);
       if(cv == null) return null;
       return cv.value != null ? cv.value : cv.defaultValue;
    }
    
+   /**
+    * Gets the value of a setting using its {@link IConfigSetting} instance.
+    *
+    * @param setting the config setting
+    * @return the value object, or {@code null} if the setting doesn't exist
+    */
    public Object getValue(IConfigSetting<?> setting){
       try{
          return this.getValue(setting.getName());
@@ -172,6 +270,14 @@ public class ConfigManager {
       return null;
    }
    
+   /**
+    * Gets an integer value from a setting.
+    *
+    * <p>If the value is not numeric, logs an error and returns 0.
+    *
+    * @param setting the config setting
+    * @return the integer value, or 0 on error
+    */
    public int getInt(IConfigSetting<?> setting){
       try{
          Object value = this.getValue(setting.getName());

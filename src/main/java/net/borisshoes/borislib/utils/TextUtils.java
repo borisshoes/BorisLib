@@ -16,8 +16,26 @@ import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Utility methods for working with Minecraft text {@link Component}s, chat formatting, and string manipulation.
+ *
+ * <p>Provides helpers for:</p>
+ * <ul>
+ *    <li>Converting RGB colors to the closest {@link ChatFormatting} constant.</li>
+ *    <li>Generating energy bars / progress indicators via Unicode block characters.</li>
+ *    <li>Parsing custom string markup into formatted {@link Component} trees.</li>
+ *    <li>Converting components back into parseable markup or Java code.</li>
+ *    <li>Number formatting (roman numerals, comma separators, abbreviated large values).</li>
+ * </ul>
+ */
 public class TextUtils {
    
+   /**
+    * Returns a human-friendly styled {@link Component} for a dimension key (e.g. "Overworld", "The Nether", "The End").
+    *
+    * @param worldKey the dimension key
+    * @return a formatted component representing the dimension name
+    */
    public static MutableComponent getFormattedDimName(ResourceKey<Level> worldKey){
       if(worldKey.identifier().toString().equals(ServerLevel.OVERWORLD.identifier().toString())){
          return Component.literal("Overworld").withStyle(ChatFormatting.GREEN);
@@ -30,10 +48,30 @@ public class TextUtils {
       }
    }
    
+   /**
+    * Sends an action-bar progress/energy bar to the given player using Unicode characters. Defaults to 10 segments.
+    *
+    * @param player   the player receiving the bar
+    * @param percentage the fill percentage (0.0 to 1.0)
+    * @param prefix   component to display before the bar
+    * @param suffix   component to display after the bar
+    * @param barStyle style operator applied to each bar character
+    */
    public static void energyBar(ServerPlayer player, double percentage, Component prefix, Component suffix, UnaryOperator<Style> barStyle){
       TextUtils.energyBar(player, percentage, 10, prefix, suffix, barStyle);
    }
    
+   /**
+    * Sends an action-bar progress/energy bar to the given player using Unicode characters, with a configurable
+    * number of segments.
+    *
+    * @param player   the player receiving the bar
+    * @param percentage the fill percentage (0.0 to 1.0)
+    * @param numBars  the number of bar segments to render
+    * @param prefix   component to display before the bar
+    * @param suffix   component to display after the bar
+    * @param barStyle style operator applied to each bar character
+    */
    public static void energyBar(ServerPlayer player, double percentage, int numBars, Component prefix, Component suffix, UnaryOperator<Style> barStyle){
       MutableComponent text = Component.literal("").append(prefix);
       int value = (int) (percentage * 100);
@@ -53,10 +91,20 @@ public class TextUtils {
       player.sendSystemMessage(text, true);
    }
    
+   /**
+    * Converts a camelCase string to snake_case.
+    *
+    * @param str the input string
+    * @return the snake_case version
+    */
    public static String camelToSnake(String str){
       return str.replaceAll("([a-z])([A-Z]+)", "$1_$2").toLowerCase(Locale.ROOT);
    }
    
+   /**
+    * Lookup table mapping {@link ChatFormatting} colors to their RGB integer values. Used by
+    * {@link #getClosestFormatting(int)} to find the nearest named color.
+    */
    public static final ArrayList<Tuple<ChatFormatting, Integer>> COLOR_MAP = new ArrayList<>(Arrays.asList(
          new Tuple<>(ChatFormatting.BLACK, 0x000000),
          new Tuple<>(ChatFormatting.DARK_BLUE, 0x0000AA),
@@ -73,9 +121,16 @@ public class TextUtils {
          new Tuple<>(ChatFormatting.RED, 0xFF5555),
          new Tuple<>(ChatFormatting.LIGHT_PURPLE, 0xFF55FF),
          new Tuple<>(ChatFormatting.YELLOW, 0xFFFF55),
-         new Tuple<>(ChatFormatting.WHITE, 0xFFFFFF)
+          new Tuple<>(ChatFormatting.WHITE, 0xFFFFFF)
    ));
    
+   /**
+    * Finds the closest {@link ChatFormatting} color constant to the given RGB value using weighted Euclidean
+    * distance (R: 0.30, G: 0.59, B: 0.11).
+    *
+    * @param colorRGB the input color as a 24-bit RGB integer (0xRRGGBB)
+    * @return the nearest formatting constant
+    */
    public static ChatFormatting getClosestFormatting(int colorRGB){
       ChatFormatting closest = ChatFormatting.WHITE;
       double cDist = Integer.MAX_VALUE;
@@ -93,6 +148,12 @@ public class TextUtils {
       return closest;
    }
    
+   /**
+    * Converts an integer to its Roman numeral representation (e.g. 4 → "IV", 1994 → "MCMXCIV").
+    *
+    * @param num the integer to convert (typically 1–3999)
+    * @return the Roman numeral string
+    */
    public static String intToRoman(int num){
       int[] values = {1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1};
       String[] romanLetters = {"M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"};
@@ -106,6 +167,12 @@ public class TextUtils {
       return roman.toString();
    }
    
+   /**
+    * Formats a large long value with abbreviated K/M/B suffixes for readability (e.g. 1,234,567 → "1.2M").
+    *
+    * @param value the value to format
+    * @return a human-readable abbreviated string
+    */
    public static String readableLong(long value){
       if(value >= 1_000_000_000) return String.format("%.2fB", value / 1_000_000_000.0);
       if(value >= 1_000_000) return String.format("%.1fM", value / 1_000_000.0);
@@ -113,27 +180,67 @@ public class TextUtils {
       return String.valueOf(value);
    }
    
+   /**
+    * Formats an integer with comma separators for readability (e.g. 1234567 → "1,234,567").
+    *
+    * @param num the integer to format
+    * @return a comma-separated string
+    */
    public static String readableInt(int num){
       return String.format("%,d", num);
    }
    
+   /**
+    * Formats a double with comma separators and 2 decimal places.
+    *
+    * @param num the double to format
+    * @return a formatted string
+    */
    public static String readableDouble(double num){
       return readableDouble(num, 2);
    }
    
+   /**
+    * Formats a double with comma separators and a configurable number of decimal places.
+    *
+    * @param num           the double to format
+    * @param decimalPlaces the number of decimal places to display
+    * @return a formatted string
+    */
    public static String readableDouble(double num, int decimalPlaces){
       return String.format("%,0" + (decimalPlaces + 1) + "." + decimalPlaces + "f", num);
    }
    
+   /**
+    * Returns a copy of the given {@link Component} with italic styling disabled.
+    *
+    * @param text the input component
+    * @return a new component without italic
+    */
    public static MutableComponent removeItalics(Component text){
       return removeItalics(Component.literal("").append(text));
    }
    
+   /**
+    * Returns a copy of the given {@link MutableComponent} with italic styling disabled.
+    *
+    * @param text the input mutable component
+    * @return the same component (mutated) without italic
+    */
    public static MutableComponent removeItalics(MutableComponent text){
       Style parentStyle = Style.EMPTY.withColor(ChatFormatting.DARK_PURPLE).withItalic(false).withBold(false).withUnderlined(false).withObfuscated(false).withStrikethrough(false);
       return text.setStyle(text.getStyle().applyTo(parentStyle));
    }
    
+   /**
+    * Parses a custom markup string into a styled {@link Component}. Format: {@code [content](color_code)}
+    * where color_code is a Minecraft formatting code (0-9,a-f) optionally followed by style flags (k,l,m,n,o).
+    * <p>
+    * Example: {@code "[Hello](a) [World](clo)"} → cyan "Hello" followed by red, bold, italic "World".
+    *
+    * @param input the markup string
+    * @return the parsed component
+    */
    public static MutableComponent parseString(String input){
       ArrayList<String> matchList = new ArrayList<>();
       MutableComponent text = Component.literal("");
@@ -181,6 +288,12 @@ public class TextUtils {
       return formatting.toArray(new ChatFormatting[0]);
    }
    
+   /**
+    * Converts a {@link Component} back into the custom markup format used by {@link #parseString}.
+    *
+    * @param text the component to convert
+    * @return the markup string representation
+    */
    public static String textToString(Component text){
       StringBuilder str = new StringBuilder();
       Style parentStyle = text.getStyle();
@@ -242,6 +355,13 @@ public class TextUtils {
       return str.toString();
    }
    
+   /**
+    * Converts a {@link Component} into executable Java code that constructs that component.
+    * Useful for generating code snippets from in-game text.
+    *
+    * @param text the component to convert
+    * @return Java code as a string
+    */
    public static String textToCode(Component text){
       Style parentStyle = text.getStyle();
       ArrayList<String> codes = new ArrayList<>();

@@ -28,6 +28,12 @@ public final class DataAccess {
          Level.END, "DIM1"            // end data was at worldRoot/DIM1/data/
    );
    
+   /**
+    * Server startup hook: migrates any legacy on-disk locations and opens the per-player store.
+    * Must run before any other {@code DataAccess} call.
+    *
+    * @param server the freshly started server
+    */
    public static void onServerStarted(MinecraftServer server){
       try{
          Path root = server.getWorldPath(LevelResource.ROOT);
@@ -100,6 +106,11 @@ public final class DataAccess {
       }
    }
    
+   /**
+    * Server shutdown hook: flushes every cached player to disk.
+    *
+    * @param s the server shutting down
+    */
    public static void onServerStop(MinecraftServer s){
       if(playerStore == null){
          BorisLib.LOGGER.warn("PlayerStore is null during server stop, skipping data save");
@@ -119,6 +130,13 @@ public final class DataAccess {
       DIRTY_PLAYERS.clear();
    }
    
+   /**
+    * Server-save hook: saves every online player plus any players marked dirty since the last save.
+    *
+    * @param s     the server
+    * @param flush forwarded from the save event (currently unused by this method)
+    * @param force forwarded from the save event (currently unused by this method)
+    */
    public static void onServerSave(MinecraftServer s, boolean flush, boolean force){
       if(playerStore == null){
          BorisLib.LOGGER.warn("PlayerStore is null during server save, skipping");
@@ -149,6 +167,11 @@ public final class DataAccess {
       }
    }
    
+   /**
+    * Player-leave hook: writes the player's data to disk and removes them from the dirty set.
+    *
+    * @param p the disconnecting player
+    */
    public static void onPlayerQuit(ServerPlayer p){
       if(playerStore != null){
          try{
@@ -160,6 +183,12 @@ public final class DataAccess {
       DIRTY_PLAYERS.remove(p.getUUID());
    }
    
+   /**
+    * Player-join hook: preloads the player's data file and runs the {@link DefaultPlayerData#onLogin}
+    * routine that updates cached username / profile information.
+    *
+    * @param p the player who just connected
+    */
    public static void onPlayerJoin(ServerPlayer p){
       if(playerStore != null){
          try{
@@ -175,6 +204,12 @@ public final class DataAccess {
       }
    }
    
+   /**
+    * Explicitly marks the given player's data as dirty so it is flushed on the next autosave.
+    * Only needed when a long-lived reference is mutated in place without going through {@code setPlayer}.
+    *
+    * @param u the player's UUID
+    */
    public static void markPlayerDirty(UUID u){
       ensureServerSide("markPlayerDirty");
       DIRTY_PLAYERS.add(u);
@@ -209,6 +244,14 @@ public final class DataAccess {
       WorldState.get(w).setDirty();
    }
    
+   /**
+    * Reads a GLOBAL-scoped value. Creates a default via {@link DataKey#makeDefaultGlobal()} on first
+    * access and flags global state as dirty so the new value is persisted.
+    *
+    * @param key the registered global key
+    * @param <T> the data type
+    * @return the live, mutable value
+    */
    public static <T extends StorableData> T getGlobal(DataKey<T> key){
       ensureServerSide("getGlobal");
       ServerLevel overworld = BorisLib.SERVER.overworld();
@@ -216,6 +259,17 @@ public final class DataAccess {
       return s.getLive(key);
    }
    
+   /**
+    * Reads a WORLD-scoped value for a specific dimension. Creates a default via
+    * {@link DataKey#makeDefaultWorld(ResourceKey)} on first access.
+    *
+    * @param wk  the dimension key
+    * @param key the registered world key
+    * @param <T> the data type
+    * @return the live, mutable value
+    * @throws IllegalArgumentException if {@code wk} is null
+    * @throws IllegalStateException    if the dimension is not loaded
+    */
    public static <T extends StorableData> T getWorld(ResourceKey<Level> wk, DataKey<T> key){
       ensureServerSide("getWorld");
       if(wk == null){
@@ -231,6 +285,16 @@ public final class DataAccess {
       return s.getLive(wk, key);
    }
    
+   /**
+    * Reads a PLAYER-scoped value for a specific player. Creates a default via
+    * {@link DataKey#makeDefaultPlayer(UUID)} on first access. Works for offline players too — the
+    * underlying file is loaded on demand.
+    *
+    * @param u   the player's UUID (online or offline)
+    * @param key the registered player key
+    * @param <T> the data type
+    * @return the live, mutable value
+    */
    public static <T extends StorableData> T getPlayer(UUID u, DataKey<T> key){
       ensureServerSide("getPlayer");
       T v = playerStore.getLive(u, key);
@@ -238,6 +302,13 @@ public final class DataAccess {
       return v;
    }
    
+   /**
+    * Overwrites the GLOBAL-scoped value for the given key. Passing {@code null} resets to the default.
+    *
+    * @param key   the registered global key
+    * @param value the new value (or {@code null} to reset)
+    * @param <T>   the data type
+    */
    public static <T extends StorableData> void setGlobal(DataKey<T> key, T value){
       ensureServerSide("setGlobal");
       ServerLevel overworld = BorisLib.SERVER.overworld();
@@ -245,6 +316,14 @@ public final class DataAccess {
       s.setLive(key, value);
    }
    
+   /**
+    * Overwrites the WORLD-scoped value for the given dimension. Passing {@code null} resets to the default.
+    *
+    * @param w     the target dimension (must be loaded)
+    * @param key   the registered world key
+    * @param value the new value (or {@code null} to reset)
+    * @param <T>   the data type
+    */
    public static <T extends StorableData> void setWorld(ServerLevel w, DataKey<T> key, T value){
       ensureServerSide("setWorld");
       if(w == null){
@@ -255,6 +334,15 @@ public final class DataAccess {
       s.setLive(w.dimension(), key, value);
    }
    
+   /**
+    * Overwrites the PLAYER-scoped value for a player. Passing {@code null} resets to the default.
+    * Marks the player dirty so the change persists on the next save.
+    *
+    * @param u     the target player's UUID
+    * @param key   the registered player key
+    * @param value the new value (or {@code null} to reset)
+    * @param <T>   the data type
+    */
    public static <T extends StorableData> void setPlayer(UUID u, DataKey<T> key, T value){
       ensureServerSide("setPlayer");
       playerStore.setLive(u, key, value);
@@ -268,6 +356,16 @@ public final class DataAccess {
       }
    }
    
+   /**
+    * Collects the value of one PLAYER-scoped key across every known player (online, cached, and on disk).
+    *
+    * <p>Useful for cross-player reports such as leaderboards. Files that fail to decode are skipped with
+    * a warning rather than aborting the entire query.</p>
+    *
+    * @param key the registered player key
+    * @param <T> the data type
+    * @return a map from each known player's UUID to their value (may be empty, never {@code null})
+    */
    public static <T extends StorableData> Map<UUID, T> allPlayerDataFor(DataKey<T> key){
       ensureServerSide("allPlayerDataFor");
       Map<UUID, T> out = new HashMap<>();

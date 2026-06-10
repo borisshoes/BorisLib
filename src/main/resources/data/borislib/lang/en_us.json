@@ -70,6 +70,7 @@
   "testmod.borislib.marker_remove_none": "Found no markers in this world of that name",
   "testmod.borislib.marker_remove_some": "Removed marker",
   "testmod.borislib.marker_set": "Added marker: %s",
+  "testmod.borislib.particledensity_started": "Particle density started! Spawning %1$s particles/tick in a sphere of radius %2$s for %3$s ticks.",
   "testmod.borislib.particlestress_started": "Particle stress test started! ~10k particles/tick for 10 seconds.",
   "testmod.borislib.servercallback": "Borislib Testing Server Callback!",
   "testmod.borislib.servercallbackfinish": "Borislib Testing Server Callback Finish!",

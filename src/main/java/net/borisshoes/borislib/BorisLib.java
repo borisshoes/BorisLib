@@ -1,6 +1,7 @@
 package net.borisshoes.borislib;
 
 import com.mojang.serialization.Lifecycle;
+import eu.pb4.polymer.core.api.entity.PolymerEntityUtils;
 import eu.pb4.polymer.resourcepack.api.PolymerResourcePackUtils;
 import net.borisshoes.borislib.callbacks.*;
 import net.borisshoes.borislib.conditions.Condition;
@@ -14,15 +15,18 @@ import net.borisshoes.borislib.datastorage.DataKey;
 import net.borisshoes.borislib.datastorage.DataRegistry;
 import net.borisshoes.borislib.datastorage.DefaultPlayerData;
 import net.borisshoes.borislib.gui.GraphicalItem;
+import net.borisshoes.borislib.sequences.CameraEntity;
 import net.borisshoes.borislib.testmod.BorisLibCommands;
 import net.borisshoes.borislib.timers.TickTimerCallback;
 import net.borisshoes.borislib.tracker.PlayerMovementEntry;
+import net.borisshoes.borislib.sequences.SequenceManager;
 import net.borisshoes.borislib.utils.AlgoUtils;
 import net.borisshoes.borislib.utils.ItemModDataHandler;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -38,7 +42,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.Tuple;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.item.Item;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -70,6 +76,14 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
    
    public static final Item GRAPHICAL_ITEM = registerItem("graphical_item", new GraphicalItem(new Item.Properties().stacksTo(99)));
    
+   public static final EntityType<CameraEntity> CAMERA_ENTITY_TYPE = registerEntity("camera_entity",
+         EntityType.Builder.of(CameraEntity::new, MobCategory.MISC)
+               .sized(0f, 0f)
+               .clientTrackingRange(128)
+               .updateInterval(1)
+               .noSummon()
+               .noSave());
+   
    public static final LoginCallback ITEM_RETURN_LOGIN_CALLBACK = registerCallback(new ItemReturnLoginCallback());
    
    public static final ItemModDataHandler BORISLIB_ITEM_DATA = new ItemModDataHandler(MOD_ID);
@@ -97,9 +111,13 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
       ServerPlayConnectionEvents.JOIN.register(PlayerConnectionCallback::onPlayerJoin);
       ServerPlayConnectionEvents.DISCONNECT.register(PlayerConnectionCallback::onPlayerLeave);
       ServerLifecycleEvents.SERVER_STARTED.register(DataAccess::onServerStarted);
+      ServerLifecycleEvents.SERVER_STARTED.register(SequenceManager::onServerStart);
       ServerLifecycleEvents.SERVER_STOPPED.register(DataAccess::onServerStop);
       ServerLifecycleEvents.AFTER_SAVE.register(DataAccess::onServerSave);
       ServerLivingEntityEvents.AFTER_DEATH.register(Conditions::entityDied);
+      ServerLivingEntityEvents.AFTER_DEATH.register(SequenceManager::onPlayerDeath);
+      ServerTickEvents.END_SERVER_TICK.register(SequenceManager::tick);
+      ServerEntityEvents.ENTITY_LOAD.register(SequenceManager::onEntityLoad);
       CommandRegistrationCallback.EVENT.register(BorisLibCommands::register);
       
       LOGGER.info("BorisLib ready and waiting!");
@@ -156,5 +174,13 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
       Identifier identifier = Identifier.fromNamespaceAndPath(MOD_ID, setting.getId());
       Registry.register(CONFIG_SETTINGS, identifier, setting);
       return setting;
+   }
+   
+   public static <T extends Entity> EntityType<T> registerEntity(String id, EntityType.Builder<T> builder){
+      Identifier identifier = Identifier.fromNamespaceAndPath(MOD_ID, id);
+      EntityType<T> entityType = builder.build(ResourceKey.create(Registries.ENTITY_TYPE, identifier));
+      Registry.register(BuiltInRegistries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(MOD_ID, id), entityType);
+      PolymerEntityUtils.registerType(entityType);
+      return entityType;
    }
 }

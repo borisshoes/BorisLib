@@ -12,15 +12,31 @@ import net.minecraft.world.item.ItemStack;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
+/**
+ * {@link LoginCallback} that hands an {@link ItemStack} back to a player the next time they log in.
+ *
+ * <p>When the player joins, the stack is added to their inventory in the preferred slot if possible. If
+ * the inventory is full or the player is in a state that prevents pickup, an
+ * {@link ItemReturnTimerCallback} is scheduled to retry shortly. If the player never logs in, the
+ * callback simply sits in their {@link LoginCallbackContainer} indefinitely.</p>
+ *
+ * <p>Typically queued via {@link BorisLib#addLoginCallback(LoginCallback)}.</p>
+ */
 public class ItemReturnLoginCallback extends LoginCallback {
    
    private ItemStack item;
    private int prefSlot;
    
+   /** Default constructor used by the codec's {@link #makeNew()} factory; populates only the type id. */
    public ItemReturnLoginCallback(){
       super(Identifier.fromNamespaceAndPath(MOD_ID, "item_return"));
    }
    
+   /**
+    * @param player   the player who should receive the item on next login
+    * @param item     the stack to return
+    * @param prefSlot inventory slot index to try first; {@code -1} disables the preference
+    */
    public ItemReturnLoginCallback(ServerPlayer player, ItemStack item, int prefSlot){
       this();
       this.playerUUID = player.getStringUUID();

@@ -22,12 +22,27 @@ import java.util.Map;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
+/**
+ * Server-wide {@link SavedData} holder that backs every GLOBAL-scoped {@link DataKey} for every mod that
+ * registers one with BorisLib.
+ *
+ * <p>Data is stored as a two-level map: <em>mod id → key → encoded NBT</em>. Values are loaded lazily:
+ * the encoded NBT sits in {@link #data} until first access via {@link #getLive(DataKey)}, at which point
+ * it is decoded into a live {@link StorableData} instance and moved into {@link #objects}. On save, live
+ * objects are re-encoded and any never-decoded raw entries are copied through unchanged so that data
+ * from mods not currently loaded is preserved.</p>
+ *
+ * <p>End users should normally interact with this class through {@link DataAccess#getGlobal} /
+ * {@link DataAccess#setGlobal}.</p>
+ */
 public final class GlobalState extends SavedData {
+   /** SavedData file id (without extension) used by Minecraft's storage layer. */
    public static final String FILE_ID = MOD_ID + "_global";
    private final Map<String, Map<String, CompoundTag>> data = new HashMap<>();
    private final Map<String, Map<String, Object>> objects = new HashMap<>();
    
    // Codec that reads and writes the raw compound structure
+   /** Pass-through codec that round-trips the entire global map as raw NBT. */
    public static final Codec<GlobalState> CODEC = Codec.PASSTHROUGH.xmap(
          dynamic -> {
             GlobalState s = new GlobalState();
@@ -72,8 +87,16 @@ public final class GlobalState extends SavedData {
    // Use SAVED_DATA_COMMAND_STORAGE to prevent DFU from mangling custom mod data during Minecraft version upgrades.
    // LEVEL's schema applies level.dat-specific fixes that strip unrecognized keys, causing data loss.
    // SAVED_DATA_COMMAND_STORAGE uses a permissive schema designed for arbitrary compound data.
+   /** Registered {@link SavedDataType} used by Minecraft's SavedDataStorage. */
    public static final SavedDataType<GlobalState> TYPE = new SavedDataType<>(Identifier.parse(FILE_ID), GlobalState::new, CODEC, DataFixTypes.SAVED_DATA_COMMAND_STORAGE);
    
+   /**
+    * Looks up (or lazily creates) the {@code GlobalState} attached to the server's overworld.
+    *
+    * @param ow the overworld {@link ServerLevel}
+    * @return the singleton {@code GlobalState} for this server
+    * @throws IllegalArgumentException if {@code ow} is null
+    */
    public static GlobalState get(ServerLevel ow){
       if(ow == null){
          throw new IllegalArgumentException("GlobalState.get() received null overworld ServerLevel. Ensure the server is fully started before accessing global data.");
@@ -81,6 +104,12 @@ public final class GlobalState extends SavedData {
       return ow.getDataStorage().computeIfAbsent(TYPE);
    }
    
+   /**
+    * Re-encodes every live {@link StorableData} object plus all undecoded raw entries into a single
+    * {@link CompoundTag} suitable for {@code SavedData} to persist.
+    *
+    * @return the encoded compound tag
+    */
    // Custom save implementation that encodes our data
    public CompoundTag save(){
       CompoundTag tag = new CompoundTag();
@@ -133,6 +162,15 @@ public final class GlobalState extends SavedData {
       return tag;
    }
    
+   /**
+    * Reads or lazily decodes the value for a GLOBAL-scoped {@link DataKey}, falling back to the key's
+    * default factory when no stored value is available. Marks the state dirty so the value is persisted.
+    *
+    * @param key the registered global key
+    * @param <T> the data type
+    * @return the live value (never {@code null})
+    * @throws IllegalStateException if the default factory returns {@code null}
+    */
    @SuppressWarnings("unchecked")
    public <T extends StorableData> T getLive(DataKey<T> key){
       Map<String, Object> modObjs = objects.computeIfAbsent(key.modId(), k -> new HashMap<>());
@@ -174,6 +212,14 @@ public final class GlobalState extends SavedData {
       return created;
    }
    
+   /**
+    * Replaces the live value associated with the given key. Passing {@code null} substitutes the key's
+    * default-factory value. Marks the state dirty.
+    *
+    * @param key   the registered global key
+    * @param value the new value (or {@code null} to reset to default)
+    * @param <T>   the data type
+    */
    public <T extends StorableData> void setLive(DataKey<T> key, T value){
       T toStore = value != null ? value : key.makeDefaultGlobal();
       if(toStore == null){
@@ -190,6 +236,7 @@ public final class GlobalState extends SavedData {
       setDirty();
    }
    
+   /** @return the raw, undecoded NBT map (mod id → key → tag). For diagnostic / migration use only. */
    public Map<String, Map<String, CompoundTag>> map(){
       return data;
    }
@@ -234,4 +281,3 @@ public final class GlobalState extends SavedData {
       }
    }
 }
-

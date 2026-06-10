@@ -11,6 +11,15 @@ import net.minecraft.world.entity.LivingEntity;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
+/**
+ * Built-in harmful {@link Condition} that reduces the affected entity's outgoing damage.
+ *
+ * <p>Uses {@linkplain Condition#isReversedImportance() reversed importance}: the prevailing value is a
+ * multiplier in {@code [0, 1]} where lower means weaker. Entities tagged
+ * {@link net.borisshoes.borislib.BorisLib#IGNORES_FEEBLE} are immune.</p>
+ *
+ * <p>Range: {@code [0, 1]}; base {@code 1}.</p>
+ */
 public class FeebleCondition extends Condition {
    private static final SimpleParticleType PARTICLE = ParticleTypes.FALLING_HONEY;
    

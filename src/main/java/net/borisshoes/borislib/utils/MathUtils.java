@@ -13,6 +13,22 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
+/**
+ * Mathematical utility methods for 3D vector operations and geometric queries.
+ *
+ * <p>Provides functions for:</p>
+ * <ul>
+ *    <li><b>Line segment operations</b> — merging co-linear segments, distance to lines, checking if
+ *        a segment falls inside a block set.</li>
+ *    <li><b>Cone intersection tests</b> — checking if a point lies within a frustum cone.</li>
+ *    <li><b>Random point generation</b> — uniform and hollow sphere distributions.</li>
+ *    <li><b>3D rotations</b> — rotating points around axes defined by yaw/pitch/roll or direction vectors.</li>
+ *    <li><b>Ray-casting</b> — testing ray-to-entity hitbox intersections.</li>
+ * </ul>
+ *
+ * <p>Most methods work with Minecraft's {@link Vec3} coordinate type and are designed for server-side
+ * gameplay logic (targeting, particle positioning, spawn placement, etc.).</p>
+ */
 public class MathUtils {
    
    /**

@@ -17,6 +17,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -31,6 +32,17 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
+/**
+ * Built-in harmful {@link Condition} that obscures the affected player's view by attaching a virtual
+ * item display "blindfold" entity in front of their camera.
+ *
+ * <p>The prevailing value controls the visual intensity of the overlay (clamped {@code [0, 1]}). For
+ * non-player living entities it also reduces their {@link Attributes#FOLLOW_RANGE} so AI sees less far.
+ * Internally the condition keeps a map of {@link ItemDisplayElement} attachments keyed by player UUID,
+ * cleaning them up on {@link #onRemove}.</p>
+ *
+ * <p>Range: {@code [0, 1]}; base {@code 0}.</p>
+ */
 public class NearsightCondition extends Condition {
    private static final SimpleParticleType PARTICLE = ParticleTypes.LARGE_SMOKE;
    private static final Map<UUID, NearsightElementHolder> ACTIVE_HOLDERS = new ConcurrentHashMap<>();
@@ -87,13 +99,6 @@ public class NearsightCondition extends Condition {
                
                EntityAttachment attachment = new EntityAttachment(holder, player, true);
                attachment.startWatching(player);
-               
-               for(ServerPlayer serverPlayer : server.getPlayerList().getPlayers()){
-                  if(serverPlayer != player){
-                     holder.stopWatching(serverPlayer);
-                     attachment.stopWatching(serverPlayer);
-                  }
-               }
                
                ACTIVE_HOLDERS.put(player.getUUID(), holder);
             }
@@ -258,6 +263,14 @@ public class NearsightCondition extends Condition {
       
       public ResourceKey<Level> getLevelKey(){
          return levelKey;
+      }
+      
+      @Override
+      public boolean startWatching(ServerGamePacketListenerImpl connection){
+         if(connection.player != this.player){
+            return false;
+         }
+         return super.startWatching(connection);
       }
       
       @Override

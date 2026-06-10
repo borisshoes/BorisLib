@@ -10,6 +10,14 @@ import net.minecraft.world.entity.LivingEntity;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
+/**
+ * Built-in beneficial {@link Condition} that heals the affected entity every server tick.
+ *
+ * <p>The prevailing value is the number of health points restored per tick. Heart particles are emitted
+ * sporadically while the condition is active.</p>
+ *
+ * <p>Range: {@code [0, +∞)}; base {@code 0}.</p>
+ */
 public class RejuvenationCondition extends Condition {
    private static final SimpleParticleType PARTICLE = ParticleTypes.HEART;
    

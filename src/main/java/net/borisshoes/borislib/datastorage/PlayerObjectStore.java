@@ -4,6 +4,8 @@ import com.mojang.logging.LogUtils;
 import net.borisshoes.borislib.BorisLib;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.ValueInput;
@@ -25,11 +27,30 @@ import java.util.zip.GZIPOutputStream;
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
 /**
- * Caches live objects per player. File format on disk is the same flat namespaced map ({modId -> {key -> NBT}}).
- * Two maps per player:
- * - objects: decoded live objects (modId -> key -> Object)
- * - raw: raw NBT for keys not yet accessed (modId -> key -> NbtCompound)
- * On save: encode objects via StorableData.write(), and write any remaining raw entries as-is.
+ * On-disk cache for every PLAYER-scoped {@link StorableData} object for every player known to the server.
+ *
+ * <p>File layout: each player has one file at {@code <worldRoot>/players/<modid>/<uuid>.dat}, gzip-compressed
+ * NBT, with a {@code .dat_old} backup that is rotated on every successful save. File contents follow the
+ * same flat namespaced layout as {@link GlobalState} / {@link WorldState}: {@code mod id → key → encoded
+ * NBT}.</p>
+ *
+ * <p>Two parallel maps per player are cached in memory:</p>
+ * <ul>
+ *    <li>{@code objects} — decoded live {@link StorableData} instances (mod id → key → object).</li>
+ *    <li>{@code raw} — encoded NBT for keys that have not yet been touched in this session. Reads are
+ *        lazy: a key moves from {@code raw} to {@code objects} the first time {@link #getLive} is called
+ *        for it.</li>
+ * </ul>
+ *
+ * <p>On save, live objects are re-encoded via {@link StorableData#writeNbt(CompoundTag)} and any raw
+ * entries that were never accessed are copied through unchanged, so data belonging to other mods (or to
+ * mods that aren't currently loaded) is preserved.</p>
+ *
+ * <p>If the main file is corrupted on read, the store transparently falls back to the {@code .dat_old}
+ * backup; if a specific key is unreadable, it attempts a per-key recovery from the backup before falling
+ * back to the {@link DataKey}'s default factory.</p>
+ *
+ * <p>End users should not interact with this class directly — use {@link DataAccess}.</p>
  */
 public final class PlayerObjectStore {
    private final Path dir;
@@ -43,6 +64,14 @@ public final class PlayerObjectStore {
       boolean backupLoaded = false;
    }
    
+   /**
+    * Opens (creating if necessary) the player-data directory under {@code worldRoot/players/<modid>/} and
+    * migrates files from the older {@code worldRoot/data/<modid>/players/} layout if present.
+    *
+    * @param worldRoot the world's root directory (as returned by
+    *                  {@link net.minecraft.server.MinecraftServer#getWorldPath
+    *                  MinecraftServer.getWorldPath(LevelResource.ROOT)})
+    */
    public PlayerObjectStore(Path worldRoot){
       this.dir = worldRoot.resolve("players").resolve(MOD_ID);
       try{
@@ -294,11 +323,27 @@ public final class PlayerObjectStore {
       }
    }
    
+   /**
+    * Ensures the player's data file is loaded and its raw NBT parsed. Called by
+    * {@link DataAccess#onPlayerJoin(ServerPlayer)} so subsequent {@link #getLive} calls during the same
+    * tick are guaranteed not to hit disk.
+    *
+    * @param u the player's UUID
+    */
    public void preload(UUID u){
       /* touch the entry so raw NBT (if any) is parsed once */
       getEntry(u);
    }
    
+   /**
+    * Writes the player's cached data back to disk atomically (write-temp + rotate-backup + rename) so a
+    * crash mid-write cannot corrupt the {@code .dat} file.
+    *
+    * <p>Both live objects (encoded via {@link StorableData#writeNbt}) and never-decoded raw entries are
+    * persisted.</p>
+    *
+    * @param u the player's UUID
+    */
    public void save(UUID u){
       Entry e = cache.get(u);
       if(e == null){
@@ -395,6 +440,10 @@ public final class PlayerObjectStore {
       }
    }
    
+   /**
+    * @return a deep snapshot of every cached player's mod → key → object map. Used by
+    *         {@link DataAccess#onServerStop(MinecraftServer)} to iterate every loaded player exactly once.
+    */
    public Map<UUID, Map<String, Map<String, Object>>> snapshotAllObjects(){
       Map<UUID, Map<String, Map<String, Object>>> copy = new HashMap<>();
       cache.forEach((u, e) -> {

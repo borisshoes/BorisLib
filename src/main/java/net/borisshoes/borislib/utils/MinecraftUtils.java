@@ -62,8 +62,59 @@ import java.util.function.Predicate;
 import static net.borisshoes.borislib.BorisLib.LOGGER;
 import static org.apache.logging.log4j.Level.WARN;
 
+/**
+ * A comprehensive collection of utility methods for common Minecraft operations including block/item queries,
+ * entity management, attribute manipulation, teleportation, inventory operations, and combat utilities.
+ *
+ * <p>This class serves as a central repository for gameplay-related helper methods that don't fit
+ * into more specialized utility classes. Methods are organized into logical categories:
+ *
+ * <h3>Categories:</h3>
+ * <ul>
+ *   <li><b>Block Utilities</b> — Finding similar blocks, block queries</li>
+ *   <li><b>Item Utilities</b> — Dye items, tag queries, container operations</li>
+ *   <li><b>Entity Utilities</b> — Finding entities, closest entity calculations</li>
+ *   <li><b>Attribute Management</b> — Modifying entity attributes (health, absorption, etc.)</li>
+ *   <li><b>Inventory Operations</b> — Giving items, removing items, container manipulation</li>
+ *   <li><b>Teleportation</b> — Safe teleport spot finding, position validation</li>
+ *   <li><b>Enchantment Utilities</b> — Enchantment registry access and component creation</li>
+ *   <li><b>Visual & Display</b> — Dimension names, atlased textures</li>
+ *   <li><b>Combat Utilities</b> — Arrow damage, laser raycasting</li>
+ * </ul>
+ *
+ * <h3>Example Usage:</h3>
+ * <pre>{@code
+ * // Find similar blocks (all concrete colors)
+ * Set<Block> allConcrete = MinecraftUtils.getSimilarBlocks(Blocks.WHITE_CONCRETE);
+ *
+ * // Give items to player
+ * MinecraftUtils.giveStacks(player,
+ *     new ItemStack(Items.DIAMOND, 10),
+ *     new ItemStack(Items.EMERALD, 5));
+ *
+ * // Perform a lasercast
+ * LasercastResult result = MinecraftUtils.lasercast(
+ *     world, startPos, direction, 50.0, true, player);
+ * for (Entity hit : result.sortedHits()) {
+ *     // Process hits
+ * }
+ * }</pre>
+ *
+ * @see MathUtils For mathematical and geometric operations
+ * @see ItemModDataHandler For item data storage
+ * @see ItemContainerContentsMutable For mutable container operations
+ */
 public class MinecraftUtils {
    
+   /**
+    * Finds all blocks in the registry that have the same path as the base block.
+    *
+    * <p>This is useful for finding color variants of the same block type. For example,
+    * passing {@code Blocks.WHITE_CONCRETE} will return all 16 concrete color variants.
+    *
+    * @param baseBlock the base block to match against
+    * @return set of all blocks with matching paths (includes the base block itself)
+    */
    public static Set<Block> getSimilarBlocks(Block baseBlock){
       Set<Block> allowedBlocks = new HashSet<>();
       allowedBlocks.add(baseBlock);
@@ -75,14 +126,37 @@ public class MinecraftUtils {
       return allowedBlocks;
    }
    
+   /**
+    * Calculates a damage percentage based on arrow velocity.
+    *
+    * <p>Returns a value typically between 0 and 1, where 0.5 is minimum natural velocity
+    * and 1.0+ is full power. This is clamped between 0.5 and 10 for sanity.
+    *
+    * @param arrow the arrow entity
+    * @return the damage percentage (0.5-1.0 for natural shots)
+    * @see #getArrowPercentage(AbstractArrow, float) For custom minimum percentage
+    */
    public static float getArrowPercentage(AbstractArrow arrow){ // 0.5 is usually smallest natural value and 2.5-3 is usually largest natural value
       return getArrowPercentage(arrow, 0f);
    }
    
+   /**
+    * Calculates a damage percentage based on arrow velocity with a custom minimum.
+    *
+    * @param arrow the arrow entity
+    * @param minPercent the minimum percentage to return
+    * @return the damage percentage, at least minPercent
+    */
    public static float getArrowPercentage(AbstractArrow arrow, float minPercent){ // 0.5 is usually smallest natural value and 2.5-3 is usually largest natural value
       return Math.max(minPercent, ((float) Mth.clamp(arrow.getDeltaMovement().length(), 0.5, 10) - 0.5f) / 2.5f);
    }
    
+   /**
+    * Returns the vanilla dye item corresponding to a {@link DyeColor} enum value.
+    *
+    * @param color the dye color
+    * @return the corresponding dye item (e.g., {@link Items#RED_DYE})
+    */
    public static Item getVanillaDyeItem(DyeColor color){
       return switch(color){
          case WHITE -> Items.WHITE_DYE;
@@ -441,6 +515,53 @@ public class MinecraftUtils {
       return new Tuple<>(ItemContainerContents.fromItems(beltList), stack);
    }
    
+   /**
+    * Performs a comprehensive raycast that finds all entities hit by a beam, sorted by distance.
+    *
+    * <p>This method combines block raycasting with entity hitscan to find all living entities
+    * in the path of a beam. It uses an iterative approach to find multiple hits and includes
+    * a secondary check for entities that might be missed by the primary hitscan.
+    *
+    * <p>When {@code blockedByShields} is true, the beam can be blocked by players holding shields
+    * who are facing the beam direction (dot product < -0.6).
+    *
+    * <h3>Features:</h3>
+    * <ul>
+    *   <li>Finds all entities hit, not just the first</li>
+    *   <li>Sorted by distance from the entity parameter</li>
+    *   <li>Optional shield blocking</li>
+    *   <li>Automatic end-point adjustment when blocked</li>
+    *   <li>Iteration limit to prevent infinite loops</li>
+    * </ul>
+    *
+    * <h3>Example:</h3>
+    * <pre>{@code
+    * Vec3 start = player.getEyePosition();
+    * Vec3 direction = player.getLookAngle();
+    *
+    * LasercastResult result = MinecraftUtils.lasercast(
+    *     world, start, direction, 50.0, true, player);
+    *
+    * // Draw particles along the beam
+    * ParticleUtils.drawLine(world, result.startPos(), result.endPos(), ParticleTypes.FLAME);
+    *
+    * // Damage all hits
+    * for (Entity hit : result.sortedHits()) {
+    *     if (hit instanceof LivingEntity living) {
+    *         living.hurt(damageSource, 10.0f);
+    *     }
+    * }
+    * }</pre>
+    *
+    * @param world the level to raycast in
+    * @param startPos the starting position of the beam
+    * @param direction the direction vector (should be normalized)
+    * @param distance the maximum beam distance
+    * @param blockedByShields whether shields can block the beam
+    * @param entity the source entity (used for collision filtering and distance sorting)
+    * @return result containing start/end positions, direction, and sorted list of hit entities
+    * @see LasercastResult The result record containing all hit information
+    */
    public static LasercastResult lasercast(Level world, Vec3 startPos, Vec3 direction, double distance, boolean blockedByShields, Entity entity){
       Vec3 rayEnd = startPos.add(direction.scale(distance));
       BlockHitResult raycast = world.clip(new ClipContext(startPos, rayEnd, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity));
@@ -501,9 +622,31 @@ public class MinecraftUtils {
       return new LasercastResult(startPos, endPoint, direction, hits3);
    }
    
+   /**
+    * Result of a {@link #lasercast} operation containing all hit information.
+    *
+    * @param startPos the starting position of the beam
+    * @param endPos the ending position (may be shortened if blocked by shield or block)
+    * @param direction the beam direction vector
+    * @param sortedHits list of all entities hit, sorted by distance from source
+    */
    public record LasercastResult(Vec3 startPos, Vec3 endPos, Vec3 direction, List<Entity> sortedHits) {
    }
    
+   /**
+    * Retrieves or reconstructs a {@link ServerPlayer} from a {@link NameAndId} entry.
+    *
+    * <p>If the player is online, returns them directly. If offline, loads their data from
+    * disk and reconstructs a temporary ServerPlayer instance. This is useful for commands
+    * that need to work with offline players.
+    *
+    * <p><b>Warning:</b> The returned player instance for offline players should not be
+    * modified or added to the world. It's primarily for reading data.
+    *
+    * @param server the server instance
+    * @param playerEntry the player's name and ID
+    * @return the online or reconstructed player instance
+    */
    public static ServerPlayer getRequestedPlayer(MinecraftServer server, NameAndId playerEntry){
       ServerPlayer requestedPlayer = server.getPlayerList().getPlayerByName(playerEntry.name());
       

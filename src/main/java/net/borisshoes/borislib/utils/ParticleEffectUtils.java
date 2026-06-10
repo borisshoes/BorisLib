@@ -18,6 +18,31 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
+/**
+ * Utility methods for creating complex particle effects in Minecraft.
+ *
+ * <p>Provides helpers for spawning particle effects in various 3D shapes including:</p>
+ * <ul>
+ *    <li><b>Lightning bolts</b> — jagged lines with random deviation, optionally animated or tracked
+ *        to follow moving points.</li>
+ *    <li><b>Lines</b> — straight particle paths between two points, with support for long-distance
+ *        rendering.</li>
+ *    <li><b>Circles</b> — 2D rings on the XZ plane.</li>
+ *    <li><b>Spheres</b> — 3D spherical particle shells using Fibonacci sphere distribution.</li>
+ *    <li><b>Icosahedrons</b> — helper methods for generating the vertices and edges of icosahedron shapes.</li>
+ * </ul>
+ *
+ * <p>Many methods come in two variants:</p>
+ * <ul>
+ *    <li>Standard versions that use {@link ServerLevel#sendParticles}, limited by Minecraft's standard
+ *        view distance.</li>
+ *    <li>{@code longDist} versions that manually send particle packets to players, extending the
+ *        effective range based on the server's configured view distance.</li>
+ * </ul>
+ *
+ * <p>Animated effects use {@link GenericTimer} to schedule particle rendering over multiple ticks,
+ * creating smooth transitions or pulsing displays.</p>
+ */
 public class ParticleEffectUtils {
    
    public static final double PHI = (1 + Math.sqrt(5)) / 2.0;
@@ -323,6 +348,10 @@ public class ParticleEffectUtils {
    
    public static int adjustTime(int tick, double speedMod){
       return (int) (((int) (tick / speedMod)) * speedMod);
+   }
+   
+   public static double particleDensityCoeff(double radius){
+      return 1.1 * Math.pow(radius, 1.5);
    }
    
    public static List<Tuple<Vec3, Vec3>> getIcosahedronPairs(List<Vec3> icosPoints){

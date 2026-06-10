@@ -22,10 +22,24 @@ import java.util.*;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
+/**
+ * Global {@link StorableData} that holds every {@link ConditionInstance} currently applied to every
+ * entity on the server, keyed by entity UUID.
+ *
+ * <p>Registered under {@link #KEY} as a {@link DataKey.StorageScope#GLOBAL GLOBAL} key. The
+ * {@link net.borisshoes.borislib.callbacks.ServerTickCallback} drives this store every tick via
+ * {@link #tick(MinecraftServer)} to:</p>
+ * <ol>
+ *    <li>Advance and expire each instance's internal timer.</li>
+ *    <li>Fire {@link Condition#onTick} for each still-active condition type with its prevailing value.</li>
+ *    <li>Fire {@link Condition#onRemove} once for any condition type that just lost its last instance.</li>
+ * </ol>
+ */
 public class ConditionData implements StorableData {
    
    private final Map<UUID, ArrayList<ConditionInstance>> entityConditions = new HashMap<>();
    
+   /** Registered key for this global condition store. */
    public static final DataKey<ConditionData> KEY = DataRegistry.register(DataKey.ofGlobal(Identifier.fromNamespaceAndPath(MOD_ID, "condition_data"), ConditionData::new));
    
    @Override
@@ -71,18 +85,45 @@ public class ConditionData implements StorableData {
       tag.put("entities", entitiesList);
    }
    
+   /**
+    * Returns the (live, mutable) list of condition instances on an entity, creating an empty list if the
+    * entity has none yet. Mutating the returned list directly affects the store.
+    *
+    * @param entityId the entity UUID
+    * @return the entity's condition instance list
+    */
    public ArrayList<ConditionInstance> getConditions(UUID entityId){
       return entityConditions.computeIfAbsent(entityId, k -> new ArrayList<>());
    }
    
+   /**
+    * Drops every condition instance bound to a given entity.
+    *
+    * @param entityId the entity UUID to wipe
+    */
    public void removeEntity(UUID entityId){
       entityConditions.remove(entityId);
    }
    
+   /** @return the underlying map from entity UUID to that entity's condition instance list. */
    public Map<UUID, ArrayList<ConditionInstance>> getAllConditions(){
       return entityConditions;
    }
    
+   /**
+    * Advances every condition on every entity by one server tick.
+    *
+    * <p>For each entity:</p>
+    * <ol>
+    *    <li>Expired instances are removed.</li>
+    *    <li>Each remaining condition type's prevailing value is recomputed and {@link Condition#onTick} is
+    *        invoked.</li>
+    *    <li>Condition types that disappeared during this tick receive a single {@link Condition#onRemove}
+    *        call.</li>
+    * </ol>
+    *
+    * @param server the server instance ticking the data
+    */
    public void tick(MinecraftServer server){
       List<UUID> toRemove = new ArrayList<>();
       for(var entry : entityConditions.entrySet()){
@@ -136,4 +177,3 @@ public class ConditionData implements StorableData {
       }
    }
 }
-

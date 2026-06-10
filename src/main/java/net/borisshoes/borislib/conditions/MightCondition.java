@@ -11,6 +11,14 @@ import net.minecraft.world.entity.LivingEntity;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
+/**
+ * Built-in beneficial {@link Condition} that increases the affected entity's outgoing damage.
+ *
+ * <p>The prevailing value acts as a damage multiplier ({@code 1.0} = unchanged). The actual damage
+ * boost wiring is performed by the damage hook that reads this condition's prevailing value.</p>
+ *
+ * <p>Range: {@code [1, +∞)}; base {@code 1}.</p>
+ */
 public class MightCondition extends Condition {
    private static final SimpleParticleType PARTICLE = ParticleTypes.TRIAL_SPAWNER_DETECTED_PLAYER;
    

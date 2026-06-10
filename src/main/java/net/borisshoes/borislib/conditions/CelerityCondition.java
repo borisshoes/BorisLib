@@ -15,6 +15,16 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
+/**
+ * Built-in beneficial {@link Condition} that increases the affected entity's
+ * {@link net.minecraft.world.entity.ai.attributes.Attributes#MOVEMENT_SPEED} attribute.
+ *
+ * <p>The prevailing value is applied as a base-multiplier modifier
+ * ({@link AttributeModifier.Operation#ADD_MULTIPLIED_BASE}). A light blue dust particle is emitted on apply
+ * and intermittently during {@link #onTick}.</p>
+ *
+ * <p>Range: {@code [0, +∞)}; base {@code 0}.</p>
+ */
 public class CelerityCondition extends Condition{
    private static final DustParticleOptions PARTICLE = new DustParticleOptions(0xA1E1F5, 0.75f);
    

@@ -10,6 +10,15 @@ import net.minecraft.world.entity.LivingEntity;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
+/**
+ * Built-in beneficial {@link Condition} that reduces incoming damage to the affected entity.
+ *
+ * <p>Uses {@linkplain Condition#isReversedImportance() reversed importance}: the prevailing value is a
+ * multiplier in {@code [0, 1]} where lower means more damage reduction. The actual damage-reduction wiring
+ * is performed in the mixin / damage hook that reads this condition's prevailing value.</p>
+ *
+ * <p>Range: {@code [0, 1]}; base {@code 1}.</p>
+ */
 public class FortitudeCondition extends Condition {
    private static final SimpleParticleType PARTICLE = ParticleTypes.FALLING_OBSIDIAN_TEAR;
    
