@@ -18,28 +18,21 @@ import net.minecraft.world.level.pathfinder.WalkNodeEvaluator;
 import java.util.ArrayList;
 
 /**
- * Helper class for generating safe spawn locations in a Minecraft world.
+ * Helper class for calculating and validating potential spawn locations in 2D and 3D space.
  *
- * <p>A {@code SpawnPile} represents a 2D position (x, z coordinate pair) and provides utilities for:</p>
- * <ul>
- *    <li>Finding the surface Y-coordinate at that (x, z) position.</li>
- *    <li>Checking if the location is safe for entity spawning (not blocked by hazards like lava, cacti,
- *        wither roses, etc.).</li>
- *    <li>Batch-generating multiple spawn locations within a range around a center point, optionally
- *        filtering for safe spawns.</li>
- * </ul>
- *
- * <p>The static {@link #makeSpawnLocations} methods are typically the main entry points.</p>
+ * <p>Used to find safe ground positions, distribute entity spawns, and perform vector-like
+ * operations on horizontal coordinates.
  */
 public class SpawnPile {
+   /** Horizontal X coordinate. */
    double x;
+   /** Horizontal Z coordinate. */
    double z;
    
    /**
-    * Constructs a new spawn pile at the given (x, z) coordinates.
-    *
-    * @param x the x-coordinate
-    * @param z the z-coordinate
+    * Creates a new spawn pile at the specified coordinates.
+    * @param x the x coordinate
+    * @param z the z coordinate
     */
    public SpawnPile(double x, double z){
       this.x = x;
@@ -47,10 +40,9 @@ public class SpawnPile {
    }
    
    /**
-    * Computes the Euclidean distance to another spawn pile in 2D (ignores Y coordinate).
-    *
+    * Calculates the Euclidean distance between this pile and another.
     * @param other the other pile
-    * @return the distance in blocks
+    * @return the horizontal distance
     */
    double getDistance(SpawnPile other){
       double d = this.x - other.x;
@@ -59,7 +51,7 @@ public class SpawnPile {
    }
    
    /**
-    * Normalizes this pile's (x, z) vector to unit length in place.
+    * Normalizes the horizontal coordinates so the vector length is 1.0.
     */
    void normalize(){
       double d = this.absolute();
@@ -68,15 +60,15 @@ public class SpawnPile {
    }
    
    /**
-    * @return the magnitude (length) of this pile's (x, z) vector
+    * Returns the horizontal distance from (0,0).
+    * @return the absolute distance
     */
    double absolute(){
       return Math.sqrt(this.x * this.x + this.z * this.z);
    }
    
    /**
-    * Subtracts another pile's (x, z) coordinates from this pile's coordinates in place.
-    *
+    * Subtracts coordinates of another pile from this one.
     * @param other the pile to subtract
     */
    public void subtract(SpawnPile other){
@@ -85,13 +77,12 @@ public class SpawnPile {
    }
    
    /**
-    * Clamps this pile's coordinates to the specified 2D bounding box.
-    *
-    * @param minX the minimum x
-    * @param minZ the minimum z
-    * @param maxX the maximum x
-    * @param maxZ the maximum z
-    * @return {@code true} if at least one coordinate was clamped
+    * Clamps the pile's coordinates within the specified bounds.
+    * @param minX minimum X
+    * @param minZ minimum Z
+    * @param maxX maximum X
+    * @param maxZ maximum Z
+    * @return {@code true} if any coordinate was changed
     */
    public boolean clamp(double minX, double minZ, double maxX, double maxZ){
       boolean bl = false;
@@ -113,15 +104,16 @@ public class SpawnPile {
    }
    
    /**
-    * Finds the surface Y-coordinate at the given (x, z) location. The surface is defined as the first
-    * solid block encountered when scanning downward from {@code maxY}, where the two blocks above it
-    * are both air.
+    * Finds the Y coordinate of the highest solid surface at a given position.
     *
-    * @param blockView the world or region to scan
-    * @param maxY      the starting Y coordinate for the downward scan
-    * @param x         the x coordinate
-    * @param z         the z coordinate
-    * @return the Y coordinate of the surface, or {@code maxY + 1} if no valid surface is found
+    * <p>Searches downwards from {@code maxY} looking for a solid block with at least
+    * two air blocks above it.
+    *
+    * @param blockView the world access
+    * @param maxY starting height for the search
+    * @param x target X
+    * @param z target Z
+    * @return the surface Y coordinate
     */
    public static int getSurfaceY(BlockGetter blockView, int maxY, int x, int z){
       BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos(x, (double) (maxY + 1), z);
@@ -141,17 +133,16 @@ public class SpawnPile {
    }
    
    /**
-    * Generates a list of spawn locations within the specified range around a center point. Uses the
-    * entity type's natural spawn constraints.
+    * Finds an appropriate spawn position for an entity type at the specified horizontal coordinates.
     *
-    * @param num        the number of spawn positions to generate
-    * @param range      the horizontal radius in blocks
-    * @param world      the server level
-    * @param entityType the type of entity being spawned (determines spawn-type constraints)
-    * @param center     the center position
-    * @return a list of block positions suitable for spawning the given entity type
+    * @param world the level
+    * @param entityType the type of entity to spawn
+    * @param x target X
+    * @param z target Z
+    * @param ignoreRestrictions whether to skip vanilla spawn rule checks
+    * @return a potential spawn BlockPos
     */
-   public static ArrayList<BlockPos> makeSpawnLocations(int num, int range, ServerLevel world, EntityType<?> entityType, BlockPos center){
+   private static BlockPos getEntitySpawnPos(Level world, EntityType<?> entityType, int x, int z, boolean ignoreRestrictions){
       //int i = world.getTopY(SpawnRestriction.getHeightmapType(entityType), x, z);
       int i = world.getMaxY();
       BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos(x, i, z);
@@ -174,6 +165,16 @@ public class SpawnPile {
       
    }
    
+   /**
+    * Generates a list of valid spawn locations for a specific entity type around a center point.
+    *
+    * @param num number of locations to find
+    * @param range maximum horizontal distance from center
+    * @param world the level
+    * @param entityType the entity type
+    * @param center center point of the search area
+    * @return a list of found BlockPos
+    */
    public static ArrayList<BlockPos> makeSpawnLocations(int num, int range, ServerLevel world, EntityType<?> entityType, BlockPos center){
       ArrayList<BlockPos> positions = new ArrayList<>();
       for(int i = 0; i < num; i++){
@@ -191,12 +192,10 @@ public class SpawnPile {
    }
    
    /**
-    * Finds the surface Y-coordinate at this pile's (x, z) position using the same surface-detection
-    * logic as {@link #getSurfaceY(BlockGetter, int, int, int)}.
-    *
-    * @param blockView the world or region to scan
-    * @param maxY      the starting Y coordinate for downward scan
-    * @return the Y coordinate of the surface, or {@code maxY + 1} if no valid surface found
+    * Gets the surface Y coordinate at this pile's horizontal position.
+    * @param blockView the world access
+    * @param maxY search start height
+    * @return the surface Y
     */
    public int getY(BlockGetter blockView, int maxY){
       BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos(this.x, (double) (maxY + 1), this.z);
@@ -216,13 +215,18 @@ public class SpawnPile {
    }
    
    /**
-    * Checks whether this pile's location is safe for entity spawning. A location is unsafe if the
-    * surface block is a hazard (wither rose, cactus, powder snow, lava, etc.) or is outside the
-    * valid Y range.
+    * Checks if the ground at this pile's position is safe for mob spawning.
     *
-    * @param world the world to check
-    * @param maxY  the maximum Y bound
-    * @return {@code true} if this location is safe for spawning
+    * <p>Verifies:
+    * <ul>
+    *    <li>Position is below maxY</li>
+    *    <li>Not inside a fluid</li>
+    *    <li>Not on damaging/preventative blocks (Wither Rose, Cactus, Sweet Berry, etc.)</li>
+    * </ul>
+    *
+    * @param world the world access
+    * @param maxY maximum allowed height
+    * @return {@code true} if position is considered safe
     */
    public boolean isSafe(BlockGetter world, int maxY){
       BlockPos blockPos = BlockPos.containing(this.x, (double) (this.getY(world, maxY) - 1), this.z);
@@ -233,13 +237,12 @@ public class SpawnPile {
    }
    
    /**
-    * Sets this pile's coordinates to a random position within the specified bounding box.
-    *
-    * @param random the random source
-    * @param minX   the minimum x
-    * @param minZ   the minimum z
-    * @param maxX   the maximum x
-    * @param maxZ   the maximum z
+    * Sets the pile to a random location within the given bounds.
+    * @param random source of randomness
+    * @param minX min X
+    * @param minZ min Z
+    * @param maxX max X
+    * @param maxZ max Z
     */
    public void setPileLocation(RandomSource random, double minX, double minZ, double maxX, double maxZ){
       this.x = Mth.nextDouble(random, minX, maxX);
@@ -247,40 +250,30 @@ public class SpawnPile {
    }
    
    /**
-    * Generates spawn locations around the origin (0, 0, 0).
-    *
-    * @param num   the number of spawn positions to generate
-    * @param range the horizontal radius in blocks
-    * @param world the server level
-    * @return a list of safe spawn positions
+    * Generates valid spawn locations around (0,0,0).
+    * @see #makeSpawnLocations(int, int, ServerLevel, BlockPos)
     */
    public static ArrayList<BlockPos> makeSpawnLocations(int num, int range, ServerLevel world){
       return makeSpawnLocations(num, range, world, new BlockPos(0, 0, 0));
    }
    
    /**
-    * Generates spawn locations around the specified center with a default max Y of 128.
-    *
-    * @param num    the number of spawn positions to generate
-    * @param range  the horizontal radius in blocks
-    * @param world  the server level
-    * @param center the center position
-    * @return a list of safe spawn positions
+    * Generates valid spawn locations around a center point with default maxY (128).
+    * @see #makeSpawnLocations(int, int, int, ServerLevel, BlockPos)
     */
    public static ArrayList<BlockPos> makeSpawnLocations(int num, int range, ServerLevel world, BlockPos center){
       return makeSpawnLocations(num, range, 128, world, center);
    }
    
    /**
-    * Generates spawn locations around the specified center, filtering for safety. This is the most
-    * configurable overload, allowing you to specify the max Y limit and center position.
+    * Generates a specific number of safe spawn locations within a range.
     *
-    * @param num    the number of spawn positions to generate
-    * @param range  the horizontal radius in blocks
-    * @param maxY   the maximum Y coordinate for the search
-    * @param world  the server level
-    * @param center the center position
-    * @return a list of safe spawn positions (attempts up to 10,000 tries per position)
+    * @param num number of locations to find
+    * @param range horizontal range from center
+    * @param maxY maximum allowed spawn height
+    * @param world the level
+    * @param center center point
+    * @return valid spawn positions
     */
    public static ArrayList<BlockPos> makeSpawnLocations(int num, int range, int maxY, ServerLevel world, BlockPos center){
       ArrayList<BlockPos> positions = new ArrayList<>();

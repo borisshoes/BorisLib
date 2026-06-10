@@ -199,6 +199,13 @@ public class MinecraftUtils {
             .orElse(null);
    }
    
+   /**
+    * Finds all online players whose names start with the current command input.
+    *
+    * @param context the command context
+    * @param builder the suggestions builder
+    * @return a future containing player name suggestions
+    */
    public static CompletableFuture<Suggestions> getPlayerSuggestions(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder){
       String start = builder.getRemaining().toLowerCase(Locale.ROOT);
       Set<String> items = new HashSet<>();
@@ -207,6 +214,12 @@ public class MinecraftUtils {
       return builder.buildFuture();
    }
    
+   /**
+    * Parses a string as either an item (namespace:path) or a tag (#namespace:path).
+    *
+    * @param str the input string
+    * @return an Either containing the Item (left) or TagKey (right), or null if invalid
+    */
    public static Either<Item, TagKey<Item>> parseItemOrTag(String str){
       if(str.startsWith("#")){ // It's a tag
          Identifier tagLoc = Identifier.parse(str.substring(1));
@@ -219,18 +232,37 @@ public class MinecraftUtils {
       }
    }
    
+   /**
+    * Creates a text component displaying the item's texture from the item atlas.
+    *
+    * @param item the item
+    * @return a text component with the texture
+    */
    public static MutableComponent getAtlasedTexture(Item item){
       Identifier id = BuiltInRegistries.ITEM.getResourceKey(item).get().identifier();
       Identifier newId = Identifier.fromNamespaceAndPath(id.getNamespace(), "item/" + id.getPath());
       return Component.object(new AtlasSprite(AtlasIds.ITEMS, newId));
    }
    
+   /**
+    * Creates a text component displaying the block's texture from the block atlas.
+    *
+    * @param block the block
+    * @return a text component with the texture
+    */
    public static MutableComponent getAtlasedTexture(Block block){
       Identifier id = BuiltInRegistries.BLOCK.getResourceKey(block).get().identifier();
       Identifier newId = Identifier.fromNamespaceAndPath(id.getNamespace(), "block/" + id.getPath());
       return Component.object(new AtlasSprite(AtlasIds.BLOCKS, newId));
    }
    
+   /**
+    * Creates a text component displaying a texture from a custom atlas.
+    *
+    * @param atlas identifier for the atlas
+    * @param rawId identifier for the texture
+    * @return a text component with the texture
+    */
    public static MutableComponent getAtlasedTexture(Identifier atlas, Identifier rawId){
       return Component.object(new AtlasSprite(atlas, rawId));
    }
@@ -285,6 +317,14 @@ public class MinecraftUtils {
       return null;
    }
    
+   /**
+    * Checks if an entity would have solid ground support at the target position.
+    *
+    * @param world the level
+    * @param entity the entity type to check for
+    * @param targetPos the position to test
+    * @return {@code true} if supported by blocks
+    */
    public static boolean hasGroundSupport(Level world, Entity entity, Vec3 targetPos){
       Vec3 delta = targetPos.subtract(entity.position());
       AABB targetBox = entity.getBoundingBox().move(delta);
@@ -293,12 +333,29 @@ public class MinecraftUtils {
       return world.getBlockCollisions(entity, floorProbe).iterator().hasNext();
    }
    
+   /**
+    * Checks if the specified space is clear of collisions for the entity.
+    *
+    * @param entity the entity to check
+    * @param world the level
+    * @param targetPos the center position
+    * @param checkFluid whether fluids count as collisions
+    * @return {@code true} if clear
+    */
    public static boolean isSpaceClearFor(Entity entity, Level world, Vec3 targetPos, boolean checkFluid){
       Vec3 delta = targetPos.subtract(entity.position());
       AABB targetBox = entity.getBoundingBox().move(delta);
       return world.noCollision(entity, targetBox, checkFluid);
    }
    
+   /**
+    * Finds the entity in the list closest to the target position.
+    *
+    * @param list the entities to search
+    * @param pos the target position
+    * @param <T> entity type
+    * @return the closest entity, or null if list is empty
+    */
    public static <T extends Entity> T getClosestEntity(List<T> list, Vec3 pos){
       T closest = null;
       double smallestDist = Double.MAX_VALUE;
@@ -311,6 +368,12 @@ public class MinecraftUtils {
       return closest;
    }
    
+   /**
+    * Finds the ItemEntity with the largest stack count in the list.
+    *
+    * @param list item entities to search
+    * @return the largest ItemEntity, or null
+    */
    public static ItemEntity getLargestItemEntity(List<ItemEntity> list){
       ItemEntity largest = null;
       double largestNumber = 0;
@@ -324,6 +387,13 @@ public class MinecraftUtils {
       return largest;
    }
    
+   /**
+    * Reduces the amount of max absorption added by a specific modifier ID.
+    *
+    * @param entity the entity
+    * @param id modifier identifier
+    * @param amount amount to remove
+    */
    public static void removeMaxAbsorption(LivingEntity entity, Identifier id, float amount){
       AttributeMap attributeContainer = entity.getAttributes();
       AttributeInstance entityAttributeInstance = attributeContainer.getInstance(Attributes.MAX_ABSORPTION);
@@ -340,6 +410,13 @@ public class MinecraftUtils {
       }
    }
    
+   /**
+    * Increases or adds a max absorption modifier to an entity.
+    *
+    * @param entity the entity
+    * @param id modifier identifier
+    * @param amount amount to add
+    */
    public static void addMaxAbsorption(LivingEntity entity, Identifier id, double amount){
       AttributeMap attributeContainer = entity.getAttributes();
       AttributeModifier modifier = new AttributeModifier(id, amount, AttributeModifier.Operation.ADD_VALUE);
@@ -374,6 +451,12 @@ public class MinecraftUtils {
       return opt.orElse(null);
    }
    
+   /**
+    * Creates an immutable ItemEnchantments component from a list of instances.
+    *
+    * @param entries the enchantments to include
+    * @return the enchantment component
+    */
    public static ItemEnchantments makeEnchantComponent(EnchantmentInstance... entries){
       ItemEnchantments.Mutable builder = new ItemEnchantments.Mutable(ItemEnchantments.EMPTY);
       
@@ -384,10 +467,22 @@ public class MinecraftUtils {
       return builder.toImmutable();
    }
    
+   /**
+    * Disperses item stacks to a player, attempting to add to inventory first then dropping.
+    *
+    * @param player the recipient
+    * @param stacks stacks to give
+    */
    public static void giveStacks(Player player, ItemStack... stacks){
       returnItems(new SimpleContainer(stacks), player);
    }
    
+   /**
+    * Returns all items from a container to the player's inventory or drops them.
+    *
+    * @param inv source container
+    * @param player recipient player
+    */
    public static void returnItems(Container inv, Player player){
       if(inv == null) return;
       for(int i = 0; i < inv.getContainerSize(); i++){
@@ -414,6 +509,14 @@ public class MinecraftUtils {
       }
    }
    
+   /**
+    * Attempts to remove a specific amount of an item from a player's inventory.
+    *
+    * @param player the player
+    * @param item the item type
+    * @param count number of items to remove
+    * @return {@code true} if sufficient items were found and removed
+    */
    public static boolean removeItems(Player player, Item item, int count){
       if(player.isCreative()) return true;
       int remaining = count;
@@ -441,6 +544,13 @@ public class MinecraftUtils {
       return true;
    }
    
+   /**
+    * Searches an item's container component (e.g. Bundle) for matches of an item type.
+    *
+    * @param container the item with a container component
+    * @param item item type to match
+    * @return list of matching templates
+    */
    public static List<ItemStackTemplate> getMatchingItemsFromContainerComp(ItemStack container, Item item){
       ItemContainerContents containerItems = container.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY);
       ArrayList<ItemStackTemplate> items = new ArrayList<>();
@@ -452,6 +562,16 @@ public class MinecraftUtils {
       return items;
    }
    
+   /**
+    * Adds or removes a transient attribute modifier.
+    *
+    * @param livingEntity the entity
+    * @param attribute target attribute
+    * @param value modifier value
+    * @param operation modifier operation
+    * @param identifier modifier ID
+    * @param remove whether to remove instead of add
+    */
    public static void attributeEffect(LivingEntity livingEntity, Holder<Attribute> attribute, double value, AttributeModifier.Operation operation, Identifier identifier, boolean remove){
       boolean hasMod = livingEntity.getAttributes().hasModifier(attribute, identifier);
       if(hasMod && remove){ // Remove the modifier
@@ -465,6 +585,16 @@ public class MinecraftUtils {
       }
    }
    
+   /**
+    * Updates an existing transient attribute modifier or adds it if missing.
+    *
+    * @param livingEntity the entity
+    * @param attribute target attribute
+    * @param value new value
+    * @param operation modifier operation
+    * @param identifier modifier ID
+    * @param upsert whether to add if not present
+    */
    public static void updateAttributeEffect(LivingEntity livingEntity, Holder<Attribute> attribute, double value, AttributeModifier.Operation operation, Identifier identifier, boolean upsert){
       boolean hasMod = livingEntity.getAttributes().hasModifier(attribute, identifier);
       if(!hasMod){
@@ -481,6 +611,14 @@ public class MinecraftUtils {
       livingEntity.getAttributes().addTransientAttributeModifiers(map);
    }
    
+   /**
+    * Logic for attempting to add an item stack to a container component.
+    *
+    * @param container existing container contents
+    * @param size max slots
+    * @param stack stack to add
+    * @return a tuple containing updated contents and any remaining stack
+    */
    public static Tuple<ItemContainerContents, ItemStack> tryAddStackToContainerComp(ItemContainerContents container, int size, ItemStack stack){
       List<ItemStack> beltList = new ArrayList<>(container.allItemsCopyStream().toList());
       
@@ -586,21 +724,21 @@ public class MinecraftUtils {
          }
          iterations++;
       }while(entityHit != null && entityHit.getType() == HitResult.Type.ENTITY && iterations < maxIterations);
-      
+
       if(iterations >= maxIterations){
          LOGGER.warn("Lasercast hit iteration limit ({}) at pos {} direction {} - possible infinite loop prevented", maxIterations, startPos, direction);
       }
-      
+
       // Secondary hitscan check to add lenience
       List<Entity> hits2 = world.getEntities(entity, box, (e) -> e instanceof LivingEntity && !e.isSpectator() && !hitSet.contains(e) && MathUtils.hitboxRaycast(e, startPos, raycast.getLocation()));
       hits.addAll(hits2);
       hitSet.addAll(hits2);
       hits.sort(Comparator.comparingDouble(e -> e.distanceTo(entity)));
-      
+
       if(!blockedByShields){
          return new LasercastResult(startPos, raycast.getLocation(), direction, hits);
       }
-      
+
       List<Entity> hits3 = new ArrayList<>();
       Vec3 endPoint = raycast.getLocation();
       for(Entity hit : hits){
@@ -618,10 +756,10 @@ public class MinecraftUtils {
             break;
          }
       }
-      
+
       return new LasercastResult(startPos, endPoint, direction, hits3);
    }
-   
+
    /**
     * Result of a {@link #lasercast} operation containing all hit information.
     *
@@ -632,7 +770,7 @@ public class MinecraftUtils {
     */
    public record LasercastResult(Vec3 startPos, Vec3 endPos, Vec3 direction, List<Entity> sortedHits) {
    }
-   
+
    /**
     * Retrieves or reconstructs a {@link ServerPlayer} from a {@link NameAndId} entry.
     *
@@ -649,7 +787,7 @@ public class MinecraftUtils {
     */
    public static ServerPlayer getRequestedPlayer(MinecraftServer server, NameAndId playerEntry){
       ServerPlayer requestedPlayer = server.getPlayerList().getPlayerByName(playerEntry.name());
-      
+
       if(requestedPlayer == null){
          requestedPlayer = new ServerPlayer(server, server.overworld(), new GameProfile(playerEntry.id(), playerEntry.name()), ClientInformation.createDefault());
          Optional<ValueInput> readViewOpt = server
@@ -657,11 +795,11 @@ public class MinecraftUtils {
                .loadPlayerData(playerEntry)
                .map(playerData -> TagValueInput.create(new ProblemReporter.ScopedCollector(LogUtils.getLogger()), server.registryAccess(), playerData));
          readViewOpt.ifPresent(requestedPlayer::load);
-         
+
          if(readViewOpt.isPresent()){
             ValueInput readView = readViewOpt.get();
             Optional<String> dimension = readView.getString("Dimension");
-            
+
             if(dimension.isPresent()){
                ServerLevel world = server.getLevel(ResourceKey.create(Registries.DIMENSION, Identifier.tryParse(dimension.get())));
                if(world != null) ((EntityAccessor) requestedPlayer).callSetLevel(world);
@@ -670,7 +808,7 @@ public class MinecraftUtils {
       }
       return requestedPlayer;
    }
-   
+
    public static boolean removeItemEntities(ServerLevel serverWorld, AABB area, Predicate<ItemStack> predicate, int count){
       List<ItemEntity> entities = serverWorld.getEntitiesOfClass(ItemEntity.class, area, entity -> predicate.test(entity.getItem()));
       int foundCount = 0;
