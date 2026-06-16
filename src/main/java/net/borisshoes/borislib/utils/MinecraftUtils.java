@@ -32,7 +32,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.Mth;
 import net.minecraft.util.ProblemReporter;
-import net.minecraft.util.Tuple;
+import com.mojang.datafixers.util.Pair;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.Entity;
@@ -51,6 +51,7 @@ import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.ColorCollection;
 import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.phys.*;
@@ -151,33 +152,6 @@ public class MinecraftUtils {
       return Math.max(minPercent, ((float) Mth.clamp(arrow.getDeltaMovement().length(), 0.5, 10) - 0.5f) / 2.5f);
    }
    
-   /**
-    * Returns the vanilla dye item corresponding to a {@link DyeColor} enum value.
-    *
-    * @param color the dye color
-    * @return the corresponding dye item (e.g., {@link Items#RED_DYE})
-    */
-   public static Item getVanillaDyeItem(DyeColor color){
-      return switch(color){
-         case WHITE -> Items.WHITE_DYE;
-         case ORANGE -> Items.ORANGE_DYE;
-         case MAGENTA -> Items.MAGENTA_DYE;
-         case LIGHT_BLUE -> Items.LIGHT_BLUE_DYE;
-         case YELLOW -> Items.YELLOW_DYE;
-         case LIME -> Items.LIME_DYE;
-         case PINK -> Items.PINK_DYE;
-         case GRAY -> Items.GRAY_DYE;
-         case LIGHT_GRAY -> Items.LIGHT_GRAY_DYE;
-         case CYAN -> Items.CYAN_DYE;
-         case PURPLE -> Items.PURPLE_DYE;
-         case BLUE -> Items.BLUE_DYE;
-         case BROWN -> Items.BROWN_DYE;
-         case GREEN -> Items.GREEN_DYE;
-         case RED -> Items.RED_DYE;
-         case BLACK -> Items.BLACK_DYE;
-      };
-   }
-   
    public static LivingEntity findLivingEntity(MinecraftServer server, UUID entityId){
       for(ServerLevel level : server.getAllLevels()){
          Entity entity = level.getEntity(entityId);
@@ -265,18 +239,6 @@ public class MinecraftUtils {
     */
    public static MutableComponent getAtlasedTexture(Identifier atlas, Identifier rawId){
       return Component.object(new AtlasSprite(atlas, rawId));
-   }
-   
-   public static MutableComponent getFormattedDimName(ResourceKey<Level> worldKey){
-      if(worldKey.identifier().toString().equals(ServerLevel.OVERWORLD.identifier().toString())){
-         return Component.literal("Overworld").withStyle(ChatFormatting.GREEN);
-      }else if(worldKey.identifier().toString().equals(ServerLevel.NETHER.identifier().toString())){
-         return Component.literal("The Nether").withStyle(ChatFormatting.RED);
-      }else if(worldKey.identifier().toString().equals(ServerLevel.END.identifier().toString())){
-         return Component.literal("The End").withStyle(ChatFormatting.DARK_PURPLE);
-      }else{
-         return Component.literal(worldKey.identifier().toString()).withStyle(ChatFormatting.YELLOW);
-      }
    }
    
    private Vec3 findSafeTeleportSpot(ServerPlayer user, double maxRange, double minRange, double leniencyRange, double distStep, double radialStep, double dropStep, boolean checkFluid){
@@ -619,7 +581,7 @@ public class MinecraftUtils {
     * @param stack stack to add
     * @return a tuple containing updated contents and any remaining stack
     */
-   public static Tuple<ItemContainerContents, ItemStack> tryAddStackToContainerComp(ItemContainerContents container, int size, ItemStack stack){
+   public static Pair<ItemContainerContents, ItemStack> tryAddStackToContainerComp(ItemContainerContents container, int size, ItemStack stack){
       List<ItemStack> beltList = new ArrayList<>(container.allItemsCopyStream().toList());
       
       // Fill up existing slots first
@@ -650,7 +612,7 @@ public class MinecraftUtils {
             }
          }
       }
-      return new Tuple<>(ItemContainerContents.fromItems(beltList), stack);
+      return Pair.of(ItemContainerContents.fromItems(beltList), stack);
    }
    
    /**

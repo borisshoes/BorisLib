@@ -5,6 +5,7 @@ import eu.pb4.sgui.api.elements.GuiElementBuilder;
 import eu.pb4.sgui.api.gui.SimpleGui;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextColor;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.ItemStack;
@@ -52,15 +53,15 @@ public abstract class PagedGuiBase extends SimpleGui {
    protected int pageNum = 1;
    
    /** Default colour applied to a control element's primary line (its title). */
-   protected int primaryTextColor = ChatFormatting.DARK_PURPLE.getColor().intValue();
+   protected int primaryTextColor = TextColor.DARK_PURPLE.getValue();
    /** Default colour applied to secondary / hint lines. */
-   protected int secondaryTextColor = ChatFormatting.LIGHT_PURPLE.getColor().intValue();
+   protected int secondaryTextColor = TextColor.LIGHT_PURPLE.getValue();
    /** Default colour applied to the "left click" action hint. */
-   protected int action1TextColor = ChatFormatting.AQUA.getColor().intValue();
+   protected int action1TextColor = TextColor.AQUA.getValue();
    /** Default colour applied to the "right click" action hint. */
-   protected int action2TextColor = ChatFormatting.GREEN.getColor().intValue();
+   protected int action2TextColor = TextColor.GREEN.getValue();
    /** Default colour applied to the "shift click" action hint. */
-   protected int action3TextColor = ChatFormatting.YELLOW.getColor().intValue();
+   protected int action3TextColor = TextColor.YELLOW.getValue();
    
    /** Callback fired when the user clicks the next-page button. */
    protected Consumer<ClickType> pageUpFunction;

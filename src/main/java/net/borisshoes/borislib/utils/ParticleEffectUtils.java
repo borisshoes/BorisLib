@@ -1,5 +1,6 @@
 package net.borisshoes.borislib.utils;
 
+import com.mojang.datafixers.util.Pair;
 import net.borisshoes.borislib.BorisLib;
 import net.borisshoes.borislib.timers.GenericTimer;
 import net.minecraft.core.particles.ParticleOptions;
@@ -7,7 +8,6 @@ import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
-import net.minecraft.util.Tuple;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
@@ -354,38 +354,38 @@ public class ParticleEffectUtils {
       return 1.1 * Math.pow(radius, 1.5);
    }
    
-   public static List<Tuple<Vec3, Vec3>> getIcosahedronPairs(List<Vec3> icosPoints){
-      List<Tuple<Vec3, Vec3>> icosOutlines = new ArrayList<>();
-      icosOutlines.add(new Tuple<>(icosPoints.get(0), icosPoints.get(1)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(0), icosPoints.get(4)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(0), icosPoints.get(7)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(0), icosPoints.get(8)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(0), icosPoints.get(11)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(9), icosPoints.get(2)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(9), icosPoints.get(3)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(9), icosPoints.get(4)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(9), icosPoints.get(5)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(9), icosPoints.get(8)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(10), icosPoints.get(7)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(10), icosPoints.get(3)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(10), icosPoints.get(6)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(10), icosPoints.get(11)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(10), icosPoints.get(2)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(4), icosPoints.get(8)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(4), icosPoints.get(7)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(4), icosPoints.get(3)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(7), icosPoints.get(3)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(3), icosPoints.get(2)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(6), icosPoints.get(2)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(6), icosPoints.get(1)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(6), icosPoints.get(11)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(6), icosPoints.get(5)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(7), icosPoints.get(11)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(2), icosPoints.get(5)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(1), icosPoints.get(5)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(8), icosPoints.get(5)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(1), icosPoints.get(11)));
-      icosOutlines.add(new Tuple<>(icosPoints.get(1), icosPoints.get(8)));
+   public static List<Pair<Vec3, Vec3>> getIcosahedronPairs(List<Vec3> icosPoints){
+      List<Pair<Vec3, Vec3>> icosOutlines = new ArrayList<>();
+      icosOutlines.add(Pair.of(icosPoints.get(0), icosPoints.get(1)));
+      icosOutlines.add(Pair.of(icosPoints.get(0), icosPoints.get(4)));
+      icosOutlines.add(Pair.of(icosPoints.get(0), icosPoints.get(7)));
+      icosOutlines.add(Pair.of(icosPoints.get(0), icosPoints.get(8)));
+      icosOutlines.add(Pair.of(icosPoints.get(0), icosPoints.get(11)));
+      icosOutlines.add(Pair.of(icosPoints.get(9), icosPoints.get(2)));
+      icosOutlines.add(Pair.of(icosPoints.get(9), icosPoints.get(3)));
+      icosOutlines.add(Pair.of(icosPoints.get(9), icosPoints.get(4)));
+      icosOutlines.add(Pair.of(icosPoints.get(9), icosPoints.get(5)));
+      icosOutlines.add(Pair.of(icosPoints.get(9), icosPoints.get(8)));
+      icosOutlines.add(Pair.of(icosPoints.get(10), icosPoints.get(7)));
+      icosOutlines.add(Pair.of(icosPoints.get(10), icosPoints.get(3)));
+      icosOutlines.add(Pair.of(icosPoints.get(10), icosPoints.get(6)));
+      icosOutlines.add(Pair.of(icosPoints.get(10), icosPoints.get(11)));
+      icosOutlines.add(Pair.of(icosPoints.get(10), icosPoints.get(2)));
+      icosOutlines.add(Pair.of(icosPoints.get(4), icosPoints.get(8)));
+      icosOutlines.add(Pair.of(icosPoints.get(4), icosPoints.get(7)));
+      icosOutlines.add(Pair.of(icosPoints.get(4), icosPoints.get(3)));
+      icosOutlines.add(Pair.of(icosPoints.get(7), icosPoints.get(3)));
+      icosOutlines.add(Pair.of(icosPoints.get(3), icosPoints.get(2)));
+      icosOutlines.add(Pair.of(icosPoints.get(6), icosPoints.get(2)));
+      icosOutlines.add(Pair.of(icosPoints.get(6), icosPoints.get(1)));
+      icosOutlines.add(Pair.of(icosPoints.get(6), icosPoints.get(11)));
+      icosOutlines.add(Pair.of(icosPoints.get(6), icosPoints.get(5)));
+      icosOutlines.add(Pair.of(icosPoints.get(7), icosPoints.get(11)));
+      icosOutlines.add(Pair.of(icosPoints.get(2), icosPoints.get(5)));
+      icosOutlines.add(Pair.of(icosPoints.get(1), icosPoints.get(5)));
+      icosOutlines.add(Pair.of(icosPoints.get(8), icosPoints.get(5)));
+      icosOutlines.add(Pair.of(icosPoints.get(1), icosPoints.get(11)));
+      icosOutlines.add(Pair.of(icosPoints.get(1), icosPoints.get(8)));
       return icosOutlines;
    }
    

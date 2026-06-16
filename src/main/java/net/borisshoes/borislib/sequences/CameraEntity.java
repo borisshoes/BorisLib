@@ -60,7 +60,7 @@ public class CameraEntity extends Entity implements PolymerEntity {
     */
    @Override
    public EntityType<?> getPolymerEntityType(PacketContext context){
-      return EntityType.INTERACTION;
+      return EntityTypes.INTERACTION;
    }
 }
 

@@ -125,7 +125,7 @@ public class NearsightCondition extends Condition {
                      stack.set(DataComponents.ITEM_MODEL, isSolid ? SOLID_ID : TRANSPARENT_ID);
                      element.setItem(stack);
                   }else{
-                     element.setItem(isSolid ? new ItemStack(Items.BLACK_CONCRETE) : new ItemStack(Items.TINTED_GLASS));
+                     element.setItem(isSolid ? new ItemStack(Items.CONCRETE.black()) : new ItemStack(Items.TINTED_GLASS));
                   }
                   
                   if(animateIn){

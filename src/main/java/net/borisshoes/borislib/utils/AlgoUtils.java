@@ -1,7 +1,7 @@
 package net.borisshoes.borislib.utils;
 
 import net.borisshoes.borislib.BorisLib;
-import net.minecraft.util.Tuple;
+import com.mojang.datafixers.util.Pair;
 
 import java.util.*;
 
@@ -21,10 +21,10 @@ import java.util.*;
  * <h3>Example Usage:</h3>
  * <pre>{@code
  * // Weighted loot selection
- * List<Tuple<Item, Integer>> loot = new ArrayList<>();
- * loot.add(new Tuple<>(Items.DIAMOND, 1));  // 1% chance
- * loot.add(new Tuple<>(Items.IRON_INGOT, 10)); // 10% chance
- * loot.add(new Tuple<>(Items.DIRT, 89));    // 89% chance
+ * List<Pair<Item, Integer>> loot = new ArrayList<>();
+ * loot.add(Pair.of(Items.DIAMOND, 1));  // 1% chance
+ * loot.add(Pair.of(Items.IRON_INGOT, 10)); // 10% chance
+ * loot.add(Pair.of(Items.DIRT, 89));    // 89% chance
  * Item reward = AlgoUtils.getWeightedOption(loot);
  *
  * // Paginate player list
@@ -50,7 +50,7 @@ public class AlgoUtils {
     * @throws IllegalArgumentException if options is empty
     * @see #getWeightedOption(List, long) For deterministic selection with a seed
     */
-   public static <T> T getWeightedOption(List<Tuple<T, Integer>> options){
+   public static <T> T getWeightedOption(List<Pair<T, Integer>> options){
       return getWeightedOption(options, new Random().nextLong());
    }
    
@@ -67,11 +67,11 @@ public class AlgoUtils {
     * @return the randomly selected option based on weights
     * @throws IllegalArgumentException if options is empty
     */
-   public static <T> T getWeightedOption(List<Tuple<T, Integer>> options, long seed){
+   public static <T> T getWeightedOption(List<Pair<T, Integer>> options, long seed){
       ArrayList<T> weightedList = new ArrayList<>();
-      for(Tuple<T, Integer> option : options){
-         for(int i = 0; i < option.getB(); i++){
-            weightedList.add(option.getA());
+      for(Pair<T, Integer> option : options){
+         for(int i = 0; i < option.getSecond(); i++){
+            weightedList.add(option.getFirst());
          }
       }
       Random random = new Random(seed);
@@ -95,11 +95,11 @@ public class AlgoUtils {
     * @return list of tuples containing each item and its assigned position index
     * @throws IllegalArgumentException if size is less than items.size()
     */
-   public static <T> List<Tuple<T, Integer>> randomlySpace(List<T> items, int size, long seed){
+   public static <T> List<Pair<T, Integer>> randomlySpace(List<T> items, int size, long seed){
       Random random = new Random(seed);
       
       List<Integer> remaining = new ArrayList<>();
-      List<Tuple<T, Integer>> randomized = new ArrayList<>();
+      List<Pair<T, Integer>> randomized = new ArrayList<>();
       
       for(int i = 0; i < size; i++){
          remaining.add(i);
@@ -108,7 +108,7 @@ public class AlgoUtils {
       int i = 0;
       while(i < items.size() && !remaining.isEmpty()){
          int index = random.nextInt(remaining.size());
-         randomized.add(new Tuple<>(items.get(i), remaining.get(index)));
+         randomized.add(Pair.of(items.get(i), remaining.get(index)));
          remaining.remove(remaining.get(index));
          i++;
       }

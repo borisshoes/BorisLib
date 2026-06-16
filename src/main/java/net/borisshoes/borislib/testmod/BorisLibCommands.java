@@ -26,7 +26,6 @@ import net.borisshoes.borislib.utils.MinecraftUtils;
 import net.borisshoes.borislib.utils.ParticleEffectUtils;
 import net.borisshoes.borislib.utils.TextUtils;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -36,6 +35,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextColor;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.commands.AttributeCommand;
 import net.minecraft.server.level.ServerLevel;
@@ -364,7 +364,7 @@ public class BorisLibCommands {
          }
       }, world));
       
-      context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.particlestress_started").withStyle(ChatFormatting.GREEN), true);
+      context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.particlestress_started").withColor(TextColor.GREEN), true);
       return 1;
    }
    
@@ -379,7 +379,7 @@ public class BorisLibCommands {
          }
       }, world));
       
-      context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.particledensity_started", count, radius, duration).withStyle(ChatFormatting.GREEN), true);
+      context.getSource().sendSuccess(() -> Component.translatable("testmod.borislib.particledensity_started", count, radius, duration).withColor(TextColor.GREEN), true);
       return 1;
    }
    
@@ -408,7 +408,7 @@ public class BorisLibCommands {
          for(int i = 0; i <= 100; i++){
             double finalI = i;
             BorisLib.addTickTimerCallback(ctx.getSource().getLevel(), new GenericTimer(i * 4, () -> {
-               TextUtils.energyBar(ctx.getSource().getPlayer(), finalI / 100.0, Component.literal(prefix).withStyle(ChatFormatting.RED), Component.literal(suffix).withStyle(ChatFormatting.AQUA), (style -> style.applyFormat(ChatFormatting.YELLOW)));
+               TextUtils.energyBar(ctx.getSource().getPlayer(), finalI / 100.0, Component.literal(prefix).withColor(TextColor.RED), Component.literal(suffix).withColor(TextColor.AQUA), (style -> style.withColor(TextColor.YELLOW)));
             }));
          }
       }else{
@@ -451,25 +451,25 @@ public class BorisLibCommands {
       
       try{
          DefaultPlayerData data = DataAccess.getPlayer(uuid, BorisLib.PLAYER_DATA_KEY);
-         context.getSource().sendSuccess(() -> Component.literal("=== DefaultPlayerData ===").withStyle(ChatFormatting.GOLD), false);
+         context.getSource().sendSuccess(() -> Component.literal("=== DefaultPlayerData ===").withColor(TextColor.GOLD), false);
          
          final UUID finalUuid = uuid;
-         context.getSource().sendSuccess(() -> Component.literal("UUID: ").withStyle(ChatFormatting.GRAY)
-               .append(Component.literal(finalUuid.toString()).withStyle(ChatFormatting.WHITE)), false);
+         context.getSource().sendSuccess(() -> Component.literal("UUID: ").withColor(TextColor.GRAY)
+               .append(Component.literal(finalUuid.toString()).withColor(TextColor.WHITE)), false);
          
-         context.getSource().sendSuccess(() -> Component.literal("Username: ").withStyle(ChatFormatting.GRAY)
-               .append(Component.literal(data.getUsername() != null ? data.getUsername() : "(none)").withStyle(ChatFormatting.WHITE)), false);
+         context.getSource().sendSuccess(() -> Component.literal("Username: ").withColor(TextColor.GRAY)
+               .append(Component.literal(data.getUsername() != null ? data.getUsername() : "(none)").withColor(TextColor.WHITE)), false);
          
-         context.getSource().sendSuccess(() -> Component.literal("Known Usernames: ").withStyle(ChatFormatting.GRAY)
-               .append(Component.literal(data.getKnownUsernames().isEmpty() ? "(none)" : String.join(", ", data.getKnownUsernames())).withStyle(ChatFormatting.WHITE)), false);
+         context.getSource().sendSuccess(() -> Component.literal("Known Usernames: ").withColor(TextColor.GRAY)
+               .append(Component.literal(data.getKnownUsernames().isEmpty() ? "(none)" : String.join(", ", data.getKnownUsernames())).withColor(TextColor.WHITE)), false);
          
-         context.getSource().sendSuccess(() -> Component.literal("Has Profile Data: ").withStyle(ChatFormatting.GRAY)
-               .append(Component.literal(data.getResolvableProfile() != null ? "Yes" : "No").withStyle(data.getResolvableProfile() != null ? ChatFormatting.GREEN : ChatFormatting.RED)), false);
+         context.getSource().sendSuccess(() -> Component.literal("Has Profile Data: ").withColor(TextColor.GRAY)
+               .append(Component.literal(data.getResolvableProfile() != null ? "Yes" : "No").withColor(data.getResolvableProfile() != null ? TextColor.GREEN : TextColor.RED)), false);
          
          if(data.getResolvableProfile() != null){
             // Show the player face if we have profile data
-            context.getSource().sendSuccess(() -> Component.literal("Player Face: ").withStyle(ChatFormatting.GRAY)
-                  .append(data.getFaceTextComponent().copy().withStyle(ChatFormatting.WHITE)), false);
+            context.getSource().sendSuccess(() -> Component.literal("Player Face: ").withColor(TextColor.GRAY)
+                  .append(data.getFaceTextComponent().copy().withColor(TextColor.WHITE)), false);
          }
          
          return 1;
@@ -627,9 +627,9 @@ public class BorisLibCommands {
       }
       
       context.getSource().sendSuccess(() -> Component.translatable(replaced ? "command.borislib.condition.add.replaced" : "command.borislib.condition.add.added",
-            holder.value().getName().withStyle(ChatFormatting.GREEN),
+            holder.value().getName().withColor(TextColor.GREEN),
             target.getDisplayName(),
-            Component.translatable(detailKey, detailArgs).withStyle(ChatFormatting.GRAY)), true);
+            Component.translatable(detailKey, detailArgs).withColor(TextColor.GRAY)), true);
       return 1;
    }
    
@@ -649,8 +649,8 @@ public class BorisLibCommands {
          boolean removed = Conditions.removeCondition(context.getSource().getServer(), living, holder, id);
          if(removed){
             context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.remove.success",
-                  holder.value().getName().withStyle(ChatFormatting.GREEN),
-                  Component.literal("[" + id + "]").withStyle(ChatFormatting.GRAY),
+                  holder.value().getName().withColor(TextColor.GREEN),
+                  Component.literal("[" + id + "]").withColor(TextColor.GRAY),
                   target.getDisplayName()), true);
          }else{
             context.getSource().sendFailure(Component.translatable("command.borislib.condition.remove.not_found",
@@ -678,7 +678,7 @@ public class BorisLibCommands {
          boolean removed = Conditions.removeConditions(context.getSource().getServer(), living, holder);
          if(removed){
             context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.clear.success",
-                  holder.value().getName().withStyle(ChatFormatting.GREEN),
+                  holder.value().getName().withColor(TextColor.GREEN),
                   target.getDisplayName()), true);
          }else{
             context.getSource().sendFailure(Component.translatable("command.borislib.condition.clear.not_found",
@@ -702,14 +702,14 @@ public class BorisLibCommands {
          Triple<Float, Boolean, Boolean> stats = Conditions.getPrevalingCondition(target.getUUID(), holder);
          if(stats == null){
             context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get.not_active",
-                  holder.value().getName().withStyle(ChatFormatting.GREEN),
+                  holder.value().getName().withColor(TextColor.GREEN),
                   target.getDisplayName(),
-                  Component.translatable("command.borislib.condition.get.base", holder.value().getBase()).withStyle(ChatFormatting.GRAY)), false);
+                  Component.translatable("command.borislib.condition.get.base", holder.value().getBase()).withColor(TextColor.GRAY)), false);
          }else{
             context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get.active",
-                  holder.value().getNameWithValue(stats.getLeft()).withStyle(ChatFormatting.GREEN),
+                  holder.value().getNameWithValue(stats.getLeft()).withColor(TextColor.GREEN),
                   target.getDisplayName(),
-                  Component.translatable("command.borislib.condition.get.stats", stats.getLeft(), stats.getMiddle(), stats.getRight()).withStyle(ChatFormatting.YELLOW)), false);
+                  Component.translatable("command.borislib.condition.get.stats", stats.getLeft(), stats.getMiddle(), stats.getRight()).withColor(TextColor.YELLOW)), false);
          }
          return 1;
       }catch(Exception e){
@@ -734,10 +734,10 @@ public class BorisLibCommands {
             return 0;
          }else{
             context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get_instance.success",
-                  holder.value().getName().withStyle(ChatFormatting.GREEN),
-                  Component.literal("[" + id + "]").withStyle(ChatFormatting.GRAY),
+                  holder.value().getName().withColor(TextColor.GREEN),
+                  Component.literal("[" + id + "]").withColor(TextColor.GRAY),
                   target.getDisplayName(),
-                  Component.translatable("command.borislib.condition.get_instance.details", inst.getValue(), inst.getDuration(), inst.getTimer(), inst.getOperation().name(), inst.isStacking(), inst.hasParticles(), inst.isPersistent(), inst.getInflictedBy() != null ? inst.getInflictedBy().toString() : "none").withStyle(ChatFormatting.YELLOW)), false);
+                  Component.translatable("command.borislib.condition.get_instance.details", inst.getValue(), inst.getDuration(), inst.getTimer(), inst.getOperation().name(), inst.isStacking(), inst.hasParticles(), inst.isPersistent(), inst.getInflictedBy() != null ? inst.getInflictedBy().toString() : "none").withColor(TextColor.YELLOW)), false);
             return 1;
          }
       }catch(Exception e){
@@ -756,8 +756,8 @@ public class BorisLibCommands {
          }
          float base = holder.value().getBase();
          context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get_base.success",
-               holder.value().getName().withStyle(ChatFormatting.GREEN),
-               Component.literal(String.valueOf(base)).withStyle(ChatFormatting.YELLOW)), false);
+               holder.value().getName().withColor(TextColor.GREEN),
+               Component.literal(String.valueOf(base)).withColor(TextColor.YELLOW)), false);
          return 1;
       }catch(Exception e){
          context.getSource().sendFailure(Component.translatable("command.borislib.condition.error", e.getMessage()));
@@ -776,17 +776,17 @@ public class BorisLibCommands {
          List<ConditionInstance> instances = Conditions.getConditionInstancesOf(target.getUUID(), holder);
          if(instances.isEmpty()){
             context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get_instances.none",
-                  holder.value().getName().withStyle(ChatFormatting.GREEN),
+                  holder.value().getName().withColor(TextColor.GREEN),
                   target.getDisplayName()), false);
          }else{
             context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get_instances.header",
-                  holder.value().getName().withStyle(ChatFormatting.GREEN),
+                  holder.value().getName().withColor(TextColor.GREEN),
                   target.getDisplayName(),
-                  Component.literal(String.valueOf(instances.size())).withStyle(ChatFormatting.GRAY)), false);
+                  Component.literal(String.valueOf(instances.size())).withColor(TextColor.GRAY)), false);
             for(ConditionInstance inst : instances){
                context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get_instances.entry",
-                     Component.literal(inst.getId().toString()).withStyle(ChatFormatting.AQUA),
-                     Component.translatable("command.borislib.condition.get_instance.details", inst.getValue(), inst.getDuration(), inst.getTimer(), inst.getOperation().name(), inst.isStacking(), inst.hasParticles(), inst.isPersistent(), inst.getInflictedBy() != null ? inst.getInflictedBy().toString() : "none").withStyle(ChatFormatting.GRAY)), false);
+                     Component.literal(inst.getId().toString()).withColor(TextColor.AQUA),
+                     Component.translatable("command.borislib.condition.get_instance.details", inst.getValue(), inst.getDuration(), inst.getTimer(), inst.getOperation().name(), inst.isStacking(), inst.hasParticles(), inst.isPersistent(), inst.getInflictedBy() != null ? inst.getInflictedBy().toString() : "none").withColor(TextColor.GRAY)), false);
             }
          }
          return instances.size();
@@ -801,7 +801,7 @@ public class BorisLibCommands {
          BorisLib.CONFIG.read();
          BorisLib.CONFIG.save();
       }
-      context.getSource().sendSuccess(() -> Component.translatable("command.borislib.reload.success").withStyle(ChatFormatting.GREEN), true);
+      context.getSource().sendSuccess(() -> Component.translatable("command.borislib.reload.success").withColor(TextColor.GREEN), true);
       return 1;
    }
    
@@ -826,11 +826,11 @@ public class BorisLibCommands {
       }
       ServerPlayer player = context.getSource().getPlayer();
       if(!SequenceManager.isInSequence(player.getUUID())){
-         context.getSource().sendSuccess(() -> Component.literal("No active sequence to cancel.").withStyle(ChatFormatting.YELLOW), false);
+         context.getSource().sendSuccess(() -> Component.literal("No active sequence to cancel.").withColor(TextColor.YELLOW), false);
          return 0;
       }
       SequenceManager.cancel(player);
-      context.getSource().sendSuccess(() -> Component.literal("Sequence cancelled and state restored.").withStyle(ChatFormatting.GREEN), false);
+      context.getSource().sendSuccess(() -> Component.literal("Sequence cancelled and state restored.").withColor(TextColor.GREEN), false);
       return 1;
    }
    
@@ -897,7 +897,7 @@ public class BorisLibCommands {
          final InterpolationType finalInterp = interp;
          context.getSource().sendSuccess(() -> Component.literal(
                "[Cutscene] Started — " + mannequinDesc + ", interp: " + finalInterp.name() + ", " + durationTicks + " ticks"
-         ).withStyle(ChatFormatting.GREEN), false);
+         ).withColor(TextColor.GREEN), false);
          return 1;
       }else{
          context.getSource().sendFailure(Component.literal("Failed to start cutscene sequence."));
@@ -947,7 +947,7 @@ public class BorisLibCommands {
                + ", " + (freeze ? "position frozen" : "free movement")
                + (hasPath && freeze ? " + leap path" : hasPath ? " (path ignored — freeze=false)" : "")
                + (lockCamera && hasPath && freeze ? ", camera locked" : ", free-look");
-         context.getSource().sendSuccess(() -> Component.literal("[IFrame] Started — " + desc + ", " + durationTicks + " ticks").withStyle(ChatFormatting.GREEN), false);
+         context.getSource().sendSuccess(() -> Component.literal("[IFrame] Started — " + desc + ", " + durationTicks + " ticks").withColor(TextColor.GREEN), false);
          return 1;
       }else{
          context.getSource().sendFailure(Component.literal("Failed to start iframe sequence."));
@@ -982,7 +982,7 @@ public class BorisLibCommands {
          String anchorDesc = anchor
                ? "anchored at current position, range " + range + " blocks"
                : "free roam (no anchor)";
-         context.getSource().sendSuccess(() -> Component.literal("[Ghost] Started — " + anchorDesc + ", " + durationTicks + " ticks").withStyle(ChatFormatting.GREEN), false);
+         context.getSource().sendSuccess(() -> Component.literal("[Ghost] Started — " + anchorDesc + ", " + durationTicks + " ticks").withColor(TextColor.GREEN), false);
          return 1;
       }else{
          context.getSource().sendFailure(Component.literal("Failed to start ghost sequence."));

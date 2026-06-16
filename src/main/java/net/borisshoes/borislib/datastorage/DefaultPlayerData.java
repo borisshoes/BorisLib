@@ -16,6 +16,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.ProfileResolver;
 import net.minecraft.util.Util;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.decoration.Mannequin;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -139,7 +140,7 @@ public class DefaultPlayerData implements StorableData {
     * @return the new mannequin (or {@code null} if creation failed)
     */
    public Mannequin createMannequin(ServerLevel level){
-      Mannequin mannequin = Mannequin.create(EntityType.MANNEQUIN, level);
+      Mannequin mannequin = Mannequin.create(EntityTypes.MANNEQUIN, level);
       if(mannequin != null && resProf != null){
          mannequin.setComponent(DataComponents.PROFILE, this.resProf);
       }

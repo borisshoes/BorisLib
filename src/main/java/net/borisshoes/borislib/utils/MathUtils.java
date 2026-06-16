@@ -1,7 +1,7 @@
 package net.borisshoes.borislib.utils;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.util.Tuple;
+import com.mojang.datafixers.util.Pair;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -35,27 +35,27 @@ public class MathUtils {
     * Merges co-linear line segments in a list of line tuples.
     * Handles: shared endpoints, overlapping segments, and segments where one is inside another.
     */
-   public static List<Tuple<Vec3, Vec3>> mergeColinearLines(List<Tuple<Vec3, Vec3>> lines){
+   public static List<Pair<Vec3, Vec3>> mergeColinearLines(List<Pair<Vec3, Vec3>> lines){
       if(lines.size() < 2) return lines;
       
-      List<Tuple<Vec3, Vec3>> merged = new ArrayList<>(lines);
+      List<Pair<Vec3, Vec3>> merged = new ArrayList<>(lines);
       boolean changed = true;
       
       while(changed){
          changed = false;
          outer:
          for(int i = 0; i < merged.size(); i++){
-            Tuple<Vec3, Vec3> line1 = merged.get(i);
+            Pair<Vec3, Vec3> line1 = merged.get(i);
             for(int j = i + 1; j < merged.size(); j++){
-               Tuple<Vec3, Vec3> line2 = merged.get(j);
+               Pair<Vec3, Vec3> line2 = merged.get(j);
                
                // Check if lines are co-linear
-               if(!areColinear(line1.getA(), line1.getB(), line2.getA(), line2.getB())){
+               if(!areColinear(line1.getFirst(), line1.getSecond(), line2.getFirst(), line2.getSecond())){
                   continue;
                }
                
                // Lines are co-linear - check if they overlap or touch
-               Tuple<Vec3, Vec3> mergedLine = mergeColinearSegments(line1, line2);
+               Pair<Vec3, Vec3> mergedLine = mergeColinearSegments(line1, line2);
                if(mergedLine != null){
                   merged.remove(j);
                   merged.remove(i);
@@ -90,16 +90,16 @@ public class MathUtils {
     * Attempts to merge two co-linear line segments.
     * Returns the merged segment if they overlap or touch, null otherwise.
     */
-   private static Tuple<Vec3, Vec3> mergeColinearSegments(Tuple<Vec3, Vec3> line1, Tuple<Vec3, Vec3> line2){
-      Vec3 a1 = line1.getA();
-      Vec3 b1 = line1.getB();
-      Vec3 a2 = line2.getA();
-      Vec3 b2 = line2.getB();
+   private static Pair<Vec3, Vec3> mergeColinearSegments(Pair<Vec3, Vec3> line1, Pair<Vec3, Vec3> line2){
+      Vec3 a1 = line1.getFirst();
+      Vec3 b1 = line1.getSecond();
+      Vec3 a2 = line2.getFirst();
+      Vec3 b2 = line2.getSecond();
       
       // Find the primary axis (the one with largest extent)
       Vec3 dir = b1.subtract(a1);
       if(dir.lengthSqr() < 1e-9) dir = b2.subtract(a2);
-      if(dir.lengthSqr() < 1e-9) return new Tuple<>(a1, a1); // Degenerate case
+      if(dir.lengthSqr() < 1e-9) return Pair.of(a1, a1); // Degenerate case
       
       // Project all points onto the line direction to get 1D coordinates
       double t1a = projectOntoLine(a1, a1, dir);
@@ -133,7 +133,7 @@ public class MathUtils {
       Vec3 newA = a1.add(dir.normalize().scale(tMin));
       Vec3 newB = a1.add(dir.normalize().scale(tMax));
       
-      return new Tuple<>(newA, newB);
+      return Pair.of(newA, newB);
    }
    
    /**

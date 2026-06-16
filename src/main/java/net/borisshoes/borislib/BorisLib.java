@@ -41,7 +41,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
-import net.minecraft.util.Tuple;
+import com.mojang.datafixers.util.Pair;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -59,7 +59,7 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
    
    public static final Logger LOGGER = LogManager.getLogger("BorisLib");
    public static final ArrayList<TickTimerCallback> SERVER_TIMER_CALLBACKS = new ArrayList<>();
-   public static final ArrayList<Tuple<ServerLevel, TickTimerCallback>> WORLD_TIMER_CALLBACKS = new ArrayList<>();
+   public static final ArrayList<Pair<ServerLevel, TickTimerCallback>> WORLD_TIMER_CALLBACKS = new ArrayList<>();
    public static final String MOD_ID = "borislib";
    private static final String CONFIG_NAME = "BorisLib.properties";
    public static final String BLANK_UUID = "00000000-0000-4000-8000-000000000000";
@@ -134,7 +134,7 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
    }
    
    public static boolean addTickTimerCallback(ServerLevel world, TickTimerCallback callback){
-      return WORLD_TIMER_CALLBACKS.add(new Tuple<>(world, callback));
+      return WORLD_TIMER_CALLBACKS.add(Pair.of(world, callback));
       // TODO serialize on world stop?
    }
    

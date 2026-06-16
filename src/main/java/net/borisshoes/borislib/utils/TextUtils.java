@@ -6,7 +6,7 @@ import net.minecraft.network.chat.contents.PlainTextContents;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.Tuple;
+import com.mojang.datafixers.util.Pair;
 import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
  *
  * <p>Provides helpers for:</p>
  * <ul>
- *    <li>Converting RGB colors to the closest {@link ChatFormatting} constant.</li>
+ *    <li>Converting RGB colors to the closest {@link TextColor} constant.</li>
  *    <li>Generating energy bars / progress indicators via Unicode block characters.</li>
  *    <li>Parsing custom string markup into formatted {@link Component} trees.</li>
  *    <li>Converting components back into parseable markup or Java code.</li>
@@ -38,13 +38,13 @@ public class TextUtils {
     */
    public static MutableComponent getFormattedDimName(ResourceKey<Level> worldKey){
       if(worldKey.identifier().toString().equals(ServerLevel.OVERWORLD.identifier().toString())){
-         return Component.literal("Overworld").withStyle(ChatFormatting.GREEN);
+         return Component.literal("Overworld").withColor(TextColor.GREEN);
       }else if(worldKey.identifier().toString().equals(ServerLevel.NETHER.identifier().toString())){
-         return Component.literal("The Nether").withStyle(ChatFormatting.RED);
+         return Component.literal("The Nether").withColor(TextColor.RED);
       }else if(worldKey.identifier().toString().equals(ServerLevel.END.identifier().toString())){
-         return Component.literal("The End").withStyle(ChatFormatting.DARK_PURPLE);
+         return Component.literal("The End").withColor(TextColor.DARK_PURPLE);
       }else{
-         return Component.literal(worldKey.identifier().toString()).withStyle(ChatFormatting.YELLOW);
+         return Component.literal(worldKey.identifier().toString()).withColor(TextColor.YELLOW);
       }
    }
    
@@ -102,47 +102,47 @@ public class TextUtils {
    }
    
    /**
-    * Lookup table mapping {@link ChatFormatting} colors to their RGB integer values. Used by
+    * Lookup table mapping {@link TextColor} colors to their RGB integer values. Used by
     * {@link #getClosestFormatting(int)} to find the nearest named color.
     */
-   public static final ArrayList<Tuple<ChatFormatting, Integer>> COLOR_MAP = new ArrayList<>(Arrays.asList(
-         new Tuple<>(ChatFormatting.BLACK, 0x000000),
-         new Tuple<>(ChatFormatting.DARK_BLUE, 0x0000AA),
-         new Tuple<>(ChatFormatting.DARK_GREEN, 0x00AA00),
-         new Tuple<>(ChatFormatting.DARK_AQUA, 0x00AAAA),
-         new Tuple<>(ChatFormatting.DARK_RED, 0xAA0000),
-         new Tuple<>(ChatFormatting.DARK_PURPLE, 0xAA00AA),
-         new Tuple<>(ChatFormatting.GOLD, 0xFFAA00),
-         new Tuple<>(ChatFormatting.GRAY, 0xAAAAAA),
-         new Tuple<>(ChatFormatting.DARK_GRAY, 0x555555),
-         new Tuple<>(ChatFormatting.BLUE, 0x5555FF),
-         new Tuple<>(ChatFormatting.GREEN, 0x55FF55),
-         new Tuple<>(ChatFormatting.AQUA, 0x55FFFF),
-         new Tuple<>(ChatFormatting.RED, 0xFF5555),
-         new Tuple<>(ChatFormatting.LIGHT_PURPLE, 0xFF55FF),
-         new Tuple<>(ChatFormatting.YELLOW, 0xFFFF55),
-          new Tuple<>(ChatFormatting.WHITE, 0xFFFFFF)
+   public static final ArrayList<Pair<TextColor, Integer>> COLOR_MAP = new ArrayList<>(Arrays.asList(
+         Pair.of(TextColor.BLACK, 0x000000),
+         Pair.of(TextColor.DARK_BLUE, 0x0000AA),
+         Pair.of(TextColor.DARK_GREEN, 0x00AA00),
+         Pair.of(TextColor.DARK_AQUA, 0x00AAAA),
+         Pair.of(TextColor.DARK_RED, 0xAA0000),
+         Pair.of(TextColor.DARK_PURPLE, 0xAA00AA),
+         Pair.of(TextColor.GOLD, 0xFFAA00),
+         Pair.of(TextColor.GRAY, 0xAAAAAA),
+         Pair.of(TextColor.DARK_GRAY, 0x555555),
+         Pair.of(TextColor.BLUE, 0x5555FF),
+         Pair.of(TextColor.GREEN, 0x55FF55),
+         Pair.of(TextColor.AQUA, 0x55FFFF),
+         Pair.of(TextColor.RED, 0xFF5555),
+         Pair.of(TextColor.LIGHT_PURPLE, 0xFF55FF),
+         Pair.of(TextColor.YELLOW, 0xFFFF55),
+          Pair.of(TextColor.WHITE, 0xFFFFFF)
    ));
    
    /**
-    * Finds the closest {@link ChatFormatting} color constant to the given RGB value using weighted Euclidean
+    * Finds the closest {@link TextColor} color constant to the given RGB value using weighted Euclidean
     * distance (R: 0.30, G: 0.59, B: 0.11).
     *
     * @param colorRGB the input color as a 24-bit RGB integer (0xRRGGBB)
     * @return the nearest formatting constant
     */
-   public static ChatFormatting getClosestFormatting(int colorRGB){
-      ChatFormatting closest = ChatFormatting.WHITE;
+   public static TextColor getClosestFormatting(int colorRGB){
+      TextColor closest = TextColor.WHITE;
       double cDist = Integer.MAX_VALUE;
-      for(Tuple<ChatFormatting, Integer> pair : COLOR_MAP){
-         int repColor = pair.getB();
+      for(Pair<TextColor, Integer> pair : COLOR_MAP){
+         int repColor = pair.getSecond();
          double rDist = (((repColor >> 16) & 0xFF) - ((colorRGB >> 16) & 0xFF)) * 0.30;
          double gDist = (((repColor >> 8) & 0xFF) - ((colorRGB >> 8) & 0xFF)) * 0.59;
          double bDist = ((repColor & 0xFF) - (colorRGB & 0xFF)) * 0.11;
          double dist = rDist * rDist + gDist * gDist + bDist * bDist;
          if(dist < cDist){
             cDist = dist;
-            closest = pair.getA();
+            closest = pair.getFirst();
          }
       }
       return closest;
@@ -228,7 +228,7 @@ public class TextUtils {
     * @return the same component (mutated) without italic
     */
    public static MutableComponent removeItalics(MutableComponent text){
-      Style parentStyle = Style.EMPTY.withColor(ChatFormatting.DARK_PURPLE).withItalic(false).withBold(false).withUnderlined(false).withObfuscated(false).withStrikethrough(false);
+      Style parentStyle = Style.EMPTY.withColor(TextColor.DARK_PURPLE).withItalic(false).withBold(false).withUnderlined(false).withObfuscated(false).withStrikethrough(false);
       return text.setStyle(text.getStyle().applyTo(parentStyle));
    }
    
@@ -307,9 +307,12 @@ public class TextUtils {
       
       TextColor parentTextColor = parentStyle.getColor();
       if(parentTextColor != null){
-         ChatFormatting formatting = ChatFormatting.getByName(parentTextColor.serialize());
-         if(formatting != null){
-            parentColor = formatting.getChar();
+         for(ChatFormatting value : ChatFormatting.values()){
+            TextColor c = TextColor.fromLegacyFormat(value);
+            if(c != null && parentTextColor.getValue() == c.getValue()){
+               parentColor = value.toString().charAt(1);
+               break;
+            }
          }
       }
       
@@ -335,9 +338,12 @@ public class TextUtils {
                char color = parentColor;
                TextColor siblingColor = siblingStyle.getColor();
                if(siblingColor != null){
-                  ChatFormatting formatting = ChatFormatting.getByName(siblingColor.serialize());
-                  if(formatting != null){
-                     color = formatting.getChar();
+                  for(ChatFormatting value : ChatFormatting.values()){
+                     TextColor c = TextColor.fromLegacyFormat(value);
+                     if(c != null && siblingColor.getValue() == c.getValue()){
+                        color = value.toString().charAt(1);
+                        break;
+                     }
                   }
                }
                String formatCodes = booleansToFormatCodes(
@@ -375,9 +381,12 @@ public class TextUtils {
       
       TextColor parentTextColor = parentStyle.getColor();
       if(parentTextColor != null){
-         ChatFormatting formatting = ChatFormatting.getByName(parentTextColor.serialize());
-         if(formatting != null){
-            parentColor = formatting;
+         for(ChatFormatting value : ChatFormatting.values()){
+            TextColor c = TextColor.fromLegacyFormat(value);
+            if(c != null && parentTextColor.getValue() == c.getValue()){
+               parentColor = value;
+               break;
+            }
          }
       }
       
@@ -386,7 +395,7 @@ public class TextUtils {
          String contentString = plainTextContent.text();
          
          if(!contentString.isEmpty()){
-            codes.add(textToCodeHelper(contentString, parentColor.getName(), parentItalic, parentBold, parentUnderlined, parentStrikethrough, parentObfuscated));
+            codes.add(textToCodeHelper(contentString, TextColor.fromLegacyFormat(parentColor).serialize(), parentItalic, parentBold, parentUnderlined, parentStrikethrough, parentObfuscated));
          }
       }
       
@@ -402,12 +411,16 @@ public class TextUtils {
                ChatFormatting color = parentColor;
                TextColor siblingColor = siblingStyle.getColor();
                if(siblingColor != null){
-                  ChatFormatting formatting = ChatFormatting.getByName(siblingColor.serialize());
-                  if(formatting != null){
-                     color = formatting;
+                  for(ChatFormatting value : ChatFormatting.values()){
+                     TextColor c = TextColor.fromLegacyFormat(value);
+                     if(c != null && siblingColor.getValue() == c.getValue()){
+                        color = value;
+                        break;
+                     }
                   }
                }
-               codes.add(textToCodeHelper(contentString, color.getName(),
+               
+               codes.add(textToCodeHelper(contentString, TextColor.fromLegacyFormat(color).serialize(),
                      siblingStyle.isItalic() || parentItalic,
                      siblingStyle.isBold() || parentBold,
                      siblingStyle.isUnderlined() || parentUnderlined,

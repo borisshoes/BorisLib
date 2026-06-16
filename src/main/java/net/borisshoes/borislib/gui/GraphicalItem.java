@@ -39,9 +39,9 @@ public class GraphicalItem extends Item implements PolymerItem {
    public static final GraphicElement ARROW_RIGHT = registerGraphicItem(new GraphicElement(Identifier.fromNamespaceAndPath(MOD_ID, "arrow_right"), Items.SPECTRAL_ARROW, true));
    public static final GraphicElement SORT = registerGraphicItem(new GraphicElement(Identifier.fromNamespaceAndPath(MOD_ID, "sort"), Items.NETHER_STAR, false));
    public static final GraphicElement FILTER = registerGraphicItem(new GraphicElement(Identifier.fromNamespaceAndPath(MOD_ID, "filter"), Items.HOPPER, false));
-   public static final GraphicElement BLACK = registerGraphicItem(new GraphicElement(Identifier.fromNamespaceAndPath(MOD_ID, "black"), Items.BLACK_DYE, false));
+   public static final GraphicElement BLACK = registerGraphicItem(new GraphicElement(Identifier.fromNamespaceAndPath(MOD_ID, "black"), Items.DYE.black(), false));
    public static final GraphicElement EMPTY = registerGraphicItem(new GraphicElement(Identifier.fromNamespaceAndPath(MOD_ID, "empty"), Items.GLASS_PANE, true));
-   public static final GraphicElement ORB = registerGraphicItem(new GraphicElement(Identifier.fromNamespaceAndPath(MOD_ID, "orb"), Items.WHITE_CONCRETE, true));
+   public static final GraphicElement ORB = registerGraphicItem(new GraphicElement(Identifier.fromNamespaceAndPath(MOD_ID, "orb"), Items.CONCRETE.white(), true));
    public static final GraphicElement REFRESH = registerGraphicItem(new GraphicElement(Identifier.fromNamespaceAndPath(MOD_ID, "refresh"), Items.MUSIC_DISC_CAT, true));
    public static final GraphicElement MENU_HORIZONTAL = registerGraphicItem(new GraphicElement(Identifier.fromNamespaceAndPath(MOD_ID, "menu_horizontal"), Items.GLASS_PANE, true));
    public static final GraphicElement MENU_HORIZONTAL_INVERTED = registerGraphicItem(new GraphicElement(Identifier.fromNamespaceAndPath(MOD_ID, "menu_horizontal_inverted"), Items.GLASS_PANE, true));
@@ -92,17 +92,17 @@ public class GraphicalItem extends Item implements PolymerItem {
    private static final Map<Item, String> COLORABLE_ITEM_PATTERNS = Map.ofEntries(
          Map.entry(Items.GLASS_PANE, "stained_glass_pane"),
          Map.entry(Items.GLASS, "stained_glass"),
-         Map.entry(Items.WHITE_DYE, "dye"),
-         Map.entry(Items.WHITE_WOOL, "wool"),
-         Map.entry(Items.WHITE_CONCRETE, "concrete"),
-         Map.entry(Items.WHITE_CONCRETE_POWDER, "concrete_powder"),
+         Map.entry(Items.DYE.white(), "dye"),
+         Map.entry(Items.WOOL.white(), "wool"),
+         Map.entry(Items.CONCRETE.white(), "concrete"),
+         Map.entry(Items.CONCRETE_POWDER.white(), "concrete_powder"),
          Map.entry(Items.TERRACOTTA, "terracotta"),
-         Map.entry(Items.WHITE_GLAZED_TERRACOTTA, "glazed_terracotta"),
-         Map.entry(Items.WHITE_CARPET, "carpet"),
-         Map.entry(Items.WHITE_BED, "bed"),
-         Map.entry(Items.WHITE_BANNER, "banner"),
-         Map.entry(Items.WHITE_CANDLE, "candle"),
-         Map.entry(Items.WHITE_SHULKER_BOX, "shulker_box")
+         Map.entry(Items.GLAZED_TERRACOTTA.white(), "glazed_terracotta"),
+         Map.entry(Items.CARPET.white(), "carpet"),
+         Map.entry(Items.BED.white(), "bed"),
+         Map.entry(Items.BANNER.white(), "banner"),
+         Map.entry(Items.CANDLE, "candle"),
+         Map.entry(Items.SHULKER_BOX, "shulker_box")
    );
    
    // RGB values for each dye color used in color matching

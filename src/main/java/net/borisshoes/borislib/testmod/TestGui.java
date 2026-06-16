@@ -9,6 +9,7 @@ import net.borisshoes.borislib.utils.MinecraftUtils;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextColor;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.inventory.MenuType;
@@ -30,9 +31,9 @@ public class TestGui extends PagedGui<Item> {
    
    public TestGui(ServerPlayer player){
       super(MenuType.GENERIC_9x6, player, BuiltInRegistries.ITEM.stream().toList());
-      action1TextColor(ChatFormatting.RED.getColor().intValue());
-      action2TextColor(ChatFormatting.GOLD.getColor().intValue());
-      action3TextColor(ChatFormatting.YELLOW.getColor().intValue());
+      action1TextColor(TextColor.RED.getValue());
+      action2TextColor(TextColor.GOLD.getValue());
+      action3TextColor(TextColor.YELLOW.getValue());
       
       itemElemBuilder((item, index) -> {
          GuiElementBuilder builder = GuiElementBuilder.from(item.getDefaultInstance());
@@ -70,7 +71,7 @@ public class TestGui extends PagedGui<Item> {
    private static class ItemFilter extends GuiFilter<Item> {
       public static final List<ItemFilter> FILTERS = new ArrayList<>();
       
-      public static final ItemFilter NONE = new ItemFilter("gui.borislib.none", ChatFormatting.WHITE.getColor().intValue(), entry -> true);
+      public static final ItemFilter NONE = new ItemFilter("gui.borislib.none", TextColor.WHITE.getValue(), entry -> true);
       
       private ItemFilter(String key, int color, Predicate<Item> predicate){
          super(key, color, predicate);
@@ -90,11 +91,11 @@ public class TestGui extends PagedGui<Item> {
    private static class ItemSort extends GuiSort<Item> {
       public static final List<ItemSort> SORTS = new ArrayList<>();
       
-      public static final ItemSort RECOMMENDED = new ItemSort("gui.borislib.recommended", ChatFormatting.LIGHT_PURPLE.getColor().intValue(),
+      public static final ItemSort RECOMMENDED = new ItemSort("gui.borislib.recommended", TextColor.LIGHT_PURPLE.getValue(),
             Comparator.comparingInt(entry -> BuiltInRegistries.ITEM.asHolderIdMap().getId(BuiltInRegistries.ITEM.wrapAsHolder(entry))));
-      public static final ItemSort ALPHABETICAL = new ItemSort("gui.borislib.alphabetical", ChatFormatting.AQUA.getColor().intValue(),
+      public static final ItemSort ALPHABETICAL = new ItemSort("gui.borislib.alphabetical", TextColor.AQUA.getValue(),
             Comparator.comparing(Item::getDescriptionId));
-      public static final ItemSort RARITY = new ItemSort("gui.borislib.rarity", ChatFormatting.GREEN.getColor().intValue(),
+      public static final ItemSort RARITY = new ItemSort("gui.borislib.rarity", TextColor.GREEN.getValue(),
             Comparator.comparingInt((Item entry) -> entry.getDefaultInstance().getRarity().ordinal()).thenComparing(Item::getDescriptionId));
       
       private ItemSort(String key, int color, Comparator<Item> comparator){
