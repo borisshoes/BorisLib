@@ -17,8 +17,8 @@ import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.ValueInput;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static net.borisshoes.borislib.BorisLib.MOD_ID;
 
@@ -38,8 +38,20 @@ import static net.borisshoes.borislib.BorisLib.MOD_ID;
 public final class GlobalState extends SavedData {
    /** SavedData file id (without extension) used by Minecraft's storage layer. */
    public static final String FILE_ID = MOD_ID + "_global";
-   private final Map<String, Map<String, CompoundTag>> data = new HashMap<>();
-   private final Map<String, Map<String, Object>> objects = new HashMap<>();
+   // Thread-safe: GlobalState is a single server-wide object reachable from any thread via the
+   // static DataAccess API, and vanilla encodes it (via save()) on the main thread during autosave.
+   // Plain HashMaps here could corrupt or throw ConcurrentModificationException mid-encode, which
+   // previously fell through to writing an empty file (total data loss).
+   private final Map<String, Map<String, CompoundTag>> data = new ConcurrentHashMap<>();
+   private final Map<String, Map<String, Object>> objects = new ConcurrentHashMap<>();
+   // Snapshot of the raw NBT exactly as loaded from disk, retained per key so that if a live
+   // object fails to re-encode at save time we can persist its last-known-good bytes instead of
+   // silently dropping the key.
+   private final Map<String, Map<String, CompoundTag>> originalRaw = new ConcurrentHashMap<>();
+   // Last successfully-encoded root tag. Used to avoid ever regressing to an empty/partial write
+   // when an encode error occurs.
+   private volatile CompoundTag lastGoodSave = null;
+   private volatile boolean restoreAttempted = false;
    
    // Codec that reads and writes the raw compound structure
    /** Pass-through codec that round-trips the entire global map as raw NBT. */
@@ -49,25 +61,7 @@ public final class GlobalState extends SavedData {
             try{
                Tag tag = dynamic.getValue() instanceof Tag t ? t : null;
                if(tag instanceof CompoundTag root){
-                  for(String modId : root.keySet()){
-                     try{
-                        if(root.get(modId) instanceof CompoundTag modTag){
-                           Map<String, CompoundTag> inner = new HashMap<>();
-                           for(String key : modTag.keySet()){
-                              try{
-                                 if(modTag.get(key) instanceof CompoundTag keyTag){
-                                    inner.put(key, keyTag);
-                                 }
-                              }catch(Exception e){
-                                 BorisLib.LOGGER.warn("Failed to parse global data key {}:{}: {}", modId, key, e.getMessage());
-                              }
-                           }
-                           s.data.put(modId, inner);
-                        }
-                     }catch(Exception e){
-                        BorisLib.LOGGER.warn("Failed to parse global data for mod {}: {}", modId, e.getMessage());
-                     }
-                  }
+                  s.ingestRoot(root);
                }
             }catch(Exception e){
                BorisLib.LOGGER.error("Failed to parse global state data: {}", e.getMessage());
@@ -75,12 +69,17 @@ public final class GlobalState extends SavedData {
             return s;
          },
          state -> {
+            CompoundTag out;
             try{
-               return new Dynamic<>(NbtOps.INSTANCE, state.save());
+               out = state.save();
             }catch(Exception e){
-               BorisLib.LOGGER.error("Failed to encode global state: {}", e.getMessage());
-               return new Dynamic<>(NbtOps.INSTANCE, new CompoundTag());
+               // Never let a transient encode failure overwrite good data with an empty tag —
+               // vanilla writes whatever we return here with no emptiness check.
+               BorisLib.LOGGER.error("Failed to encode global state, preserving last known good data: {}", e.getMessage());
+               out = state.lastGoodSave;
             }
+            if(out == null) out = new CompoundTag();
+            return new Dynamic<>(NbtOps.INSTANCE, out);
          }
    );
    
@@ -113,6 +112,7 @@ public final class GlobalState extends SavedData {
    // Custom save implementation that encodes our data
    public CompoundTag save(){
       CompoundTag tag = new CompoundTag();
+      boolean hadError = false;
       
       // Encode all live objects
       for(var modEntry : objects.entrySet()){
@@ -128,15 +128,32 @@ public final class GlobalState extends SavedData {
                      if(encoded != null && !encoded.isEmpty()){
                         modTag.put(key, encoded);
                      }else{
-                        BorisLib.LOGGER.warn("Skipping save for global key {}:{} - encoded data is empty/invalid", modId, key);
+                        // Encoder produced nothing usable. Rather than drop the key (which loads
+                        // as a default next boot), fall back to the last bytes we persisted for it.
+                        hadError = true;
+                        CompoundTag prev = previousFor(modId, key);
+                        if(prev != null && !prev.isEmpty()){
+                           modTag.put(key, prev);
+                           BorisLib.LOGGER.warn("Encode for global key {}:{} was empty/invalid - kept last known good value", modId, key);
+                        }else{
+                           BorisLib.LOGGER.warn("Skipping save for global key {}:{} - encoded data is empty/invalid and no prior value exists", modId, key);
+                        }
                      }
                   }
                }catch(Exception e){
-                  BorisLib.LOGGER.error("Failed to encode global key {}:{}: {}", modId, key, e.getMessage());
+                  hadError = true;
+                  CompoundTag prev = previousFor(modId, key);
+                  if(prev != null && !prev.isEmpty()){
+                     modTag.put(key, prev);
+                     BorisLib.LOGGER.error("Failed to encode global key {}:{} ({}) - kept last known good value", modId, key, e.getMessage());
+                  }else{
+                     BorisLib.LOGGER.error("Failed to encode global key {}:{}: {}", modId, key, e.getMessage());
+                  }
                }
             }
             if(!modTag.isEmpty()) tag.put(modId, modTag);
          }catch(Exception e){
+            hadError = true;
             BorisLib.LOGGER.error("Failed to save global data for mod {}: {}", modId, e.getMessage());
          }
       }
@@ -156,10 +173,84 @@ public final class GlobalState extends SavedData {
             }
             if(!modTag.isEmpty()) tag.put(modId, modTag);
          }catch(Exception e){
+            hadError = true;
             BorisLib.LOGGER.error("Failed to copy raw global data for mod {}: {}", modId, e.getMessage());
          }
       }
+      
+      // Never regress to an empty/partial write because of an error: keep the last good copy.
+      if(hadError && tag.isEmpty() && lastGoodSave != null && !lastGoodSave.isEmpty()){
+         BorisLib.LOGGER.error("Global save produced no data after encode errors - preserving last known good save");
+         return lastGoodSave;
+      }
+      lastGoodSave = tag;
       return tag;
+   }
+   
+   /** Last-persisted NBT for a key: prefer this session's last good save, then the on-disk load. */
+   @Nullable
+   private CompoundTag previousFor(String modId, String key){
+      if(lastGoodSave != null){
+         CompoundTag prevMod = lastGoodSave.getCompoundOrEmpty(modId);
+         CompoundTag prevKey = prevMod.getCompoundOrEmpty(key);
+         if(!prevKey.isEmpty()) return prevKey;
+      }
+      Map<String, CompoundTag> orig = originalRaw.get(modId);
+      if(orig != null){
+         CompoundTag prevKey = orig.get(key);
+         if(prevKey != null && !prevKey.isEmpty()) return prevKey;
+      }
+      return null;
+   }
+   
+   /** Resiliently parses a namespaced {@code mod -> key -> tag} root into {@link #data} + {@link #originalRaw}. */
+   private void ingestRoot(CompoundTag root){
+      for(String modId : root.keySet()){
+         try{
+            if(root.get(modId) instanceof CompoundTag modTag){
+               Map<String, CompoundTag> inner = new ConcurrentHashMap<>();
+               Map<String, CompoundTag> orig = new ConcurrentHashMap<>();
+               for(String key : modTag.keySet()){
+                  try{
+                     if(modTag.get(key) instanceof CompoundTag keyTag){
+                        inner.put(key, keyTag);
+                        orig.put(key, keyTag);
+                     }
+                  }catch(Exception e){
+                     BorisLib.LOGGER.warn("Failed to parse global data key {}:{}: {}", modId, key, e.getMessage());
+                  }
+               }
+               if(!inner.isEmpty()){
+                  data.put(modId, inner);
+                  originalRaw.put(modId, orig);
+               }
+            }
+         }catch(Exception e){
+            BorisLib.LOGGER.warn("Failed to parse global data for mod {}: {}", modId, e.getMessage());
+         }
+      }
+   }
+   
+   /** @return {@code true} if this state currently holds no decoded objects and no raw entries. */
+   public boolean isEmptyState(){
+      return objects.isEmpty() && data.isEmpty();
+   }
+   
+   /**
+    * If vanilla loaded this state empty (missing/corrupt/wiped .dat) but a BorisLib backup exists,
+    * heal the state from the backup. Runs at most once, on first access, so it also covers the case
+    * where another mod touches global data before our server-start hook.
+    */
+   private void attemptBackupRestore(){
+      if(restoreAttempted) return;
+      restoreAttempted = true;
+      if(!isEmptyState()) return;
+      if(!DataBackups.available()) return;
+      CompoundTag backup = DataBackups.read(DataBackups.globalName());
+      if(backup == null || backup.isEmpty()) return;
+      BorisLib.LOGGER.warn("GlobalState loaded empty but a BorisLib backup exists - restoring {} mod namespace(s) from backup", backup.keySet().size());
+      ingestRoot(backup);
+      setDirty();
    }
    
    /**
@@ -173,7 +264,8 @@ public final class GlobalState extends SavedData {
     */
    @SuppressWarnings("unchecked")
    public <T extends StorableData> T getLive(DataKey<T> key){
-      Map<String, Object> modObjs = objects.computeIfAbsent(key.modId(), k -> new HashMap<>());
+      attemptBackupRestore();
+      Map<String, Object> modObjs = objects.computeIfAbsent(key.modId(), k -> new ConcurrentHashMap<>());
       Object got = modObjs.get(key.key());
       if(got != null){
          // Pessimistic dirty on access — covers implementations that don't call markDirty().
@@ -221,13 +313,14 @@ public final class GlobalState extends SavedData {
     * @param <T>   the data type
     */
    public <T extends StorableData> void setLive(DataKey<T> key, T value){
+      attemptBackupRestore();
       T toStore = value != null ? value : key.makeDefaultGlobal();
       if(toStore == null){
          BorisLib.LOGGER.error("Cannot store null value for global key {} and default factory also returned null", key.id());
          return;
       }
       toStore.setDirtyCallback(this::setDirty);
-      objects.computeIfAbsent(key.modId(), k -> new HashMap<>()).put(key.key(), toStore);
+      objects.computeIfAbsent(key.modId(), k -> new ConcurrentHashMap<>()).put(key.key(), toStore);
       Map<String, CompoundTag> modRaw = data.get(key.modId());
       if(modRaw != null){
          modRaw.remove(key.key());

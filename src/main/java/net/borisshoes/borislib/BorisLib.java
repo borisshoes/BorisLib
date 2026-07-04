@@ -113,6 +113,7 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
       ServerLifecycleEvents.SERVER_STARTED.register(DataAccess::onServerStarted);
       ServerLifecycleEvents.SERVER_STARTED.register(SequenceManager::onServerStart);
       ServerLifecycleEvents.SERVER_STOPPED.register(DataAccess::onServerStop);
+      ServerLifecycleEvents.BEFORE_SAVE.register(DataAccess::onServerPreSave);
       ServerLifecycleEvents.AFTER_SAVE.register(DataAccess::onServerSave);
       ServerLivingEntityEvents.AFTER_DEATH.register(Conditions::entityDied);
       ServerLivingEntityEvents.AFTER_DEATH.register(SequenceManager::onPlayerDeath);

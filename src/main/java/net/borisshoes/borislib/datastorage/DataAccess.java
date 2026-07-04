@@ -43,6 +43,7 @@ public final class DataAccess {
          migrateLegacySavedData(root);
          
          playerStore = new PlayerObjectStore(root);
+         DataBackups.init(root);
          BorisLib.LOGGER.info("BorisLib data storage initialized at {}", root);
       }catch(Exception e){
          BorisLib.LOGGER.error("Failed to initialize BorisLib data storage: {}", e.getMessage());
@@ -128,6 +129,51 @@ public final class DataAccess {
          BorisLib.LOGGER.error("Error during server stop data save: {}", e.getMessage());
       }
       DIRTY_PLAYERS.clear();
+   }
+   
+   /**
+    * Pre-save hook (runs on the main thread at the HEAD of the server save, before Minecraft encodes
+    * its {@code SavedData}). Does two things for every already-loaded GLOBAL/WORLD state:
+    * <ol>
+    *    <li>Marks it dirty, so vanilla always re-encodes and writes the current live state. This
+    *        closes the gap where a mod mutates a long-held global/world object in place without
+    *        re-accessing it or calling {@code markDirty()} — previously that change could be dropped
+    *        on reboot, loading older data back.</li>
+    *    <li>Writes an independent, atomic BorisLib backup ({@link DataBackups}) so the data survives
+    *        a corrupt/interrupted vanilla write (vanilla writes these files non-atomically with no
+    *        backup of their own).</li>
+    * </ol>
+    * Uses the non-creating {@code get} accessor so dimensions that never stored BorisLib data are
+    * left untouched.
+    *
+    * @param s     the server
+    * @param flush forwarded from the save event (unused)
+    * @param force forwarded from the save event (unused)
+    */
+   public static void onServerPreSave(MinecraftServer s, boolean flush, boolean force){
+      try{
+         ServerLevel overworld = s.overworld();
+         if(overworld != null){
+            GlobalState g = overworld.getDataStorage().get(GlobalState.TYPE);
+            if(g != null){
+               g.setDirty();
+               DataBackups.write(DataBackups.globalName(), g.save());
+            }
+         }
+         for(ServerLevel w : s.getAllLevels()){
+            try{
+               WorldState ws = w.getDataStorage().get(WorldState.TYPE);
+               if(ws != null){
+                  ws.setDirty();
+                  DataBackups.write(DataBackups.worldName(w.dimension()), ws.save());
+               }
+            }catch(Exception e){
+               BorisLib.LOGGER.error("Failed to back up world data for dimension {}: {}", w.dimension().identifier(), e.getMessage());
+            }
+         }
+      }catch(Exception e){
+         BorisLib.LOGGER.error("Error during BorisLib pre-save backup: {}", e.getMessage());
+      }
    }
    
    /**
