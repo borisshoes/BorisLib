@@ -138,7 +138,11 @@ public class NearsightCondition extends Condition {
                         case Y -> new Vec3(startLayerSize, thinThickness, startLayerSize);
                         case Z -> new Vec3(startLayerSize, startLayerSize, thinThickness);
                      };
-                     element.setScale(startScale.toVector3f());
+                     if(PolymerResourcePackUtils.hasMainPack(player)){
+                        element.setScale(startScale.toVector3f());
+                     }else{
+                        element.setScale(startScale.toVector3f().mul(2));
+                     }
                      
                      double startAxisOffset = dir.getAxisDirection() == Direction.AxisDirection.POSITIVE ? startDist - thinThickness / 2 : -startDist - thinThickness / 2;
                      Vec3 startOffset = switch(dir.getAxis()){
@@ -163,7 +167,11 @@ public class NearsightCondition extends Condition {
                      case Y -> new Vec3(layerSize, thinThickness, layerSize);
                      case Z -> new Vec3(layerSize, layerSize, thinThickness);
                   };
-                  element.setScale(scale.toVector3f());
+                  if(PolymerResourcePackUtils.hasMainPack(player)){
+                     element.setScale(scale.toVector3f());
+                  }else{
+                     element.setScale(scale.toVector3f().mul(2));
+                  }
                   
                   double axisOffset = dir.getAxisDirection() == Direction.AxisDirection.POSITIVE ? dist - thinThickness / 2 : -dist - thinThickness / 2;
                   
