@@ -698,7 +698,7 @@ public class MinecraftUtils {
       hits.sort(Comparator.comparingDouble(e -> e.distanceTo(entity)));
 
       if(!blockedByShields){
-         return new LasercastResult(startPos, raycast.getLocation(), direction, hits);
+         return new LasercastResult(startPos, raycast.getLocation(), direction, hits, raycast);
       }
 
       List<Entity> hits3 = new ArrayList<>();
@@ -719,7 +719,7 @@ public class MinecraftUtils {
          }
       }
 
-      return new LasercastResult(startPos, endPoint, direction, hits3);
+      return new LasercastResult(startPos, endPoint, direction, hits3, raycast);
    }
 
    /**
@@ -730,7 +730,7 @@ public class MinecraftUtils {
     * @param direction the beam direction vector
     * @param sortedHits list of all entities hit, sorted by distance from source
     */
-   public record LasercastResult(Vec3 startPos, Vec3 endPos, Vec3 direction, List<Entity> sortedHits) {
+   public record LasercastResult(Vec3 startPos, Vec3 endPos, Vec3 direction, List<Entity> sortedHits, BlockHitResult blockHit) {
    }
 
    /**
