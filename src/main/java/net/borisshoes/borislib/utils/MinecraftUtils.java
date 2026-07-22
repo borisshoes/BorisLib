@@ -6,10 +6,10 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.mojang.datafixers.util.Either;
+import com.mojang.datafixers.util.Pair;
 import com.mojang.logging.LogUtils;
 import net.borisshoes.borislib.BorisLib;
 import net.borisshoes.borislib.mixins.EntityAccessor;
-import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryAccess;
@@ -27,12 +27,9 @@ import net.minecraft.server.level.ClientInformation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.NameAndId;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.Mth;
 import net.minecraft.util.ProblemReporter;
-import com.mojang.datafixers.util.Pair;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.Entity;
@@ -41,9 +38,10 @@ import net.minecraft.world.entity.ai.attributes.*;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
-import net.minecraft.world.item.*;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentInstance;
@@ -51,10 +49,12 @@ import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.ColorCollection;
 import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.phys.*;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -144,7 +144,7 @@ public class MinecraftUtils {
    /**
     * Calculates a damage percentage based on arrow velocity with a custom minimum.
     *
-    * @param arrow the arrow entity
+    * @param arrow      the arrow entity
     * @param minPercent the minimum percentage to return
     * @return the damage percentage, at least minPercent
     */
@@ -282,8 +282,8 @@ public class MinecraftUtils {
    /**
     * Checks if an entity would have solid ground support at the target position.
     *
-    * @param world the level
-    * @param entity the entity type to check for
+    * @param world     the level
+    * @param entity    the entity type to check for
     * @param targetPos the position to test
     * @return {@code true} if supported by blocks
     */
@@ -298,9 +298,9 @@ public class MinecraftUtils {
    /**
     * Checks if the specified space is clear of collisions for the entity.
     *
-    * @param entity the entity to check
-    * @param world the level
-    * @param targetPos the center position
+    * @param entity     the entity to check
+    * @param world      the level
+    * @param targetPos  the center position
     * @param checkFluid whether fluids count as collisions
     * @return {@code true} if clear
     */
@@ -314,8 +314,8 @@ public class MinecraftUtils {
     * Finds the entity in the list closest to the target position.
     *
     * @param list the entities to search
-    * @param pos the target position
-    * @param <T> entity type
+    * @param pos  the target position
+    * @param <T>  entity type
     * @return the closest entity, or null if list is empty
     */
    public static <T extends Entity> T getClosestEntity(List<T> list, Vec3 pos){
@@ -353,7 +353,7 @@ public class MinecraftUtils {
     * Reduces the amount of max absorption added by a specific modifier ID.
     *
     * @param entity the entity
-    * @param id modifier identifier
+    * @param id     modifier identifier
     * @param amount amount to remove
     */
    public static void removeMaxAbsorption(LivingEntity entity, Identifier id, float amount){
@@ -376,7 +376,7 @@ public class MinecraftUtils {
     * Increases or adds a max absorption modifier to an entity.
     *
     * @param entity the entity
-    * @param id modifier identifier
+    * @param id     modifier identifier
     * @param amount amount to add
     */
    public static void addMaxAbsorption(LivingEntity entity, Identifier id, double amount){
@@ -442,7 +442,7 @@ public class MinecraftUtils {
    /**
     * Returns all items from a container to the player's inventory or drops them.
     *
-    * @param inv source container
+    * @param inv    source container
     * @param player recipient player
     */
    public static void returnItems(Container inv, Player player){
@@ -475,8 +475,8 @@ public class MinecraftUtils {
     * Attempts to remove a specific amount of an item from a player's inventory.
     *
     * @param player the player
-    * @param item the item type
-    * @param count number of items to remove
+    * @param item   the item type
+    * @param count  number of items to remove
     * @return {@code true} if sufficient items were found and removed
     */
    public static boolean removeItems(Player player, Item item, int count){
@@ -510,7 +510,7 @@ public class MinecraftUtils {
     * Searches an item's container component (e.g. Bundle) for matches of an item type.
     *
     * @param container the item with a container component
-    * @param item item type to match
+    * @param item      item type to match
     * @return list of matching templates
     */
    public static List<ItemStackTemplate> getMatchingItemsFromContainerComp(ItemStack container, Item item){
@@ -528,11 +528,11 @@ public class MinecraftUtils {
     * Adds or removes a transient attribute modifier.
     *
     * @param livingEntity the entity
-    * @param attribute target attribute
-    * @param value modifier value
-    * @param operation modifier operation
-    * @param identifier modifier ID
-    * @param remove whether to remove instead of add
+    * @param attribute    target attribute
+    * @param value        modifier value
+    * @param operation    modifier operation
+    * @param identifier   modifier ID
+    * @param remove       whether to remove instead of add
     */
    public static void attributeEffect(LivingEntity livingEntity, Holder<Attribute> attribute, double value, AttributeModifier.Operation operation, Identifier identifier, boolean remove){
       boolean hasMod = livingEntity.getAttributes().hasModifier(attribute, identifier);
@@ -551,19 +551,19 @@ public class MinecraftUtils {
     * Updates an existing transient attribute modifier or adds it if missing.
     *
     * @param livingEntity the entity
-    * @param attribute target attribute
-    * @param value new value
-    * @param operation modifier operation
-    * @param identifier modifier ID
-    * @param upsert whether to add if not present
+    * @param attribute    target attribute
+    * @param value        new value
+    * @param operation    modifier operation
+    * @param identifier   modifier ID
+    * @param upsert       whether to add if not present
     */
    public static void updateAttributeEffect(LivingEntity livingEntity, Holder<Attribute> attribute, double value, AttributeModifier.Operation operation, Identifier identifier, boolean upsert){
       boolean hasMod = livingEntity.getAttributes().hasModifier(attribute, identifier);
       if(!hasMod){
-         if(upsert) attributeEffect(livingEntity,attribute,value,operation,identifier,false);
+         if(upsert) attributeEffect(livingEntity, attribute, value, operation, identifier, false);
          return;
       }
-      double curMod = livingEntity.getAttributes().getModifierValue(attribute,identifier);
+      double curMod = livingEntity.getAttributes().getModifierValue(attribute, identifier);
       if(curMod == value) return;
       HashMultimap<Holder<Attribute>, AttributeModifier> map = HashMultimap.create();
       map.put(attribute, new AttributeModifier(identifier, value, operation));
@@ -577,8 +577,8 @@ public class MinecraftUtils {
     * Logic for attempting to add an item stack to a container component.
     *
     * @param container existing container contents
-    * @param size max slots
-    * @param stack stack to add
+    * @param size      max slots
+    * @param stack     stack to add
     * @return a tuple containing updated contents and any remaining stack
     */
    public static Pair<ItemContainerContents, ItemStack> tryAddStackToContainerComp(ItemContainerContents container, int size, ItemStack stack){
@@ -616,22 +616,31 @@ public class MinecraftUtils {
    }
    
    /**
-    * Performs a comprehensive raycast that finds all entities hit by a beam, sorted by distance.
+    * Performs a comprehensive raycast that finds all living entities hit by a beam, sorted by distance.
     *
     * <p>This method combines block raycasting with entity hitscan to find all living entities
-    * in the path of a beam. It uses an iterative approach to find multiple hits and includes
-    * a secondary check for entities that might be missed by the primary hitscan.
+    * in the path of a beam. The beam searches within an inflated bounding box determined by the
+    * block raycast endpoint, identifying entities whose bounding boxes (expanded by pick radius and leniency)
+    * intersect with the beam path.
     *
-    * <p>When {@code blockedByShields} is true, the beam can be blocked by players holding shields
-    * who are facing the beam direction (dot product < -0.6).
+    * <p>When {@code blockedByShields} is true, the beam can be blocked by living entities holding shields
+    * who are facing the beam direction (dot product < -0.6). If a shield blocks the beam, all hits beyond
+    * the blocking entity are filtered out and the beam's endpoint is adjusted.
+    *
+    * <p>The {@code maxEntities} parameter limits the maximum number of entities returned. After sorting
+    * by distance, only the closest {@code maxEntities} are kept. Shield blocking is then applied to this
+    * subset, potentially reducing the count further. If a blocking entity is beyond the limit, blocking
+    * has no effect.
     *
     * <h3>Features:</h3>
     * <ul>
-    *   <li>Finds all entities hit, not just the first</li>
-    *   <li>Sorted by distance from the entity parameter</li>
-    *   <li>Optional shield blocking</li>
-    *   <li>Automatic end-point adjustment when blocked</li>
-    *   <li>Iteration limit to prevent infinite loops</li>
+    *   <li>Finds all living entities hit, not just the first</li>
+    *   <li>Sorted by distance from start position</li>
+    *   <li>Configurable hit leniency via bounding box inflation</li>
+    *   <li>Optional shield blocking with automatic endpoint adjustment</li>
+    *   <li>Configurable maximum entity limit</li>
+    *   <li>Excludes specified entity from collision checks</li>
+    *   <li>Returns block hit information alongside entity hits</li>
     * </ul>
     *
     * <h3>Example:</h3>
@@ -640,99 +649,130 @@ public class MinecraftUtils {
     * Vec3 direction = player.getLookAngle();
     *
     * LasercastResult result = MinecraftUtils.lasercast(
-    *     world, start, direction, 50.0, true, player);
+    *     world, start, direction, 50.0, true, player, 0.1, 100);
     *
     * // Draw particles along the beam
     * ParticleUtils.drawLine(world, result.startPos(), result.endPos(), ParticleTypes.FLAME);
     *
     * // Damage all hits
-    * for (Entity hit : result.sortedHits()) {
-    *     if (hit instanceof LivingEntity living) {
+    * for (LasercastEntityHit hit : result.sortedHits()) {
+    *     if (hit.entity() instanceof LivingEntity living) {
     *         living.hurt(damageSource, 10.0f);
     *     }
     * }
+    *
+    * // Check if beam was blocked
+    * if (result.blockingEntity() != null) {
+    *     result.blockingEntity().level().playSound(null, result.blockingEntity().blockPosition(),
+    *         SoundEvents.SHIELD_BLOCK, SoundSource.PLAYERS, 1.0F, 1.0F);
+    * }
     * }</pre>
     *
-    * @param world the level to raycast in
-    * @param startPos the starting position of the beam
-    * @param direction the direction vector (should be normalized)
-    * @param distance the maximum beam distance
-    * @param blockedByShields whether shields can block the beam
-    * @param entity the source entity (used for collision filtering and distance sorting)
-    * @return result containing start/end positions, direction, and sorted list of hit entities
+    * @param world            the level to raycast in
+    * @param startPos         the starting position of the beam
+    * @param direction        the direction vector (should be normalized)
+    * @param distance         the maximum beam distance
+    * @param blockedByShields whether shields can block the beam and filter subsequent hits
+    * @param except           the entity to exclude from collision checks (typically the source entity)
+    * @param leniency         additional inflation applied to entity bounding boxes for hit detection (0 for exact hits)
+    * @param maxEntities      maximum number of entities to return (sorted by distance, closest first)
+    * @return result containing start/end positions, direction, sorted entity hits, block hit, and blocking entity
     * @see LasercastResult The result record containing all hit information
+    * @see LasercastEntityHit Individual entity hit information
     */
-   public static LasercastResult lasercast(Level world, Vec3 startPos, Vec3 direction, double distance, boolean blockedByShields, Entity entity){
+   public static LasercastResult lasercast(Level world, Vec3 startPos, Vec3 direction, double distance, boolean blockedByShields, Entity except, double leniency, int maxEntities){
       Vec3 rayEnd = startPos.add(direction.scale(distance));
-      BlockHitResult raycast = world.clip(new ClipContext(startPos, rayEnd, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity));
-      EntityHitResult entityHit;
+      BlockHitResult raycast = world.clip(new ClipContext(startPos, rayEnd, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, except));
       Set<Entity> hitSet = new HashSet<>();
-      List<Entity> hits = new ArrayList<>();
       AABB box = new AABB(startPos, raycast.getLocation());
       box = box.inflate(2);
-      // Primary hitscan check with iteration limit to prevent infinite loops
-      // The loop finds entities one at a time (closest first) by excluding already-found entities
-      int maxIterations = 1000;
-      int iterations = 0;
-      do{
-         entityHit = ProjectileUtil.getEntityHitResult(entity, startPos, raycast.getLocation(), box, e -> e instanceof LivingEntity && !e.isSpectator() && !hitSet.contains(e), distance * 2);
-         if(entityHit != null && entityHit.getType() == HitResult.Type.ENTITY){
-            Entity hitEntity = entityHit.getEntity();
-            if(!hitSet.add(hitEntity)){
-               LOGGER.warn("Lasercast duplicate entity detected despite filter - breaking to prevent infinite loop");
-               break;
-            }
-            hits.add(hitEntity);
-         }
-         iterations++;
-      }while(entityHit != null && entityHit.getType() == HitResult.Type.ENTITY && iterations < maxIterations);
-
-      if(iterations >= maxIterations){
-         LOGGER.warn("Lasercast hit iteration limit ({}) at pos {} direction {} - possible infinite loop prevented", maxIterations, startPos, direction);
-      }
-
-      // Secondary hitscan check to add lenience
-      List<Entity> hits2 = world.getEntities(entity, box, (e) -> e instanceof LivingEntity && !e.isSpectator() && !hitSet.contains(e) && MathUtils.hitboxRaycast(e, startPos, raycast.getLocation()));
-      hits.addAll(hits2);
-      hitSet.addAll(hits2);
-      hits.sort(Comparator.comparingDouble(e -> e.distanceTo(entity)));
-
-      if(!blockedByShields){
-         return new LasercastResult(startPos, raycast.getLocation(), direction, hits);
-      }
-
-      List<Entity> hits3 = new ArrayList<>();
+      Predicate<Entity> pred = e -> e instanceof LivingEntity && !e.isSpectator() && !hitSet.contains(e);
+      
+      List<LasercastEntityHit> hits = new ArrayList<>();
+      LivingEntity closestBlocking = null;
+      double closestBlockingDistSqr = distance * distance;
       Vec3 endPoint = raycast.getLocation();
-      for(Entity hit : hits){
-         boolean blocked = false;
-         if(hit instanceof ServerPlayer hitPlayer && hitPlayer.isBlocking()){
-            double dp = hitPlayer.getForward().normalize().dot(direction.normalize());
-            blocked = dp < -0.6;
-            if(blocked){
-               SoundUtils.playSound(world, hitPlayer.blockPosition(), SoundEvents.SHIELD_BLOCK, SoundSource.PLAYERS, 1f, 1f);
-               endPoint = startPos.add(direction.normalize().scale(direction.normalize().dot(hitPlayer.position().subtract(startPos)))).subtract(direction.normalize());
+      
+      for(Entity entity : world.getEntities(except, box, pred)){
+         if(hitSet.contains(entity)) continue;
+         AABB bb = entity.getBoundingBox().inflate(entity.getPickRadius() + leniency);
+         Optional<Vec3> clipPoint = bb.clip(startPos, raycast.getLocation());
+         if(bb.contains(startPos) && entity.canBePickedFromInside()){
+            hitSet.add(entity);
+            hits.add(new LasercastEntityHit(entity, clipPoint.orElse(startPos), 0));
+         }else if(clipPoint.isPresent()){
+            Vec3 location = clipPoint.get();
+            double dd = startPos.distanceToSqr(location);
+            if(blockedByShields && entity instanceof LivingEntity living && living.isBlocking() && dd < closestBlockingDistSqr){
+               double dp = living.getForward().normalize().dot(direction.normalize());
+               boolean blocked = dp < -0.6;
+               if(blocked){
+                  closestBlocking = living;
+                  closestBlockingDistSqr = dd;
+                  endPoint = startPos.add(direction.normalize().scale(direction.normalize().dot(closestBlocking.position().subtract(startPos)))).subtract(direction.normalize());
+               }
             }
-         }
-         hits3.add(hit);
-         if(blocked){
-            break;
+            hitSet.add(entity);
+            hits.add(new LasercastEntityHit(entity, location, Math.sqrt(dd)));
          }
       }
-
-      return new LasercastResult(startPos, endPoint, direction, hits3);
+      
+      hits.sort(Comparator.comparingDouble(LasercastEntityHit::distance));
+      if(hits.size() > maxEntities){
+         hits.subList(maxEntities,hits.size()).clear();
+      }
+      
+      if(closestBlocking != null){
+         double closestBlockingDist = Math.sqrt(closestBlockingDistSqr);
+         hits.removeIf(hit -> hit.distance > closestBlockingDist + 1e-9);
+      }
+      
+      return new LasercastResult(startPos, endPoint, direction, hits, raycast, closestBlocking);
    }
-
+   
    /**
-    * Result of a {@link #lasercast} operation containing all hit information.
+    * Result of a {@link #lasercast} operation containing comprehensive hit information.
     *
-    * @param startPos the starting position of the beam
-    * @param endPos the ending position (may be shortened if blocked by shield or block)
-    * @param direction the beam direction vector
-    * @param sortedHits list of all entities hit, sorted by distance from source
+    * <p>The {@code endPos} may differ from the theoretical maximum distance endpoint if:
+    * <ul>
+    *   <li>A block was hit (shortened to block collision point)</li>
+    *   <li>A shield blocked the beam (shortened to blocking entity position)</li>
+    * </ul>
+    *
+    * <p>The {@code sortedHits} list is sorted by distance from {@code startPos}, with the closest
+    * entity first. The list is limited to the {@code maxEntities} parameter passed to lasercast,
+    * containing only the closest entities. If a shield blocked the beam, hits beyond the blocking
+    * entity are also excluded from the final list.
+    *
+    * @param startPos       the starting position of the beam
+    * @param endPos         the ending position (may be shortened if blocked by shield or block)
+    * @param direction      the beam direction vector (normalized)
+    * @param sortedHits     list of living entities hit, sorted by distance (limited by maxEntities, filtered by blocking)
+    * @param blockHit       the block collision result, or null if no block was hit within range
+    * @param blockingEntity the closest living entity that blocked with a shield, or null if none blocked
+    * @see LasercastEntityHit Information about individual entity hits
     */
-   public record LasercastResult(Vec3 startPos, Vec3 endPos, Vec3 direction, List<Entity> sortedHits) {
+   public record LasercastResult(Vec3 startPos, Vec3 endPos, Vec3 direction, List<LasercastEntityHit> sortedHits, @Nullable BlockHitResult blockHit, @Nullable LivingEntity blockingEntity) {
    }
-
+   
+   /**
+    * Information about a single entity hit by a {@link #lasercast} operation.
+    *
+    * <p>The {@code location} represents the point where the beam first intersected with the entity's
+    * bounding box (inflated by pick radius and leniency). For entities containing the start position,
+    * the location is the start position itself.
+    *
+    * <p>The {@code distance} is measured from the beam's start position to the hit location.
+    * Entities at the start position have a distance of 0.
+    *
+    * @param entity   the entity that was hit (always a LivingEntity)
+    * @param location the world position where the beam intersected the entity's bounding box
+    * @param distance the distance from the beam start to the hit location (in blocks)
+    * @see LasercastResult The complete result containing all hits
+    */
+   public record LasercastEntityHit(Entity entity, Vec3 location, double distance) {
+   }
+   
    /**
     * Retrieves or reconstructs a {@link ServerPlayer} from a {@link NameAndId} entry.
     *
@@ -743,13 +783,13 @@ public class MinecraftUtils {
     * <p><b>Warning:</b> The returned player instance for offline players should not be
     * modified or added to the world. It's primarily for reading data.
     *
-    * @param server the server instance
+    * @param server      the server instance
     * @param playerEntry the player's name and ID
     * @return the online or reconstructed player instance
     */
    public static ServerPlayer getRequestedPlayer(MinecraftServer server, NameAndId playerEntry){
       ServerPlayer requestedPlayer = server.getPlayerList().getPlayerByName(playerEntry.name());
-
+      
       if(requestedPlayer == null){
          requestedPlayer = new ServerPlayer(server, server.overworld(), new GameProfile(playerEntry.id(), playerEntry.name()), ClientInformation.createDefault());
          Optional<ValueInput> readViewOpt = server
@@ -757,11 +797,11 @@ public class MinecraftUtils {
                .loadPlayerData(playerEntry)
                .map(playerData -> TagValueInput.create(new ProblemReporter.ScopedCollector(LogUtils.getLogger()), server.registryAccess(), playerData));
          readViewOpt.ifPresent(requestedPlayer::load);
-
+         
          if(readViewOpt.isPresent()){
             ValueInput readView = readViewOpt.get();
             Optional<String> dimension = readView.getString("Dimension");
-
+            
             if(dimension.isPresent()){
                ServerLevel world = server.getLevel(ResourceKey.create(Registries.DIMENSION, Identifier.tryParse(dimension.get())));
                if(world != null) ((EntityAccessor) requestedPlayer).callSetLevel(world);
@@ -770,7 +810,7 @@ public class MinecraftUtils {
       }
       return requestedPlayer;
    }
-
+   
    public static boolean removeItemEntities(ServerLevel serverWorld, AABB area, Predicate<ItemStack> predicate, int count){
       List<ItemEntity> entities = serverWorld.getEntitiesOfClass(ItemEntity.class, area, entity -> predicate.test(entity.getItem()));
       int foundCount = 0;
