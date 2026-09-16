@@ -31,7 +31,7 @@
   },
   "custom": {
     "mc-publish": {
-      "modrinth-id": "4COXIRzj"
+      "modrinth": "https://api.modrinth.com/v2/project/4COXIRzj"
     }
   }
 }
