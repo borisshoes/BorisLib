@@ -22,6 +22,19 @@ The server has the ability to automatically generate and serve the mod's texture
 
 If everything is done correctly, then players will automatically load into the server with the resource pack installed.
 
+## Using BorisLib for your own mods
+Add the following repository to your build.gradle file
+```
+maven {
+    name = "Boris Maven"
+    url = "https://maven.borisshoes.net/releases"
+}
+```
+Add the following dependency to your build.gradle file
+```
+implementation("net.borisshoes:BorisLib:3.4.5+26.2")
+```
+
 ### Try My Other Mods!
 All server-side Fabric mods — no client installation required.
 
