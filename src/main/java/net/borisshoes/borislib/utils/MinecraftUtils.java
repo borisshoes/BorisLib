@@ -42,6 +42,7 @@ import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.component.BlocksAttacks;
 import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentInstance;
@@ -712,12 +713,18 @@ public class MinecraftUtils {
             Vec3 location = clipPoint.get();
             double dd = startPos.distanceToSqr(location);
             if(blockedByShields && entity instanceof LivingEntity living && living.isBlocking() && dd < closestBlockingDistSqr){
-               double dp = living.getForward().normalize().dot(direction.normalize());
-               boolean blocked = dp < -0.6;
-               if(blocked){
-                  closestBlocking = living;
-                  closestBlockingDistSqr = dd;
-                  endPoint = startPos.add(direction.normalize().scale(direction.normalize().dot(closestBlocking.position().subtract(startPos)))).subtract(direction.normalize());
+               ItemStack blockingStack = living.getItemBlockingWith();
+               BlocksAttacks blocksAttacks = blockingStack.get(DataComponents.BLOCKS_ATTACKS);
+               Optional<Float> maxAngle = blocksAttacks.damageReductions().stream().map(BlocksAttacks.DamageReduction::horizontalBlockingAngle).reduce(Float::max);
+               if(maxAngle.isPresent()){
+                  double dp = living.getForward().normalize().dot(direction.normalize());
+                  double threshold = -Math.cos(Math.toRadians(maxAngle.get()));
+                  boolean blocked = dp <= threshold;
+                  if(blocked){
+                     closestBlocking = living;
+                     closestBlockingDistSqr = dd;
+                     endPoint = startPos.add(direction.normalize().scale(direction.normalize().dot(closestBlocking.position().subtract(startPos)))).subtract(direction.normalize());
+                  }
                }
             }
             hitSet.add(entity);
