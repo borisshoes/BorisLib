@@ -54,6 +54,7 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.CollisionContext;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -628,9 +629,13 @@ public class MinecraftUtils {
     * the blocking entity are filtered out and the beam's endpoint is adjusted.
     *
     * <p>The {@code maxEntities} parameter limits the maximum number of entities returned. After sorting
-    * by distance, only the closest {@code maxEntities} are kept. Shield blocking is then applied to this
-    * subset, potentially reducing the count further. If a blocking entity is beyond the limit, blocking
-    * has no effect.
+    * by distance, only the closest {@code maxEntities} are kept. Values ≤ 0 disable the limit entirely.
+    * Shield blocking is then applied to this subset, potentially reducing the count further. If a blocking
+    * entity is beyond the limit, blocking has no effect.
+    *
+    * <p>The optional {@code entityPredicate} provides additional filtering of entities after basic collision
+    * detection. Only entities for which the predicate returns {@code true} are included in the results.
+    * Pass {@code null} for no additional filtering.
     *
     * <h3>Features:</h3>
     * <ul>
@@ -638,7 +643,8 @@ public class MinecraftUtils {
     *   <li>Sorted by distance from start position</li>
     *   <li>Configurable hit leniency via bounding box inflation</li>
     *   <li>Optional shield blocking with automatic endpoint adjustment</li>
-    *   <li>Configurable maximum entity limit</li>
+    *   <li>Configurable maximum entity limit (≤ 0 disables limit)</li>
+    *   <li>Optional entity predicate for additional filtering</li>
     *   <li>Excludes specified entity from collision checks</li>
     *   <li>Returns block hit information alongside entity hits</li>
     * </ul>
@@ -680,9 +686,10 @@ public class MinecraftUtils {
     * @see LasercastResult The result record containing all hit information
     * @see LasercastEntityHit Individual entity hit information
     */
-   public static LasercastResult lasercast(Level world, Vec3 startPos, Vec3 direction, double distance, boolean blockedByShields, Entity except, double leniency, int maxEntities){
+   public static LasercastResult lasercast(Level world, Vec3 startPos, Vec3 direction, double distance, boolean blockedByShields, @Nullable Entity except, double leniency, int maxEntities, @Nullable Predicate<Entity> entityPredicate){
       Vec3 rayEnd = startPos.add(direction.scale(distance));
-      BlockHitResult raycast = world.clip(new ClipContext(startPos, rayEnd, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, except));
+      ClipContext context = except == null ? new ClipContext(startPos, rayEnd, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, CollisionContext.empty()) : new ClipContext(startPos, rayEnd, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, except);
+      BlockHitResult raycast = world.clip(context);
       Set<Entity> hitSet = new HashSet<>();
       AABB box = new AABB(startPos, raycast.getLocation());
       box = box.inflate(2);
@@ -695,6 +702,7 @@ public class MinecraftUtils {
       
       for(Entity entity : world.getEntities(except, box, pred)){
          if(hitSet.contains(entity)) continue;
+         if(entityPredicate != null && !entityPredicate.test(entity)) continue;
          AABB bb = entity.getBoundingBox().inflate(entity.getPickRadius() + leniency);
          Optional<Vec3> clipPoint = bb.clip(startPos, raycast.getLocation());
          if(bb.contains(startPos) && entity.canBePickedFromInside()){
@@ -718,8 +726,8 @@ public class MinecraftUtils {
       }
       
       hits.sort(Comparator.comparingDouble(LasercastEntityHit::distance));
-      if(hits.size() > maxEntities){
-         hits.subList(maxEntities,hits.size()).clear();
+      if(maxEntities > 0 && hits.size() > maxEntities){
+         hits.subList(maxEntities, hits.size()).clear();
       }
       
       if(closestBlocking != null){
@@ -727,8 +735,80 @@ public class MinecraftUtils {
          hits.removeIf(hit -> hit.distance > closestBlockingDist + 1e-9);
       }
       
-      return new LasercastResult(startPos, endPoint, direction, hits, raycast, closestBlocking);
-   }
+       return new LasercastResult(startPos, endPoint, direction, hits, raycast, closestBlocking);
+    }
+    
+    /**
+     * Convenience overload of {@link #lasercast} without entity predicate filtering.
+     *
+     * @param world            the level to raycast in
+     * @param startPos         the starting position of the beam
+     * @param direction        the direction vector (should be normalized)
+     * @param distance         the maximum beam distance
+     * @param blockedByShields whether shields can block the beam
+     * @param except           the entity to exclude from collision checks
+     * @param leniency         additional inflation applied to entity bounding boxes
+     * @param maxEntities      maximum number of entities to return
+     * @return result containing hit information
+     * @see #lasercast(Level, Vec3, Vec3, double, boolean, Entity, double, int, Predicate) For full documentation
+     */
+    public static LasercastResult lasercast(Level world, Vec3 startPos, Vec3 direction, double distance, boolean blockedByShields, Entity except, double leniency, int maxEntities){
+       return lasercast(world, startPos, direction, distance, blockedByShields, except, leniency, maxEntities, null);
+    }
+    
+    /**
+     * Convenience overload of {@link #lasercast} without entity limit or predicate filtering.
+     *
+     * <p>Uses default entity limit of -1 (no limit).
+     *
+     * @param world            the level to raycast in
+     * @param startPos         the starting position of the beam
+     * @param direction        the direction vector (should be normalized)
+     * @param distance         the maximum beam distance
+     * @param blockedByShields whether shields can block the beam
+     * @param except           the entity to exclude from collision checks
+     * @param leniency         additional inflation applied to entity bounding boxes
+     * @return result containing hit information
+     * @see #lasercast(Level, Vec3, Vec3, double, boolean, Entity, double, int, Predicate) For full documentation
+     */
+    public static LasercastResult lasercast(Level world, Vec3 startPos, Vec3 direction, double distance, boolean blockedByShields, Entity except, double leniency){
+       return lasercast(world, startPos, direction, distance, blockedByShields, except, leniency, -1, null);
+    }
+    
+    /**
+     * Convenience overload of {@link #lasercast} without leniency, entity limit, or predicate filtering.
+     *
+     * <p>Uses default leniency of 0.1 and entity limit of -1 (no limit).
+     *
+     * @param world            the level to raycast in
+     * @param startPos         the starting position of the beam
+     * @param direction        the direction vector (should be normalized)
+     * @param distance         the maximum beam distance
+     * @param blockedByShields whether shields can block the beam
+     * @param except           the entity to exclude from collision checks
+     * @return result containing hit information
+     * @see #lasercast(Level, Vec3, Vec3, double, boolean, Entity, double, int, Predicate) For full documentation
+     */
+    public static LasercastResult lasercast(Level world, Vec3 startPos, Vec3 direction, double distance, boolean blockedByShields, Entity except){
+       return lasercast(world, startPos, direction, distance, blockedByShields, except, 0.1, -1, null);
+    }
+    
+    /**
+     * Convenience overload of {@link #lasercast} with no excluded entity or filtering.
+     *
+     * <p>Uses default leniency of 0.1, entity limit of -1 (no limit), and no excluded entity.
+     *
+     * @param world            the level to raycast in
+     * @param startPos         the starting position of the beam
+     * @param direction        the direction vector (should be normalized)
+     * @param distance         the maximum beam distance
+     * @param blockedByShields whether shields can block the beam
+     * @return result containing hit information
+     * @see #lasercast(Level, Vec3, Vec3, double, boolean, Entity, double, int, Predicate) For full documentation
+     */
+    public static LasercastResult lasercast(Level world, Vec3 startPos, Vec3 direction, double distance, boolean blockedByShields){
+       return lasercast(world, startPos, direction, distance, blockedByShields, null, 0.1, -1, null);
+    }
    
    /**
     * Result of a {@link #lasercast} operation containing comprehensive hit information.
@@ -752,7 +832,8 @@ public class MinecraftUtils {
     * @param blockingEntity the closest living entity that blocked with a shield, or null if none blocked
     * @see LasercastEntityHit Information about individual entity hits
     */
-   public record LasercastResult(Vec3 startPos, Vec3 endPos, Vec3 direction, List<LasercastEntityHit> sortedHits, @Nullable BlockHitResult blockHit, @Nullable LivingEntity blockingEntity) {
+   public record LasercastResult(Vec3 startPos, Vec3 endPos, Vec3 direction, List<LasercastEntityHit> sortedHits,
+                                 @Nullable BlockHitResult blockHit, @Nullable LivingEntity blockingEntity) {
    }
    
    /**
