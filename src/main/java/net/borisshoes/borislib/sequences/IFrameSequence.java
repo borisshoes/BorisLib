@@ -132,7 +132,7 @@ public class IFrameSequence extends PlayerSequence {
       }
       
       if(immuneToDamage){
-         player.setInvulnerable(true);
+         player.setPermanentlyInvulnerable(true);
       }
    }
    

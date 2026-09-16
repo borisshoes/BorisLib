@@ -143,7 +143,7 @@ public class CutsceneSequence extends PlayerSequence {
             mannequin.setPose(player.getPose());
 
             mannequin.setNoGravity(true);
-            mannequin.setInvulnerable(true);
+            mannequin.setPermanentlyInvulnerable(true);
             mannequin.setSilent(true);
 
             // ── Equipment ────────────────────────────────────────────────

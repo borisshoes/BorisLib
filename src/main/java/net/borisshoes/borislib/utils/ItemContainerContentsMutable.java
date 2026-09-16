@@ -78,7 +78,7 @@ public class ItemContainerContentsMutable {
     * @param component the component to convert
     */
    public ItemContainerContentsMutable(ItemContainerContents component){
-      this.items = component.allItemsCopyStream().collect(Collectors.toCollection(ArrayList::new));
+      this.items = component.itemCopies().collect(Collectors.toCollection(ArrayList::new));
    }
    
    /**

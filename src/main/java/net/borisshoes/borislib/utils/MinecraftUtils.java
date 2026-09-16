@@ -29,6 +29,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.NameAndId;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.Mth;
+import net.minecraft.util.Prediction;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
@@ -457,14 +458,14 @@ public class MinecraftUtils {
             ItemEntity itemEntity;
             boolean bl = player.getInventory().add(stack);
             if(!bl || !stack.isEmpty()){
-               itemEntity = player.drop(stack, false);
+               itemEntity = player.drop(stack, false, Prediction.SERVER_ONLY);
                if(itemEntity == null) continue;
                itemEntity.setNoPickUpDelay();
                itemEntity.setTarget(player.getUUID());
                continue;
             }
             stack.setCount(1);
-            itemEntity = player.drop(stack, false);
+            itemEntity = player.drop(stack, false, Prediction.SERVER_ONLY);
             if(itemEntity != null){
                itemEntity.makeFakeItem();
             }
@@ -584,7 +585,7 @@ public class MinecraftUtils {
     * @return a tuple containing updated contents and any remaining stack
     */
    public static Pair<ItemContainerContents, ItemStack> tryAddStackToContainerComp(ItemContainerContents container, int size, ItemStack stack){
-      List<ItemStack> beltList = new ArrayList<>(container.allItemsCopyStream().toList());
+      List<ItemStack> beltList = new ArrayList<>(container.itemCopies().toList());
       
       // Fill up existing slots first
       for(ItemStack existingStack : beltList){

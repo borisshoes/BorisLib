@@ -404,7 +404,7 @@ public final class SequenceManager {
       
       // ── Invulnerability ────────────────────────────────────────────────────
       try{
-         player.setInvulnerable(snapshot.wasInvulnerable());
+         player.setPermanentlyInvulnerable(snapshot.wasInvulnerable());
       }catch(Exception e){
          LOGGER.warn("Failed to restore invulnerability for {}: {}", player.getUUID(), e.getMessage());
       }
@@ -469,7 +469,7 @@ public final class SequenceManager {
       }catch(Exception ignored){
       }
       try{
-         player.setInvulnerable(snapshot.wasInvulnerable());
+         player.setPermanentlyInvulnerable(snapshot.wasInvulnerable());
       }catch(Exception ignored){
       }
       try{

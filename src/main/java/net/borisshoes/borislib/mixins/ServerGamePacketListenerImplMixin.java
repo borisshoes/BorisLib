@@ -52,26 +52,26 @@ public class ServerGamePacketListenerImplMixin {
     * <b>Arcana-style position lock — override the {@code x} local.</b>
     *
     * <p>When an active sequence blocks movement, the first {@code double} local
-    * stored in {@code handleMovePlayer} (i.e. the x-coordinate read from the packet)
+    * stored in {@code handlePlayerPositionChange} (i.e. the x-coordinate read from the packet)
     * is replaced with the server's authoritative x.  The packet is never cancelled,
     * so all other vanilla processing — on-ground flag, rotation, etc. — continues
     * to run normally.
     */
-   @ModifyVariable(method = "handleMovePlayer", at = @At("STORE"), ordinal = 0)
+   @ModifyVariable(method = "handlePlayerPositionChange", at = @At("STORE"), ordinal = 3)
    private double borislib$lockX(double x){
       PlayerSequence seq = SequenceManager.getActiveSequence(player.getUUID());
       return (seq != null && seq.blocksMovement()) ? player.getX() : x;
    }
 
    /** Arcana-style position lock — override the {@code y} local. */
-   @ModifyVariable(method = "handleMovePlayer", at = @At("STORE"), ordinal = 1)
+   @ModifyVariable(method = "handlePlayerPositionChange", at = @At("STORE"), ordinal = 4)
    private double borislib$lockY(double y){
       PlayerSequence seq = SequenceManager.getActiveSequence(player.getUUID());
       return (seq != null && seq.blocksMovement()) ? player.getY() : y;
    }
 
    /** Arcana-style position lock — override the {@code z} local. */
-   @ModifyVariable(method = "handleMovePlayer", at = @At("STORE"), ordinal = 2)
+   @ModifyVariable(method = "handlePlayerPositionChange", at = @At("STORE"), ordinal = 5)
    private double borislib$lockZ(double z){
       PlayerSequence seq = SequenceManager.getActiveSequence(player.getUUID());
       return (seq != null && seq.blocksMovement()) ? player.getZ() : z;
@@ -117,10 +117,10 @@ public class ServerGamePacketListenerImplMixin {
     *       direction is preserved.</li>
     * </ul>
     */
-   @Inject(method = "handleMovePlayer",
+   @Inject(method = "handlePlayerPositionChange",
          at = @At(value = "INVOKE",
                target = "Lnet/minecraft/server/level/ServerPlayer;move(Lnet/minecraft/world/entity/MoverType;Lnet/minecraft/world/phys/Vec3;)V"))
-   private void borislib$sendPositionCorrection(ServerboundMovePlayerPacket packet, CallbackInfo ci){
+   private void borislib$sendPositionCorrection(double requestedX, double requestedY, double requestedZ, float requestedYRot, float requestedXRot, boolean isOnGround, boolean horizontalCollision, CallbackInfo ci){
       PlayerSequence seq = SequenceManager.getActiveSequence(player.getUUID());
       if(seq == null || !seq.blocksMovement()) return;
 
@@ -163,10 +163,10 @@ public class ServerGamePacketListenerImplMixin {
 
    // ─────────────────────── velocity tracker (existing) ──────────────────────
 
-   @Inject(method = "handleMovePlayer",
+   @Inject(method = "handlePlayerPositionChange",
          at = @At(value = "INVOKE",
                target = "Lnet/minecraft/server/level/ServerPlayer;setOnGroundWithMovement(ZZLnet/minecraft/world/phys/Vec3;)V"))
-   private void borislib$updateVelocityTracker(ServerboundMovePlayerPacket packet, CallbackInfo ci, @Local Vec3 velocity){
+   private void borislib$updateVelocityTracker(double requestedX, double requestedY, double requestedZ, float requestedYRot, float requestedXRot, boolean isOnGround, boolean horizontalCollision, CallbackInfo ci, @Local Vec3 velocity){
       if(PLAYER_MOVEMENT_TRACKER.containsKey(player) && !player.isDeadOrDying()){
          PlayerMovementEntry newEntry = new PlayerMovementEntry(player, player.position(), velocity, System.nanoTime());
          PLAYER_MOVEMENT_TRACKER.put(player, newEntry);
