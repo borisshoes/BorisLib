@@ -3,13 +3,18 @@ package net.borisshoes.borislib.sequences;
 import net.borisshoes.borislib.BorisLib;
 import net.borisshoes.borislib.datastorage.DataAccess;
 import net.borisshoes.borislib.datastorage.DefaultPlayerData;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.decoration.Mannequin;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.portal.TeleportTransition;
 import net.minecraft.world.phys.Vec3;
 
@@ -35,7 +40,17 @@ import java.util.UUID;
  * <h3>Mannequin stand-in</h3>
  * When {@code spawnMannequin} is {@code true}, a vanilla {@link Mannequin} entity
  * carrying the player's skin, equipment, body rotation, and current pose is spawned at
- * the player's original body position for the duration of the cutscene.
+ * the player's original body position for the duration of the cutscene. The mannequin
+ * always spawns in the player's <em>origin</em> dimension, even when the cutscene camera
+ * itself takes place in a different dimension (see below) — it represents the player's
+ * body staying behind.
+ *
+ * <h3>Cross-dimension cutscenes</h3>
+ * By default the camera path plays out in the player's current dimension. Passing a
+ * non-null {@code targetDimension} instead teleports the player (the camera) into that
+ * dimension for the duration of the cutscene — e.g. a player standing in the Overworld
+ * can watch a cutscene unfold in the Nether. {@link SequenceManager} restores the player
+ * to their original dimension and position automatically once the sequence ends.
  *
  * <h3>Example usage</h3>
  * <pre>{@code
@@ -52,76 +67,145 @@ import java.util.UUID;
  * }</pre>
  */
 public class CutsceneSequence extends PlayerSequence {
-
+   
+   /**
+    * Keeps the mannequin's origin-dimension chunk loaded for the duration of the cutscene.
+    * Without this, a cutscene that moves the player away from the mannequin (especially into
+    * another dimension, where no player remains nearby at all) can let that chunk unload —
+    * once unloaded, the mannequin is detached from the level's live entity tracking and a
+    * later {@link Mannequin#discard()} silently does nothing, leaving a permanent ghost
+    * mannequin behind in the saved chunk data.
+    */
+   private static final TicketType MANNEQUIN_LOAD_TICKET = new TicketType(TicketType.NO_TIMEOUT, TicketType.FLAG_LOADING);
+   
    private final CameraPath path;
    private final int durationTicks;
-
+   
    /**
     * When {@code true}, a {@link Mannequin} with the player's skin (equipment,
     * rotation, and pose) is spawned at their original body position for the
     * duration of the cutscene.
     */
    private final boolean spawnMannequin;
-
-   /** Optional mannequin stand-in. Non-null only when {@link #spawnMannequin} is {@code true}. */
-   private Mannequin mannequin = null;
-
-   /** Body position captured before entering spectator; used for mannequin placement. */
-   private double pinnedX, pinnedY, pinnedZ;
-
-   // ─────────────────────────────── constructors ────────────────────────────
-
+   
    /**
-    * @param playerUUID     UUID of the player.
-    * @param path           Camera path evaluated from t=0 to t=1 over {@code durationTicks}.
-    * @param durationTicks  Duration in server ticks. {@code -1} = indefinite.
-    * @param spawnMannequin When {@code true}, a Mannequin is spawned as a visual body stand-in.
+    * Optional mannequin stand-in. Non-null only when {@link #spawnMannequin} is {@code true}.
     */
-   public CutsceneSequence(UUID playerUUID, CameraPath path, int durationTicks, boolean spawnMannequin){
+   private Mannequin mannequin = null;
+   
+   /**
+    * Body position captured before entering spectator; used for mannequin placement.
+    */
+   private double pinnedX, pinnedY, pinnedZ;
+   
+   /**
+    * Dimension the cutscene camera plays out in. {@code null} means "the player's
+    * current dimension" (legacy/default behaviour).
+    */
+   private final ResourceKey<Level> targetDimension;
+   
+   /**
+    * The resolved level the camera path runs in, set in {@link #onStart}.
+    */
+   private ServerLevel cutsceneLevel;
+   
+   /**
+    * Origin-dimension level + chunk holding the mannequin's forced-load ticket; null if none is held.
+    */
+   private ServerLevel mannequinTicketLevel;
+   private ChunkPos mannequinChunkPos;
+   
+   // ─────────────────────────────── constructors ────────────────────────────
+   
+   /**
+    * @param playerUUID      UUID of the player.
+    * @param path            Camera path evaluated from t=0 to t=1 over {@code durationTicks}.
+    * @param durationTicks   Duration in server ticks. {@code -1} = indefinite.
+    * @param spawnMannequin  When {@code true}, a Mannequin is spawned as a visual body stand-in
+    *                        at the player's origin position (always in the origin dimension).
+    * @param targetDimension Dimension the camera path plays out in, or {@code null} to use the
+    *                        player's current dimension.
+    */
+   public CutsceneSequence(UUID playerUUID, CameraPath path, int durationTicks, boolean spawnMannequin, ResourceKey<Level> targetDimension){
       super(playerUUID);
       this.path = path;
       this.durationTicks = durationTicks;
       this.spawnMannequin = spawnMannequin;
+      this.targetDimension = targetDimension;
    }
-
-   /** Convenience constructor: spectator-only, no mannequin. */
+   
+   /**
+    * Convenience constructor: plays out in the player's current dimension.
+    */
+   public CutsceneSequence(UUID playerUUID, CameraPath path, int durationTicks, boolean spawnMannequin){
+      this(playerUUID, path, durationTicks, spawnMannequin, null);
+   }
+   
+   /**
+    * Convenience constructor: spectator-only, no mannequin, current dimension.
+    */
    public CutsceneSequence(UUID playerUUID, CameraPath path, int durationTicks){
-      this(playerUUID, path, durationTicks, false);
+      this(playerUUID, path, durationTicks, false, null);
    }
-
-   /** Convenience factory for a completely static (non-moving) camera view. */
-   public static CutsceneSequence staticView(UUID playerUUID, double x, double y, double z,
-                                             float yaw, float pitch, int durationTicks, boolean spawnMannequin){
+   
+   /**
+    * Convenience factory for a completely static (non-moving) camera view.
+    */
+   public static CutsceneSequence staticView(UUID playerUUID, double x, double y, double z, float yaw, float pitch, int durationTicks, boolean spawnMannequin, ResourceKey<Level> targetDimension){
       return new CutsceneSequence(playerUUID,
             CameraPath.staticView(new Vec3(x, y, z), yaw, pitch),
-            durationTicks, spawnMannequin);
+            durationTicks, spawnMannequin, targetDimension);
    }
-
-   public static CutsceneSequence staticView(UUID playerUUID, double x, double y, double z,
-                                             float yaw, float pitch, int durationTicks){
-      return staticView(playerUUID, x, y, z, yaw, pitch, durationTicks, false);
+   
+   public static CutsceneSequence staticView(UUID playerUUID, double x, double y, double z, float yaw, float pitch, int durationTicks, boolean spawnMannequin){
+      return staticView(playerUUID, x, y, z, yaw, pitch, durationTicks, spawnMannequin, null);
    }
-
+   
+   public static CutsceneSequence staticView(UUID playerUUID, double x, double y, double z, float yaw, float pitch, int durationTicks){
+      return staticView(playerUUID, x, y, z, yaw, pitch, durationTicks, false, null);
+   }
+   
    // ─────────────────────────────── lifecycle ───────────────────────────────
-
+   
    @Override
    public void onStart(ServerPlayer player){
       CameraPathSample initial = path.evaluate(0.0);
+      // "level" is always the player's ORIGIN dimension — used for mannequin placement,
+      // since the mannequin represents the player's body staying behind.
       ServerLevel level = (ServerLevel) player.level();
-
+      
+      // Resolve the dimension the camera path itself plays out in. Falls back to the
+      // origin dimension if none was requested, or if the requested one doesn't exist.
+      cutsceneLevel = level;
+      if(targetDimension != null){
+         ServerLevel resolved = player.level().getServer().getLevel(targetDimension);
+         if(resolved != null){
+            cutsceneLevel = resolved;
+         }else{
+            BorisLib.LOGGER.warn("CutsceneSequence: could not resolve target dimension '{}' — using player's current dimension.", targetDimension.identifier());
+         }
+      }
+      
       // Capture the body position before entering spectator.
       pinnedX = player.getX();
       pinnedY = player.getY();
       pinnedZ = player.getZ();
-
+      
       // ── Optional Mannequin stand-in ─────────────────────────────────────
       if(spawnMannequin){
+         // Force-load the mannequin's chunk for the cutscene's duration so it can't unload
+         // out from under us (see MANNEQUIN_LOAD_TICKET javadoc).
+         mannequinTicketLevel = level;
+         BlockPos pinnedBlockPos = BlockPos.containing(pinnedX, pinnedY, pinnedZ);
+         mannequinChunkPos = new ChunkPos(pinnedBlockPos.getX() >> 4, pinnedBlockPos.getZ() >> 4);
+         level.getChunkSource().addTicketWithRadius(MANNEQUIN_LOAD_TICKET, mannequinChunkPos, 1);
+         
          DefaultPlayerData data = DataAccess.getPlayer(player.getUUID(), BorisLib.PLAYER_DATA_KEY);
          mannequin = data.createMannequin(level);
          if(mannequin != null){
             // Position
             mannequin.setPos(pinnedX, pinnedY, pinnedZ);
-
+            
             // ── Rotation ────────────────────────────────────────────────
             // yRot      = general entity yaw (also used as body yaw in absence of explicit override)
             mannequin.setYRot(player.getYRot());
@@ -135,17 +219,17 @@ public class CutsceneSequence extends PlayerSequence {
             // yBodyRot  = body yaw (server-side, informs client-side body direction)
             mannequin.setYBodyRot(player.yBodyRot);
             mannequin.yBodyRotO = player.yBodyRot;
-
+            
             // ── Pose ─────────────────────────────────────────────────────
             // Copies STANDING / CROUCHING / SLEEPING / SWIMMING (crawl), etc.
             // Mannequin only supports poses in its VALID_POSES set; unsupported
             // poses fall back to STANDING naturally.
             mannequin.setPose(player.getPose());
-
+            
             mannequin.setNoGravity(true);
             mannequin.setPermanentlyInvulnerable(true);
             mannequin.setSilent(true);
-
+            
             // ── Equipment ────────────────────────────────────────────────
             if(mannequin instanceof LivingEntity livingMannequin){
                for(EquipmentSlot slot : EquipmentSlot.values()){
@@ -156,14 +240,14 @@ public class CutsceneSequence extends PlayerSequence {
                }
             }
             level.addFreshEntity(mannequin);
-
+            
             // Persist UUID for crash-recovery cleanup in SequenceManager.
             PlayerSnapshot snapshot = DataAccess.getPlayer(player.getUUID(), PlayerSnapshot.KEY);
             snapshot.setCameraEntityUUID(mannequin.getUUID().toString());
             DataAccess.markPlayerDirty(player.getUUID());
          }
       }
-
+      
       // ── Enter spectator and teleport to path start ───────────────────────
       // The player IS the camera in spectator mode.  Set server-side rotation
       // first so the mixin correction packet uses the correct values immediately.
@@ -171,13 +255,14 @@ public class CutsceneSequence extends PlayerSequence {
       player.setYRot(initial.yaw());
       player.setXRot(initial.pitch());
       player.teleport(new TeleportTransition(
-            level,
+            cutsceneLevel,
             new Vec3(initial.position().x, initial.position().y, initial.position().z),
             Vec3.ZERO,
             initial.yaw(), initial.pitch(),
-            entity -> {}));
+            entity -> {
+            }));
    }
-
+   
    @Override
    public void onTick(ServerPlayer player, int tick){
       // t=0.0 on tick 0, t=1.0 on the final tick.
@@ -188,24 +273,25 @@ public class CutsceneSequence extends PlayerSequence {
          t = 0.0; // indefinite — hold at path start
       }
       CameraPathSample sample = path.evaluate(t);
-
+      
       // Update server-side rotation BEFORE the teleport so the mixin's
       // correction packet (which reads player.getYRot()/getXRot()) already
       // has the current path rotation when a client movement packet arrives.
       player.setYRot(sample.yaw());
       player.setXRot(sample.pitch());
-
+      
       // Teleport the player (= the camera) to the new path position+rotation.
       // TeleportTransition sends ClientboundPlayerPositionPacket, which encodes
       // yaw and pitch as full-precision floats — no byte-quantisation artefacts.
       player.teleport(new TeleportTransition(
-            (ServerLevel) player.level(),
+            cutsceneLevel,
             new Vec3(sample.position().x, sample.position().y, sample.position().z),
             Vec3.ZERO,
             sample.yaw(), sample.pitch(),
-            entity -> {}));
+            entity -> {
+            }));
    }
-
+   
    @Override
    public void onEnd(ServerPlayer player, boolean cancelled){
       // Discard the optional mannequin.
@@ -213,42 +299,71 @@ public class CutsceneSequence extends PlayerSequence {
          mannequin.discard();
       }
       mannequin = null;
-
+      
+      // Release the chunk-load ticket now that the mannequin has been discarded.
+      if(mannequinTicketLevel != null && mannequinChunkPos != null){
+         mannequinTicketLevel.getChunkSource().removeTicketWithRadius(MANNEQUIN_LOAD_TICKET, mannequinChunkPos, 1);
+         mannequinTicketLevel = null;
+         mannequinChunkPos = null;
+      }
+      
       // Clear the persisted entity UUID so SequenceManager skips re-discard.
       PlayerSnapshot snapshot = DataAccess.getPlayer(player.getUUID(), PlayerSnapshot.KEY);
       snapshot.setCameraEntityUUID("");
       DataAccess.markPlayerDirty(player.getUUID());
-
+      
       // NOTE: Game-mode, position, and flags are restored by SequenceManager
       // from the PlayerSnapshot automatically — do NOT restore them here.
    }
-
+   
    // ─────────────────────────────── flags ───────────────────────────────────
-
+   
    @Override
-   public int getDurationTicks(){ return durationTicks; }
-
+   public int getDurationTicks(){
+      return durationTicks;
+   }
+   
    /**
     * Block position input — the per-tick TeleportTransition drives position.
     * The Arcana-style @ModifyVariable mixin corrects any drift.
     */
    @Override
-   public boolean blocksMovement(){ return true; }
-
+   public boolean blocksMovement(){
+      return true;
+   }
+   
    /**
     * Lock look input to the scripted path rotation.
     * Combined with the Arcana-style correction packet (absolute float rotation),
     * this gives the client sub-degree precision without byte quantisation.
     */
    @Override
-   public boolean blocksLook(){ return true; }
-
-   /** Always restrict spectator abuse — the player is always in spectator mode. */
+   public boolean blocksLook(){
+      return true;
+   }
+   
+   /**
+    * Always restrict spectator abuse — the player is always in spectator mode.
+    */
    @Override
-   public boolean restrictsSpectatorAbuse(){ return true; }
-
+   public boolean restrictsSpectatorAbuse(){
+      return true;
+   }
+   
    // ─────────────────────────────── accessors ───────────────────────────────
-
-   public CameraPath getPath(){ return path; }
-   public boolean isSpawnMannequin(){ return spawnMannequin; }
+   
+   public CameraPath getPath(){
+      return path;
+   }
+   
+   public boolean isSpawnMannequin(){
+      return spawnMannequin;
+   }
+   
+   /**
+    * @return the requested camera dimension, or {@code null} if it plays out in the player's current dimension.
+    */
+   public ResourceKey<Level> getTargetDimension(){
+      return targetDimension;
+   }
 }

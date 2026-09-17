@@ -29,6 +29,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.DimensionArgument;
 import net.minecraft.commands.arguments.ParticleArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -209,7 +210,15 @@ public class BorisLibCommands {
                                                       context,
                                                       getBool(context, "mannequin"),
                                                       getString(context, "interpolation"),
-                                                      getInteger(context, "duration")))))))
+                                                      getInteger(context, "duration"),
+                                                      null))
+                                                .then(argument("dimension", DimensionArgument.dimension())
+                                                      .executes(context -> BorisLibCommands.sequenceCutscene(
+                                                            context,
+                                                            getBool(context, "mannequin"),
+                                                            getString(context, "interpolation"),
+                                                            getInteger(context, "duration"),
+                                                            DimensionArgument.getDimension(context, "dimension"))))))))
                         .then(literal("iframe")
                               .requires(Permissions.require(MOD_ID + ".testmod.sequence.iframe", PermissionLevel.GAMEMASTERS))
                               .then(argument("immune", bool())
@@ -844,8 +853,12 @@ public class BorisLibCommands {
     * <p>The camera orbits at a radius of 7 blocks, with a height that undulates via
     * {@code sin(2 * angle)} so the sweep rises and dips twice per revolution.
     * The camera always faces inward toward the player's torso.
+    *
+    * @param targetLevel dimension the camera path plays out in, or {@code null} to use the
+    *                     player's current dimension. The orbit is centered on the player's
+    *                     current coordinates regardless of dimension.
     */
-   private static int sequenceCutscene(CommandContext<CommandSourceStack> context, boolean spawnMannequin, String interpStr, int durationTicks){
+   private static int sequenceCutscene(CommandContext<CommandSourceStack> context, boolean spawnMannequin, String interpStr, int durationTicks, ServerLevel targetLevel){
       if(!context.getSource().isPlayer()){
          context.getSource().sendFailure(Component.translatable("text.borislib.must_be_executed_by_player"));
          return -1;
@@ -889,14 +902,16 @@ public class BorisLibCommands {
          pathBuilder.add(kf.build());
       }
       
-      CutsceneSequence sequence = new CutsceneSequence(player.getUUID(), pathBuilder.build(), durationTicks, spawnMannequin);
+      CutsceneSequence sequence = new CutsceneSequence(player.getUUID(), pathBuilder.build(), durationTicks, spawnMannequin,
+            targetLevel != null ? targetLevel.dimension() : null);
       boolean started = SequenceManager.start(player, sequence);
-      
+
       if(started){
          final String mannequinDesc = spawnMannequin ? "mannequin stand-in" : "no body (pure spectator)";
          final InterpolationType finalInterp = interp;
+         final String dimensionDesc = targetLevel != null ? (", dimension: " + targetLevel.dimension().identifier()) : "";
          context.getSource().sendSuccess(() -> Component.literal(
-               "[Cutscene] Started — " + mannequinDesc + ", interp: " + finalInterp.name() + ", " + durationTicks + " ticks"
+               "[Cutscene] Started — " + mannequinDesc + ", interp: " + finalInterp.name() + ", " + durationTicks + " ticks" + dimensionDesc
          ).withColor(TextColor.GREEN), false);
          return 1;
       }else{
