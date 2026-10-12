@@ -1,7 +1,6 @@
 package net.borisshoes.borislib.callbacks;
 
-import net.borisshoes.borislib.datastorage.ConditionData;
-import net.borisshoes.borislib.datastorage.DataAccess;
+import net.borisshoes.borislib.conditions.Conditions;
 import net.borisshoes.borislib.events.Event;
 import net.borisshoes.borislib.timers.TickTimerCallback;
 import net.minecraft.server.MinecraftServer;
@@ -16,8 +15,8 @@ import static net.borisshoes.borislib.events.Event.RECENT_EVENTS;
 
 /**
  * Server-wide tick hook that drives the global pieces of BorisLib: server-level
- * {@link net.borisshoes.borislib.timers.TickTimerCallback}s, the {@link Event} queue, and the
- * condition tick loop.
+ * {@link net.borisshoes.borislib.timers.TickTimerCallback}s, the {@link Event} queue, and flushing
+ * condition changes to storage.
  *
  * <p>Wired up by BorisLib during init and called by the Fabric server-tick event.</p>
  */
@@ -30,7 +29,8 @@ public class ServerTickCallback {
     *    <li>Tick every server-scoped {@link net.borisshoes.borislib.timers.TickTimerCallback}, firing and
     *        removing the ones that reach zero (skipped if tickrate is paused).</li>
     *    <li>Tick every {@link Event} in {@link Event#RECENT_EVENTS}.</li>
-    *    <li>Tick all conditions for all entities via {@link ConditionData#tick(MinecraftServer)}.</li>
+    *    <li>Mark condition storage dirty if any condition changed this tick, via
+    *        {@link Conditions#flushDirty(MinecraftServer)}. Conditions themselves tick with their entity.</li>
     *    <li>Drop expired events.</li>
     * </ol>
     *
@@ -46,8 +46,8 @@ public class ServerTickCallback {
             event.tick();
          }
          
-         // Tick Conditions for all living entities
-         DataAccess.getGlobal(ConditionData.KEY).tick(server);
+         // Persist condition changes made this tick
+         Conditions.flushDirty(server);
          
          RECENT_EVENTS.removeIf(Event::isExpired);
       }catch(Exception e){

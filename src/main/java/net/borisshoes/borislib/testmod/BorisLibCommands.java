@@ -49,7 +49,6 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.phys.Vec3;
-import org.apache.commons.lang3.tuple.Triple;
 import org.w3c.dom.Text;
 
 import java.util.List;
@@ -90,8 +89,8 @@ public class BorisLibCommands {
                         .requires(Permissions.require(MOD_ID + ".condition.add", PermissionLevel.GAMEMASTERS))
                         .then(argument("entity", entity())
                               .then(argument("condition", id()).suggests(BorisLibCommands::suggestConditions)
-                                    .then(argument("value", floatArg())
-                                          .then(argument("duration", integer(1))
+                                    .then(argument("value", string())
+                                          .then(argument("duration", integer(ConditionInstance.INFINITE_DURATION))
                                                 .then(argument("operation", string()).suggests(BorisLibCommands::suggestOperations)
                                                       .then(argument("particles", bool())
                                                             .then(argument("stacking", bool())
@@ -125,11 +124,6 @@ public class BorisLibCommands {
                               .then(argument("condition", id()).suggests(BorisLibCommands::suggestConditions)
                                     .then(argument("identifier", id()).suggests(BorisLibCommands::suggestInstanceIds)
                                           .executes(BorisLibCommands::conditionGetInstance)))))
-                  .then(literal("getBase")
-                        .requires(Permissions.require(MOD_ID + ".condition.getbase", PermissionLevel.GAMEMASTERS))
-                        .then(argument("entity", entity())
-                              .then(argument("condition", id()).suggests(BorisLibCommands::suggestConditions)
-                                    .executes(BorisLibCommands::conditionGetBase))))
                   .then(literal("getInstances")
                         .requires(Permissions.require(MOD_ID + ".condition.getinstances", PermissionLevel.GAMEMASTERS))
                         .then(argument("entity", entity())
@@ -562,6 +556,23 @@ public class BorisLibCommands {
       return resolveCondition(Identifier.tryParse(condStr));
    }
    
+   // Brigadier's float argument cannot parse infinity, so condition values are read from a string
+   private static float parseConditionValue(String valueStr) throws NumberFormatException{
+      String normalized = valueStr.trim().toLowerCase(Locale.ROOT);
+      if(normalized.startsWith("+")) normalized = normalized.substring(1);
+      if(normalized.equals("inf") || normalized.equals("infinity") || normalized.equals("\u221e")) return Float.POSITIVE_INFINITY;
+      return Float.parseFloat(normalized);
+   }
+
+   private static String formatConditionValue(float value){
+      return value == Float.POSITIVE_INFINITY ? "\u221e" : String.valueOf(value);
+   }
+
+   private static String describeParticles(ConditionInstance inst){
+      if(inst.getParticles().isEmpty()) return "default";
+      return inst.getParticles().get().isNone() ? "none" : "custom";
+   }
+
    private static AttributeModifier.Operation resolveOperation(String opStr){
       try{
          return AttributeModifier.Operation.valueOf(opStr.toUpperCase(Locale.ROOT));
@@ -609,7 +620,13 @@ public class BorisLibCommands {
          context.getSource().sendFailure(Component.translatable("command.borislib.condition.unknown_condition", getId(context, "condition").toString()));
          return 0;
       }
-      float value = getFloat(context, "value");
+      float value;
+      try{
+         value = parseConditionValue(getString(context, "value"));
+      }catch(NumberFormatException e){
+         context.getSource().sendFailure(Component.translatable("command.borislib.condition.invalid_value", getString(context, "value")));
+         return 0;
+      }
       int duration = getInteger(context, "duration");
       AttributeModifier.Operation operation = resolveOperation(getString(context, "operation"));
       if(operation == null){
@@ -620,19 +637,25 @@ public class BorisLibCommands {
       UUID inflictedByUuid = inflicter != null ? inflicter.getUUID() : null;
       
       ConditionInstance instance = new ConditionInstance(holder, id, duration, value, stacking, particles, persistent, operation, inflictedByUuid);
-      boolean replaced = Conditions.addCondition(context.getSource().getServer(), living, instance);
+      Conditions.AddResult result = Conditions.addCondition(context.getSource().getServer(), living, instance);
+      if(result == Conditions.AddResult.REJECTED){
+         context.getSource().sendFailure(Component.translatable("command.borislib.condition.add.rejected", holder.value().getName(), target.getDisplayName()));
+         return 0;
+      }
+      boolean replaced = result == Conditions.AddResult.REPLACED;
+      String shownValue = formatConditionValue(value);
       
       String detailKey;
       Object[] detailArgs;
       if(inflicter != null){
          detailKey = "command.borislib.condition.add.details_full_inflicter";
-         detailArgs = new Object[]{id.toString(), value, duration, operation.name(), particles, stacking, persistent, inflicter.getDisplayName()};
+         detailArgs = new Object[]{id.toString(), shownValue, duration, operation.name(), particles, stacking, persistent, inflicter.getDisplayName()};
       }else if(persistent || !particles || !stacking){
          detailKey = "command.borislib.condition.add.details_full";
-         detailArgs = new Object[]{id.toString(), value, duration, operation.name(), particles, stacking, persistent};
+         detailArgs = new Object[]{id.toString(), shownValue, duration, operation.name(), particles, stacking, persistent};
       }else{
          detailKey = "command.borislib.condition.add.details_short";
-         detailArgs = new Object[]{id.toString(), value, duration, operation.name()};
+         detailArgs = new Object[]{id.toString(), shownValue, duration, operation.name()};
       }
       
       context.getSource().sendSuccess(() -> Component.translatable(replaced ? "command.borislib.condition.add.replaced" : "command.borislib.condition.add.added",
@@ -684,8 +707,8 @@ public class BorisLibCommands {
             context.getSource().sendFailure(Component.translatable("command.borislib.condition.unknown_condition", getId(context, "condition").toString()));
             return 0;
          }
-         boolean removed = Conditions.removeConditions(context.getSource().getServer(), living, holder);
-         if(removed){
+         int removed = Conditions.removeConditions(context.getSource().getServer(), living, holder);
+         if(removed > 0){
             context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.clear.success",
                   holder.value().getName().withColor(TextColor.GREEN),
                   target.getDisplayName()), true);
@@ -693,7 +716,7 @@ public class BorisLibCommands {
             context.getSource().sendFailure(Component.translatable("command.borislib.condition.clear.not_found",
                   holder.value().getName(), target.getDisplayName()));
          }
-         return removed ? 1 : 0;
+         return removed;
       }catch(Exception e){
          context.getSource().sendFailure(Component.translatable("command.borislib.condition.error", e.getMessage()));
          return 0;
@@ -703,22 +726,26 @@ public class BorisLibCommands {
    private static int conditionGet(CommandContext<CommandSourceStack> context){
       try{
          Entity target = getEntity(context, "entity");
+         if(!(target instanceof LivingEntity living)){
+            context.getSource().sendFailure(Component.translatable("command.borislib.condition.not_living_entity"));
+            return 0;
+         }
          Holder<Condition> holder = resolveCondition(getId(context, "condition"));
          if(holder == null){
             context.getSource().sendFailure(Component.translatable("command.borislib.condition.unknown_condition", getId(context, "condition").toString()));
             return 0;
          }
-         Triple<Float, Boolean, Boolean> stats = Conditions.getPrevalingCondition(target.getUUID(), holder);
-         if(stats == null){
+         PrevailingCondition stats = Conditions.getPrevailingCondition(living, holder);
+         if(!stats.isActive()){
             context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get.not_active",
                   holder.value().getName().withColor(TextColor.GREEN),
                   target.getDisplayName(),
-                  Component.translatable("command.borislib.condition.get.base", holder.value().getBase()).withColor(TextColor.GRAY)), false);
+                  Component.translatable("command.borislib.condition.get.inactive").withColor(TextColor.GRAY)), false);
          }else{
             context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get.active",
-                  holder.value().getNameWithValue(stats.getLeft()).withColor(TextColor.GREEN),
+                  holder.value().getNameWithValue(stats.value()).withColor(TextColor.GREEN),
                   target.getDisplayName(),
-                  Component.translatable("command.borislib.condition.get.stats", stats.getLeft(), stats.getMiddle(), stats.getRight()).withColor(TextColor.YELLOW)), false);
+                  Component.translatable("command.borislib.condition.get.stats", formatConditionValue(stats.value()), stats.fromStacking()).withColor(TextColor.YELLOW)), false);
          }
          return 1;
       }catch(Exception e){
@@ -746,28 +773,9 @@ public class BorisLibCommands {
                   holder.value().getName().withColor(TextColor.GREEN),
                   Component.literal("[" + id + "]").withColor(TextColor.GRAY),
                   target.getDisplayName(),
-                  Component.translatable("command.borislib.condition.get_instance.details", inst.getValue(), inst.getDuration(), inst.getTimer(), inst.getOperation().name(), inst.isStacking(), inst.hasParticles(), inst.isPersistent(), inst.getInflictedBy() != null ? inst.getInflictedBy().toString() : "none").withColor(TextColor.YELLOW)), false);
+                  Component.translatable("command.borislib.condition.get_instance.details", formatConditionValue(inst.getValue()), inst.getDuration(), inst.getTimer(), inst.getOperation().name(), inst.isStacking(), describeParticles(inst), inst.isPersistent(), inst.getInflictedBy() != null ? inst.getInflictedBy().toString() : "none").withColor(TextColor.YELLOW)), false);
             return 1;
          }
-      }catch(Exception e){
-         context.getSource().sendFailure(Component.translatable("command.borislib.condition.error", e.getMessage()));
-         return 0;
-      }
-   }
-   
-   private static int conditionGetBase(CommandContext<CommandSourceStack> context){
-      try{
-         getEntity(context, "entity"); // validate entity exists
-         Holder<Condition> holder = resolveCondition(getId(context, "condition"));
-         if(holder == null){
-            context.getSource().sendFailure(Component.translatable("command.borislib.condition.unknown_condition", getId(context, "condition").toString()));
-            return 0;
-         }
-         float base = holder.value().getBase();
-         context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get_base.success",
-               holder.value().getName().withColor(TextColor.GREEN),
-               Component.literal(String.valueOf(base)).withColor(TextColor.YELLOW)), false);
-         return 1;
       }catch(Exception e){
          context.getSource().sendFailure(Component.translatable("command.borislib.condition.error", e.getMessage()));
          return 0;
@@ -795,7 +803,7 @@ public class BorisLibCommands {
             for(ConditionInstance inst : instances){
                context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.get_instances.entry",
                      Component.literal(inst.getId().toString()).withColor(TextColor.AQUA),
-                     Component.translatable("command.borislib.condition.get_instance.details", inst.getValue(), inst.getDuration(), inst.getTimer(), inst.getOperation().name(), inst.isStacking(), inst.hasParticles(), inst.isPersistent(), inst.getInflictedBy() != null ? inst.getInflictedBy().toString() : "none").withColor(TextColor.GRAY)), false);
+                     Component.translatable("command.borislib.condition.get_instance.details", formatConditionValue(inst.getValue()), inst.getDuration(), inst.getTimer(), inst.getOperation().name(), inst.isStacking(), describeParticles(inst), inst.isPersistent(), inst.getInflictedBy() != null ? inst.getInflictedBy().toString() : "none").withColor(TextColor.GRAY)), false);
             }
          }
          return instances.size();

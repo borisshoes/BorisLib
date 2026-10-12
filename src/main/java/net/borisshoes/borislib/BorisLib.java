@@ -111,14 +111,18 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
       ServerPlayConnectionEvents.JOIN.register(PlayerConnectionCallback::onPlayerJoin);
       ServerPlayConnectionEvents.DISCONNECT.register(PlayerConnectionCallback::onPlayerLeave);
       ServerLifecycleEvents.SERVER_STARTED.register(DataAccess::onServerStarted);
+      ServerLifecycleEvents.SERVER_STARTED.register(Conditions::onServerStarted);
       ServerLifecycleEvents.SERVER_STARTED.register(SequenceManager::onServerStart);
       ServerLifecycleEvents.SERVER_STOPPED.register(DataAccess::onServerStop);
+      ServerLifecycleEvents.SERVER_STOPPED.register(Conditions::onServerStopped);
       ServerLifecycleEvents.BEFORE_SAVE.register(DataAccess::onServerPreSave);
       ServerLifecycleEvents.AFTER_SAVE.register(DataAccess::onServerSave);
       ServerLivingEntityEvents.AFTER_DEATH.register(Conditions::entityDied);
       ServerLivingEntityEvents.AFTER_DEATH.register(SequenceManager::onPlayerDeath);
       ServerTickEvents.END_SERVER_TICK.register(SequenceManager::tick);
       ServerEntityEvents.ENTITY_LOAD.register(SequenceManager::onEntityLoad);
+      ServerEntityEvents.ENTITY_LOAD.register(Conditions::onEntityLoad);
+      ServerEntityEvents.ENTITY_UNLOAD.register(Conditions::onEntityUnload);
       CommandRegistrationCallback.EVENT.register(BorisLibCommands::register);
       
       LOGGER.info("BorisLib ready and waiting!");

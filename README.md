@@ -81,7 +81,6 @@ Config commands are generated dynamically per config value. The `<modid>` and `<
 | `borislib.condition.clear` | `GAMEMASTERS` | Clear all instances of a condition type from an entity |
 | `borislib.condition.get` | `GAMEMASTERS` | Get the prevailing value of a condition on an entity |
 | `borislib.condition.getinstance` | `GAMEMASTERS` | Get details of a specific condition instance by ID |
-| `borislib.condition.getbase` | `GAMEMASTERS` | Get the base (default) value of a condition type |
 | `borislib.condition.getinstances` | `GAMEMASTERS` | List all instances of a condition type on an entity |
 
 #### Testmod (requires `testmodFeaturesEnabled` config option)

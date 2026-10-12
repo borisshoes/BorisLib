@@ -72,6 +72,15 @@ dependencies {
     include(implementation("eu.pb4:factorytools:${project.factorytools_version}"))
     include(implementation("xyz.nucleoid:server-translations-api:${project.translation_version}"))
     include(implementation("me.lucko:fabric-permissions-api:${project.fabric_permissions_api_version}"))
+
+    testImplementation "net.fabricmc:fabric-loader-junit:${project.loader_version}"
+}
+
+test {
+    useJUnitPlatform()
+    // Loaded mods write default configs into the working directory; keep them out of the project root
+    workingDir = layout.buildDirectory.dir("test-run").get().asFile
+    doFirst { workingDir.mkdirs() }
 }
 
 processResources {

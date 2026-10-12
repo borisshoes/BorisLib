@@ -4,12 +4,14 @@
   "package": "net.borisshoes.borislib.mixins",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "ConditionHolderMixin",
     "DedicatedServerMixin",
     "DimensionStorageFileFixMixin",
     "EntityAccessor",
     "IntegratedServerMixin",
     "InventoryAccessor",
     "LivingEntityMixin",
+    "ServerExplosionMixin",
     "ServerGamePacketListenerImplMixin",
     "ServerPlayerMixin"
   ],
