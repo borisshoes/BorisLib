@@ -14,8 +14,9 @@ import java.util.List;
  *    <li>{@link #amplify(float) Amplify}: {@code 1 + m}</li>
  *    <li>{@link #attenuate(float) Attenuate}: {@code 1 / (1 + m)}</li>
  * </ul>
- * <p>Equal magnitudes of an opposing pair cancel exactly. Nothing in this class touches the server, so it
- * can be unit tested without a running game.</p>
+ * <p>Equal magnitudes of an opposing pair cancel exactly. Instances can also be written as percentages of
+ * the effect instead of magnitudes; see {@link Scale} and {@link #combine(List, float, Scale)}. Nothing in
+ * this class touches the server, so it can be unit tested without a running game.</p>
  */
 public final class ConditionMath {
 
@@ -23,7 +24,7 @@ public final class ConditionMath {
    }
 
    /**
-    * The minimal view of a {@link ConditionInstance} that {@link #combine(List, float)} needs. Exists so the
+    * The minimal view of a {@link ConditionInstance} that {@link #combine(List, float, Scale)} needs. Exists so the
     * combine rules can be exercised without registries.
     */
    public interface Term {
@@ -136,38 +137,73 @@ public final class ConditionMath {
    }
 
    /**
+    * How a condition's magnitude {@code m} turns into its effect, which decides what a <em>percentage</em>
+    * of that condition means. {@code ADD_VALUE} instances always add magnitude; the two multiplied
+    * operations work in percent of the effect, on this scale.
+    */
+   public enum Scale {
+      /**
+       * The magnitude is a plain quantity (health per second, an intensity). Percentages scale the
+       * magnitude itself, exactly like vanilla attribute modifiers, so they do nothing without an
+       * {@code ADD_VALUE} instance to scale.
+       */
+      LINEAR,
+      /**
+       * The effect is multiplied by {@code 1 + m}. A percentage {@code p} is an increase of the effect:
+       * {@code ADD_MULTIPLIED_BASE} percentages add up ({@code +15%} and {@code +20%} give {@code +35%})
+       * and {@code ADD_MULTIPLIED_TOTAL} percentages compound ({@code ×1.15 × 1.20}).
+       */
+      AMPLIFY,
+      /**
+       * The effect is multiplied by {@code 1 / (1 + m)}. A percentage {@code p} is a reduction of the
+       * effect: {@code ADD_MULTIPLIED_BASE} percentages add up ({@code 15%} and {@code 20%} give
+       * {@code 35%}) and {@code ADD_MULTIPLIED_TOTAL} percentages compound ({@code ×0.85 × 0.80}).
+       * Reaching a 100% reduction gives the condition's cap.
+       */
+      ATTENUATE
+   }
+
+   /**
     * Combines every instance of one condition type into its prevailing magnitude.
     *
     * @param instances instances of one condition type
-    * @param condition the condition type, which supplies the cap
+    * @param condition the condition type, which supplies the cap and the scale
     * @return the prevailing state; its value is {@code 0} when nothing is in effect
-    * @see #combine(List, float)
+    * @see #combine(List, float, Scale)
     */
    public static PrevailingCondition combine(List<ConditionInstance> instances, Condition condition){
-      return combine(instances, condition.getCap());
+      return combine(instances, condition.getCap(), condition.getScale());
    }
 
    /**
     * Combines terms of one condition type into a prevailing magnitude, in a single pass.
     *
-    * <p>Stacking terms are folded in vanilla attribute order:</p>
-    * <ol>
-    *    <li>{@code A} = the sum of all {@code ADD_VALUE} values.</li>
-    *    <li>{@code B} = {@code A + A × S}, where {@code S} is the sum of {@code ADD_MULTIPLIED_BASE}
-    *        values.</li>
-    *    <li>{@code C} = {@code B × Π(1 + t)} over {@code ADD_MULTIPLIED_TOTAL} values {@code t}.</li>
-    *    <li>{@code stacked = clamp(C, 0, cap)}.</li>
-    * </ol>
-    * <p>{@code 0 × ∞} is defined as {@code 0}, and infinity is absorbing: once {@code A} or {@code B} is
-    * {@code +∞} no multiplier can cancel it. Each non-stacking term is a candidate
-    * {@code clamp(v, 0, cap)}; the result is the larger of the stacked value and the best candidate, with
-    * the stacked value winning ties.</p>
+    * <p>Stacking terms are gathered by operation: {@code A} is the sum of the {@code ADD_VALUE} values,
+    * {@code S} the sum of the {@code ADD_MULTIPLIED_BASE} values and {@code t} each
+    * {@code ADD_MULTIPLIED_TOTAL} value. They are folded in vanilla attribute order (adds, then base
+    * percentages, then total percentages) on the condition's {@link Scale}:</p>
+    * <ul>
+    *    <li>{@link Scale#LINEAR}: {@code m = A × (1 + S) × Π(1 + t)}</li>
+    *    <li>{@link Scale#AMPLIFY}: {@code 1 + m = (1 + A + S) × Π(1 + t)}</li>
+    *    <li>{@link Scale#ATTENUATE}: {@code 1 / (1 + m) = (1 / (1 + A) − S) × Π(1 − t)}</li>
+    * </ul>
+    * <p>On the two factor scales a base percentage is a share of the unmodified effect, so it is worth the
+    * same whatever else is present, while a total percentage is a share of whatever is left.</p>
+    * <p>With only {@code ADD_VALUE} terms every scale reduces to {@code m = A}. On the two factor scales
+    * each bracket is floored at 0, so over-100% percentages saturate instead of flipping sign; an
+    * attenuation that reaches 100% gives the cap. {@code 0 × ∞} is defined as {@code 0}, and an infinite
+    * {@code A} is absorbing: no percentage can cancel it. The stacked result is clamped to
+    * {@code [0, cap]}.</p>
+    *
+    * <p>Each non-stacking term is a candidate: the magnitude it would give on its own. The result is the
+    * larger of the stacked value and the best candidate, with the stacked value winning ties.</p>
     *
     * @param terms terms of one condition type
     * @param cap   the largest permitted magnitude
+    * @param scale how the condition's magnitude turns into its effect
     * @return the prevailing state; its value is {@code 0} when nothing is in effect
     */
-   public static PrevailingCondition combine(List<? extends Term> terms, float cap){
+   public static PrevailingCondition combine(List<? extends Term> terms, float cap, Scale scale){
       double addSum = 0.0;
       double baseSum = 0.0;
       double totalProduct = 1.0;
@@ -177,23 +213,51 @@ public final class ConditionMath {
          Term term = terms.get(i);
          float v = term.getValue();
          if(!term.isStacking()){
-            float candidate = clampMagnitude(v, cap);
+            float candidate = switch(term.getOperation()){
+               case ADD_VALUE -> resolve(v, 0.0, 1.0, cap, scale);
+               case ADD_MULTIPLIED_BASE -> resolve(0.0, v, 1.0, cap, scale);
+               case ADD_MULTIPLIED_TOTAL -> resolve(0.0, 0.0, totalFactor(v, scale), cap, scale);
+            };
             if(candidate > bestNonStacking) bestNonStacking = candidate;
             continue;
          }
          switch(term.getOperation()){
             case ADD_VALUE -> addSum += v;
             case ADD_MULTIPLIED_BASE -> baseSum += v;
-            case ADD_MULTIPLIED_TOTAL -> totalProduct = multiply(totalProduct, 1.0 + v);
+            case ADD_MULTIPLIED_TOTAL -> totalProduct = multiply(totalProduct, totalFactor(v, scale));
          }
       }
 
-      double b = addSum == Double.POSITIVE_INFINITY ? addSum : addSum + multiply(addSum, baseSum);
-      double c = b == Double.POSITIVE_INFINITY ? b : multiply(b, totalProduct);
-      float stacked = clampMagnitude(c, cap);
-
+      float stacked = resolve(addSum, baseSum, totalProduct, cap, scale);
       if(bestNonStacking > stacked) return new PrevailingCondition(bestNonStacking, false);
       return new PrevailingCondition(stacked, true);
+   }
+
+   /** The factor one {@code ADD_MULTIPLIED_TOTAL} value contributes to the running product. */
+   private static double totalFactor(float t, Scale scale){
+      return switch(scale){
+         case LINEAR -> 1.0 + t;
+         case AMPLIFY -> Math.max(0.0, 1.0 + t);
+         case ATTENUATE -> Math.max(0.0, 1.0 - t);
+      };
+   }
+
+   private static float resolve(double addSum, double baseSum, double totalProduct, float cap, Scale scale){
+      // Infinity is absorbing, and plain adds are already a magnitude on every scale
+      if(addSum == Double.POSITIVE_INFINITY || (baseSum == 0.0 && totalProduct == 1.0)) return clampMagnitude(addSum, cap);
+      return switch(scale){
+         case LINEAR -> {
+            double b = addSum + multiply(addSum, baseSum);
+            yield clampMagnitude(b == Double.POSITIVE_INFINITY ? b : multiply(b, totalProduct), cap);
+         }
+         case AMPLIFY -> clampMagnitude(multiply(Math.max(0.0, 1.0 + addSum + baseSum), totalProduct) - 1.0, cap);
+         case ATTENUATE -> {
+            // What the magnitudes leave of the effect, less the base percentages, times what each total percentage leaves
+            double afterAdds = addSum <= -1.0 ? Double.POSITIVE_INFINITY : 1.0 / (1.0 + addSum);
+            double remaining = baseSum == Double.POSITIVE_INFINITY ? 0.0 : multiply(Math.max(0.0, afterAdds - baseSum), totalProduct);
+            yield remaining == 0.0 ? cap : clampMagnitude(1.0 / remaining - 1.0, cap);
+         }
+      };
    }
 
    private static double multiply(double a, double b){

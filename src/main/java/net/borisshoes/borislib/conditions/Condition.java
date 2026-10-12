@@ -19,7 +19,8 @@ import net.minecraft.world.entity.LivingEntity;
  * absent, larger is always stronger in the condition's own direction, and {@code +∞} is available to
  * conditions that pass {@link Float#POSITIVE_INFINITY} as their cap. A condition is <em>active</em> while
  * its prevailing magnitude is greater than 0. See {@link ConditionMath} for the curves that turn a
- * magnitude into a multiplier.</p>
+ * magnitude into a multiplier, and for how instances can stack in percent of the effect instead of in
+ * magnitude.</p>
  *
  * <p>A {@code Condition} subclass typically:</p>
  * <ul>
@@ -132,6 +133,20 @@ public abstract class Condition {
     */
    public ConditionParticles getDefaultParticles(){
       return ConditionParticles.NONE;
+   }
+
+   /**
+    * How this condition's magnitude turns into its effect, which decides what instances using
+    * {@code ADD_MULTIPLIED_BASE} and {@code ADD_MULTIPLIED_TOTAL} mean. Override to return
+    * {@link ConditionMath.Scale#AMPLIFY} if the effect is multiplied by {@code 1 + m}, or
+    * {@link ConditionMath.Scale#ATTENUATE} if it is multiplied by {@code 1 / (1 + m)}; such conditions can
+    * then be stacked in percent of their effect as well as in magnitude.
+    *
+    * @return this condition's scale; {@link ConditionMath.Scale#LINEAR} by default, where percentages
+    *         scale the magnitude like vanilla attribute modifiers
+    */
+   public ConditionMath.Scale getScale(){
+      return ConditionMath.Scale.LINEAR;
    }
 
    /**

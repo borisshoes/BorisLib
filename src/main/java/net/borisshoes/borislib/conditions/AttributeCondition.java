@@ -86,6 +86,16 @@ public abstract class AttributeCondition extends Condition {
       return curve;
    }
 
+   /** @return the scale matching this condition's {@link Curve}, so percentages mean percent of the attribute. */
+   @Override
+   public ConditionMath.Scale getScale(){
+      return switch(curve){
+         case AMPLIFY_BASE -> ConditionMath.Scale.AMPLIFY;
+         case ATTENUATE_TOTAL, RESISTANCE -> ConditionMath.Scale.ATTENUATE;
+         case LINEAR_TOTAL -> ConditionMath.Scale.LINEAR;
+      };
+   }
+
    /**
     * The modifier value for a magnitude. Defaults to the {@link Curve}; override for a custom mapping.
     *

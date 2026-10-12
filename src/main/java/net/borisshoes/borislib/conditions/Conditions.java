@@ -92,23 +92,23 @@ public class Conditions {
    /** Built-in beneficial condition that resists knockback; immune at +∞. */
    public static final Holder<Condition> POISE = registerAttribute("poise", MobEffectCategory.BENEFICIAL, true, Attributes.KNOCKBACK_RESISTANCE, RESISTANCE, 0xD9B38C);
    /** Built-in harmful condition that amplifies knockback taken. */
-   public static final Holder<Condition> FALTER = registerPassive("falter", MobEffectCategory.HARMFUL, false, 0x6B5238);
+   public static final Holder<Condition> FALTER = registerPassive("falter", MobEffectCategory.HARMFUL, false, ConditionMath.Scale.AMPLIFY, 0x6B5238);
    /** Built-in beneficial condition that resists explosion knockback; immune at +∞. */
    public static final Holder<Condition> DAMPING = registerAttribute("damping", MobEffectCategory.BENEFICIAL, true, Attributes.EXPLOSION_KNOCKBACK_RESISTANCE, RESISTANCE, 0xF58AD0);
    /** Built-in harmful condition that amplifies explosion knockback taken. */
-   public static final Holder<Condition> RUPTURE = registerPassive("rupture", MobEffectCategory.HARMFUL, false, 0x7A3A63);
+   public static final Holder<Condition> RUPTURE = registerPassive("rupture", MobEffectCategory.HARMFUL, false, ConditionMath.Scale.AMPLIFY, 0x7A3A63);
    /** Built-in beneficial condition that amplifies healing received through {@link LivingEntity#heal}. */
-   public static final Holder<Condition> VITALITY = registerPassive("vitality", MobEffectCategory.BENEFICIAL, false, 0xB6F542);
+   public static final Holder<Condition> VITALITY = registerPassive("vitality", MobEffectCategory.BENEFICIAL, false, ConditionMath.Scale.AMPLIFY, 0xB6F542);
    /** Built-in harmful condition that attenuates healing received through {@link LivingEntity#heal}; none at +∞. */
-   public static final Holder<Condition> BLIGHT = registerPassive("blight", MobEffectCategory.HARMFUL, true, 0x566B1F);
+   public static final Holder<Condition> BLIGHT = registerPassive("blight", MobEffectCategory.HARMFUL, true, ConditionMath.Scale.ATTENUATE, 0x566B1F);
    /**
     * Built-in beneficial condition that attenuates the range at which mobs detect the entity. Vanilla
     * floors that range at 2 blocks, so even +∞ is noticed up close. It only affects acquiring a target:
     * retaliation ignores visibility, and a target that is already acquired is kept within follow range.
     */
-   public static final Holder<Condition> OBSCURITY = registerPassive("obscurity", MobEffectCategory.BENEFICIAL, true, 0x6A7BF5);
+   public static final Holder<Condition> OBSCURITY = registerPassive("obscurity", MobEffectCategory.BENEFICIAL, true, ConditionMath.Scale.ATTENUATE, 0x6A7BF5);
    /** Built-in harmful condition that amplifies the range at which mobs detect the entity. */
-   public static final Holder<Condition> EXPOSURE = registerPassive("exposure", MobEffectCategory.HARMFUL, false, 0x2E377A);
+   public static final Holder<Condition> EXPOSURE = registerPassive("exposure", MobEffectCategory.HARMFUL, false, ConditionMath.Scale.AMPLIFY, 0x2E377A);
 
    private static ConditionData data;
    private static boolean dirty;
@@ -129,8 +129,8 @@ public class Conditions {
       return BorisLib.registerCondition(new SimpleAttributeCondition(builtinId(path), category, builtinCap(infinite), attribute, curve, builtinParticles(color), true));
    }
 
-   private static Holder<Condition> registerPassive(String path, MobEffectCategory category, boolean infinite, int color){
-      return BorisLib.registerCondition(new PassiveCondition(builtinId(path), category, builtinCap(infinite), builtinParticles(color)));
+   private static Holder<Condition> registerPassive(String path, MobEffectCategory category, boolean infinite, ConditionMath.Scale scale, int color){
+      return BorisLib.registerCondition(new PassiveCondition(builtinId(path), category, builtinCap(infinite), scale, builtinParticles(color)));
    }
 
    private static Identifier builtinId(String path){

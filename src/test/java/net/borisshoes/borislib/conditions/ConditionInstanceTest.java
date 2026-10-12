@@ -20,9 +20,18 @@ class ConditionInstanceTest {
    private static final Identifier ID = Identifier.fromNamespaceAndPath("test", "source");
 
    private static Holder<Condition> condition(float cap){
+      return condition(cap, ConditionMath.Scale.LINEAR);
+   }
+
+   private static Holder<Condition> condition(float cap, ConditionMath.Scale scale){
       return Holder.direct(new Condition(Identifier.fromNamespaceAndPath("test", "condition"), MobEffectCategory.NEUTRAL, cap) {
          @Override
          public void onTick(MinecraftServer server, LivingEntity entity, float value){
+         }
+
+         @Override
+         public ConditionMath.Scale getScale(){
+            return scale;
          }
       });
    }
@@ -50,6 +59,19 @@ class ConditionInstanceTest {
       assertThrows(IllegalArgumentException.class, () -> new ConditionInstance(holder, ID, 20, 1.0f, false, true, Operation.ADD_MULTIPLIED_BASE));
       assertThrows(IllegalArgumentException.class, () -> new ConditionInstance(holder, ID, 20, 1.0f, false, true, Operation.ADD_MULTIPLIED_TOTAL));
       assertDoesNotThrow(() -> new ConditionInstance(holder, ID, 20, 1.0f, false, true, Operation.ADD_VALUE));
+
+      // On a factor scale a lone percentage is meaningful, so it is allowed
+      Holder<Condition> attenuating = condition(INF, ConditionMath.Scale.ATTENUATE);
+      assertDoesNotThrow(() -> new ConditionInstance(attenuating, ID, 20, 0.2f, false, true, Operation.ADD_MULTIPLIED_BASE));
+   }
+
+   @Test
+   void percentInstancesStackOnTheConditionScale(){
+      Holder<Condition> resist = condition(INF, ConditionMath.Scale.ATTENUATE);
+      List<ConditionInstance> instances = List.of(
+            new ConditionInstance(resist, Identifier.fromNamespaceAndPath("test", "armor"), 20, 0.15f, Operation.ADD_MULTIPLIED_BASE),
+            new ConditionInstance(resist, Identifier.fromNamespaceAndPath("test", "potion"), 20, 0.20f, Operation.ADD_MULTIPLIED_BASE));
+      assertEquals(0.35f, ConditionMath.magnitudeToReduction(ConditionMath.combine(instances, resist.value()).value()), 1e-6f);
    }
 
    @Test

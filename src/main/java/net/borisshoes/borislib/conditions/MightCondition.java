@@ -29,6 +29,11 @@ public class MightCondition extends Condition {
    }
 
    @Override
+   public ConditionMath.Scale getScale(){
+      return ConditionMath.Scale.AMPLIFY;
+   }
+
+   @Override
    public ConditionParticles getDefaultParticles(){
       return PARTICLES;
    }

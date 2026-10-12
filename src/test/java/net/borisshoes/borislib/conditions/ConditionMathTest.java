@@ -1,5 +1,6 @@
 package net.borisshoes.borislib.conditions;
 
+import net.borisshoes.borislib.conditions.ConditionMath.Scale;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation;
 import org.junit.jupiter.api.Test;
 
@@ -29,8 +30,25 @@ class ConditionMathTest {
       return new Term(value, Operation.ADD_VALUE, false);
    }
 
+   private static Term solo(float value, Operation operation){
+      return new Term(value, operation, false);
+   }
+
    private static float combine(float cap, Term... terms){
-      return ConditionMath.combine(List.of(terms), cap).value();
+      return ConditionMath.combine(List.of(terms), cap, Scale.LINEAR).value();
+   }
+
+   private static float amplify(float cap, Term... terms){
+      return ConditionMath.combine(List.of(terms), cap, Scale.AMPLIFY).value();
+   }
+
+   private static float attenuate(float cap, Term... terms){
+      return ConditionMath.combine(List.of(terms), cap, Scale.ATTENUATE).value();
+   }
+
+   /** The fraction of the effect an attenuating magnitude removes. */
+   private static float reduction(float magnitude){
+      return ConditionMath.magnitudeToReduction(magnitude);
    }
 
    @Test
@@ -66,18 +84,18 @@ class ConditionMathTest {
 
    @Test
    void nothingInEffectIsZero(){
-      PrevailingCondition none = ConditionMath.combine(List.<Term>of(), INF);
+      PrevailingCondition none = ConditionMath.combine(List.<Term>of(), INF, Scale.LINEAR);
       assertEquals(0.0f, none.value());
       assertFalse(none.isActive());
    }
 
    @Test
    void nonStackingCompetesWithStacked(){
-      PrevailingCondition nonStackingWins = ConditionMath.combine(List.of(add(0.2f), solo(0.3f), solo(0.1f)), INF);
+      PrevailingCondition nonStackingWins = ConditionMath.combine(List.of(add(0.2f), solo(0.3f), solo(0.1f)), INF, Scale.LINEAR);
       assertEquals(0.3f, nonStackingWins.value());
       assertFalse(nonStackingWins.fromStacking());
 
-      PrevailingCondition tie = ConditionMath.combine(List.of(add(0.3f), solo(0.3f)), INF);
+      PrevailingCondition tie = ConditionMath.combine(List.of(add(0.3f), solo(0.3f)), INF, Scale.LINEAR);
       assertEquals(0.3f, tie.value());
       assertTrue(tie.fromStacking());
    }
@@ -95,10 +113,83 @@ class ConditionMathTest {
       for(float a : values){
          for(float b : values){
             for(float c : values){
-               assertFalse(Float.isNaN(combine(INF, add(a), base(b), total(c), total(a), solo(b))), a + " " + b + " " + c);
+               for(Scale scale : Scale.values()){
+                  List<Term> terms = List.of(add(a), base(b), total(c), total(a), solo(b), solo(c, Operation.ADD_MULTIPLIED_BASE), solo(a, Operation.ADD_MULTIPLIED_TOTAL));
+                  float value = ConditionMath.combine(terms, INF, scale).value();
+                  assertFalse(Float.isNaN(value) || value < 0.0f, scale + " " + a + " " + b + " " + c);
+               }
             }
          }
       }
+   }
+
+   @Test
+   void addsAreMagnitudesOnEveryScale(){
+      for(Scale scale : Scale.values()){
+         assertEquals(0.3f, ConditionMath.combine(List.of(add(0.1f), add(0.2f)), INF, scale).value());
+         assertEquals(0.0f, ConditionMath.combine(List.of(add(0.5f), add(-0.5f)), INF, scale).value());
+         assertEquals(INF, ConditionMath.combine(List.of(add(INF), base(-1.0f), total(-1.0f)), INF, scale).value());
+      }
+   }
+
+   @Test
+   void attenuatePercentagesAddUp(){
+      // 15% + 20% resist = 35% resist
+      assertEquals(0.35f, reduction(attenuate(INF, base(0.15f), base(0.20f))), 1e-6f);
+      // Magnitudes alone give diminishing returns instead
+      assertEquals(0.29897f, reduction(attenuate(INF, add(ConditionMath.reductionToMagnitude(0.15f)), add(ConditionMath.reductionToMagnitude(0.20f)))), 1e-4f);
+   }
+
+   @Test
+   void attenuatePercentagesCompound(){
+      // 0.85 x 0.80 = 0.68 of the effect remains
+      assertEquals(0.32f, reduction(attenuate(INF, total(0.15f), total(0.20f))), 1e-6f);
+      // Base percentages add first, then total percentages compound on what remains: 0.65 x 0.5
+      assertEquals(0.675f, reduction(attenuate(INF, base(0.15f), base(0.20f), total(0.5f))), 1e-6f);
+      // A magnitude of 1 halves the effect, and a base 20% takes another 20 points off
+      assertEquals(0.7f, reduction(attenuate(INF, add(1.0f), base(0.2f))), 1e-6f);
+      assertEquals(INF, attenuate(INF, add(1.0f), base(0.5f)));
+   }
+
+   @Test
+   void attenuateSaturatesAtTheCap(){
+      assertEquals(INF, attenuate(INF, base(0.6f), base(0.4f)));
+      assertEquals(INF, attenuate(INF, base(0.9f), base(0.9f), total(0.5f)));
+      assertEquals(INF, attenuate(INF, total(1.0f), base(0.1f)));
+      assertEquals(Float.MAX_VALUE, attenuate(Float.MAX_VALUE, base(1.0f)));
+      // Over 100% never flips into a bonus, and a negative percentage only weakens the condition
+      assertEquals(INF, attenuate(INF, total(1.5f), total(1.5f)));
+      assertEquals(0.1f, reduction(attenuate(INF, base(0.3f), base(-0.2f))), 1e-6f);
+      assertEquals(0.0f, attenuate(INF, base(-0.5f)));
+   }
+
+   @Test
+   void amplifyPercentagesAddAndCompound(){
+      // +15% and +20% add to +35%, the same as adding magnitudes
+      assertEquals(0.35f, amplify(INF, base(0.15f), base(0.20f)), 1e-6f);
+      assertEquals(0.35f, amplify(INF, add(0.15f), base(0.20f)), 1e-6f);
+      // x1.15 x 1.20 = x1.38
+      assertEquals(0.38f, amplify(INF, total(0.15f), total(0.20f)), 1e-6f);
+      // (1 + 1 + 0.5) x 1.5 = 3.75
+      assertEquals(2.75f, amplify(INF, add(1.0f), base(0.5f), total(0.5f)), 1e-6f);
+      // A penalty can remove the bonus but never turns it into a debuff
+      assertEquals(0.0f, amplify(INF, add(0.5f), total(-1.0f)));
+      assertEquals(0.0f, amplify(INF, base(-2.0f), total(-2.0f)));
+   }
+
+   @Test
+   void linearPercentagesNeedAMagnitude(){
+      assertEquals(0.0f, combine(INF, base(0.5f), total(0.5f)));
+      assertEquals(0.0f, combine(INF, solo(0.5f, Operation.ADD_MULTIPLIED_BASE)));
+   }
+
+   @Test
+   void nonStackingPercentagesStandAlone(){
+      PrevailingCondition aura = ConditionMath.combine(List.of(base(0.15f), solo(0.2f, Operation.ADD_MULTIPLIED_BASE), solo(0.1f, Operation.ADD_MULTIPLIED_TOTAL)), INF, Scale.ATTENUATE);
+      assertEquals(0.2f, reduction(aura.value()), 1e-6f);
+      assertFalse(aura.fromStacking());
+      assertEquals(0.25f, amplify(INF, solo(0.25f, Operation.ADD_MULTIPLIED_TOTAL), solo(0.1f)), 1e-6f);
+      assertEquals(INF, attenuate(INF, solo(1.0f, Operation.ADD_MULTIPLIED_BASE)));
    }
 
    @Test

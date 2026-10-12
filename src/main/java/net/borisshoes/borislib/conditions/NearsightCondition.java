@@ -35,7 +35,7 @@ import static net.borisshoes.borislib.BorisLib.MOD_ID;
  *
  * <p>The magnitude is an intensity; the sight radius is derived from it with
  * {@link #radiusForMagnitude(float)}: {@code REFERENCE_RADIUS / (1 + m)}, floored at
- * {@link #MIN_RADIUS}. Intensity 1 gives 16 blocks, 3 gives 8, 7 gives 4 and {@code +∞} gives
+ * {@link #MIN_RADIUS}. Intensity 1 gives 128 blocks, 3 gives 64, 7 gives 32, 15 gives 16 and {@code +∞} gives
  * {@link #MIN_RADIUS}, so more stacks mean less sight.</p>
  *
  * <p>For players the radius is rendered as nested boxes of virtual item displays around the camera, which
@@ -46,8 +46,8 @@ import static net.borisshoes.borislib.BorisLib.MOD_ID;
  * <p>Cap: {@code +∞}.</p>
  */
 public class NearsightCondition extends Condition {
-   /** The sight radius, in blocks, that an intensity of 0 corresponds to. */
-   public static final float REFERENCE_RADIUS = 32.0f;
+   /** The largest sight radius, in blocks: the radius an intensity approaching 0 corresponds to. */
+   public static final float REFERENCE_RADIUS = 256.0f;
    /** The smallest sight radius, in blocks, reached at infinite intensity. */
    public static final float MIN_RADIUS = 1.0f;
 
@@ -85,6 +85,11 @@ public class NearsightCondition extends Condition {
    @Override
    public boolean canApply(LivingEntity entity){
       return !entity.is(BorisLib.IGNORES_NEARSIGHT);
+   }
+
+   @Override
+   public ConditionMath.Scale getScale(){
+      return ConditionMath.Scale.ATTENUATE;
    }
 
    @Override

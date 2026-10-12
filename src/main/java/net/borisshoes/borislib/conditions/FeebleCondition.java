@@ -35,6 +35,11 @@ public class FeebleCondition extends Condition {
    }
 
    @Override
+   public ConditionMath.Scale getScale(){
+      return ConditionMath.Scale.ATTENUATE;
+   }
+
+   @Override
    public ConditionParticles getDefaultParticles(){
       return PARTICLES;
    }

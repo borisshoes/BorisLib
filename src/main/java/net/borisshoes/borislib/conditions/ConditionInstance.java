@@ -25,6 +25,11 @@ import java.util.UUID;
  * place. Use a distinct {@link Identifier} for each independent source so they can coexist and be removed
  * individually, or share one identifier between sources that should be mutually exclusive.</p>
  *
+ * <p>The {@link #getOperation() operation} says what the value is. {@code ADD_VALUE} is a magnitude.
+ * {@code ADD_MULTIPLIED_BASE} and {@code ADD_MULTIPLIED_TOTAL} are percentages of the condition's effect
+ * (for example {@code 0.15} for 15% damage resistance on Fortitude) that stack additively and by
+ * compounding respectively; see {@link ConditionMath.Scale}.</p>
+ *
  * <p>A value may be {@code +∞} or a finite negative number, but never {@code NaN} or {@code -∞}. Infinity
  * is absorbing: a stacking {@code -100%} multiplier cannot cancel an infinite magnitude, only removing the
  * infinite instance can. Whether an infinite value survives is decided by the condition's
@@ -117,8 +122,8 @@ public class ConditionInstance implements ConditionMath.Term {
     * @param stacking  if {@code true} this instance contributes to the stacked sum, otherwise it competes
     *                  with other non-stacking instances for the prevailing slot
     * @param particles {@code true} to show the condition's default particles, {@code false} to show none
-    * @param operation stacking operation; non-stacking instances must use
-    *                  {@link AttributeModifier.Operation#ADD_VALUE}
+    * @param operation what {@code value} means: a magnitude ({@code ADD_VALUE}) or a percentage of the
+    *                  condition's effect, see {@link ConditionMath.Scale}
     */
    public ConditionInstance(Holder<Condition> condition, Identifier id, int duration, float value, boolean stacking, boolean particles, AttributeModifier.Operation operation){
       this(condition, id, duration, value, stacking, particles, false, operation, null);
@@ -164,18 +169,23 @@ public class ConditionInstance implements ConditionMath.Term {
     *                    shows none, and any other value is this instance's own override
     * @param persistent  if {@code true} the source reapplies this instance continuously (see
     *                    {@link #isPersistent()})
-    * @param operation   stacking operation used when computing the prevailing value; non-stacking
-    *                    instances must use {@link AttributeModifier.Operation#ADD_VALUE}
+    * @param operation   what {@code value} means: {@code ADD_VALUE} adds magnitude, while
+    *                    {@code ADD_MULTIPLIED_BASE} (additive) and {@code ADD_MULTIPLIED_TOTAL}
+    *                    (compounding) are percentages of the condition's effect, see
+    *                    {@link ConditionMath.Scale}
     * @param inflictedBy optional UUID of the entity that applied this condition; used to skip friendly fire
     *                    on harmful conditions
     * @throws IllegalArgumentException if {@code value} is {@code NaN} or {@code -∞}, if {@code duration} is
     *                                  0 or below {@link #INFINITE_DURATION}, or if a non-stacking instance
-    *                                  uses an operation other than {@code ADD_VALUE}
+    *                                  of a {@link ConditionMath.Scale#LINEAR linear} condition uses an
+    *                                  operation other than {@code ADD_VALUE} (it could only ever be 0)
     */
    public ConditionInstance(Holder<Condition> condition, Identifier id, int duration, float value, boolean stacking, Optional<ConditionParticles> particles, boolean persistent, AttributeModifier.Operation operation, UUID inflictedBy){
       if(Float.isNaN(value) || value == Float.NEGATIVE_INFINITY) throw new IllegalArgumentException("Condition value must not be NaN or -Infinity, got " + value);
       if(duration == 0 || duration < INFINITE_DURATION) throw new IllegalArgumentException("Condition duration must be positive or INFINITE_DURATION, got " + duration);
-      if(!stacking && operation != AttributeModifier.Operation.ADD_VALUE) throw new IllegalArgumentException("Non-stacking condition instances must use ADD_VALUE, got " + operation);
+      if(!stacking && operation != AttributeModifier.Operation.ADD_VALUE && condition.value().getScale() == ConditionMath.Scale.LINEAR){
+         throw new IllegalArgumentException("Non-stacking instances of a linear condition must use ADD_VALUE, got " + operation);
+      }
       this.condition = condition;
       this.id = id;
       this.duration = duration;

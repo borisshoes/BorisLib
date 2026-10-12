@@ -20,14 +20,38 @@ For an `ADD_VALUE` instance with v3 value `d`:
 
 `reductionToMagnitude` takes the fraction removed: 0.5 (half) gives 1, 0.75 gives 3, and 1.0 gives +∞ (full immunity, a full root, and so on). It throws outside `[0, 1]`, so clamp a v3 Torpor value above 1 to 1 first.
 
+### Magnitudes or percentages
+
+The operation says what an instance's value is:
+
+| Operation | Value is | Two instances stack as |
+| --- | --- | --- |
+| `ADD_VALUE` | a magnitude | sum of magnitudes |
+| `ADD_MULTIPLIED_BASE` | a percentage of the effect | sum of percentages |
+| `ADD_MULTIPLIED_TOTAL` | a percentage of the effect | compounding percentages |
+
+For a reducing condition (Fortitude, Feeble, Torpor, Nearsight, ...) the percentage is the fraction removed; for a boosting one (Might, Vulnerability, Celerity, ...) it is the fraction added.
+
+| Fortitude instances | Damage resisted |
+| --- | --- |
+| `ADD_MULTIPLIED_BASE` 0.15 and 0.20 | 35% |
+| `ADD_MULTIPLIED_TOTAL` 0.15 and 0.20 | 32% (0.85 × 0.80 remains) |
+| `ADD_VALUE` `reductionToMagnitude(0.15)` and `(0.20)` | about 30% (diminishing returns) |
+
+Percentages on a reducing condition saturate at 100%, which is the condition's cap: immunity for Fortitude, a root for Torpor. Summed magnitudes never reach it, so use `ADD_VALUE` where sources should not be able to stack to immunity. All three kinds can be mixed on one entity: magnitudes apply first, then base percentages (points of the unmodified effect, so each is worth the same whatever else is present), then total percentages (a share of what is left).
+
+So there are two ways to port a v3 instance of a reducing condition, and v3's own stacking is the percentage one:
+
 ```java
 // v3: 40% damage reduction
 new ConditionInstance(Conditions.FORTITUDE, id, 200, -0.4f);
-// v4
+// v4, stacking like v3 did: 40% + 40% = 80%
+new ConditionInstance(Conditions.FORTITUDE, id, 200, 0.4f, AttributeModifier.Operation.ADD_MULTIPLIED_BASE);
+// v4, as a magnitude: 40% + 40% = 57%
 new ConditionInstance(Conditions.FORTITUDE, id, 200, ConditionMath.reductionToMagnitude(0.4f));
 ```
 
-Instances using `ADD_MULTIPLIED_BASE` or `ADD_MULTIPLIED_TOTAL` need converting by hand: they now scale the magnitude, not the final multiplier.
+A v3 `ADD_MULTIPLIED_TOTAL` instance on Fortitude or Feeble ports the same way: negate the value and keep the operation. Decay, Rejuvenation and Levity are plain quantities, so percentages there scale the magnitude like vanilla attribute modifiers and do nothing on their own.
 
 ## 2. Fix instances that now throw
 
@@ -35,7 +59,7 @@ The `ConditionInstance` constructor throws `IllegalArgumentException` for:
 
 - a `NaN` or `-∞` value (+∞ and finite negatives are fine);
 - a duration of 0 or below -1. Use `ConditionInstance.INFINITE_DURATION` (-1) for an instance that never expires;
-- a non-stacking instance with any operation other than `ADD_VALUE`.
+- a non-stacking percentage instance on a plain-quantity condition (Decay, Rejuvenation, Levity, or any custom condition that does not override `getScale()`), since it could only ever be 0.
 
 ## 3. Update API calls
 
@@ -65,6 +89,8 @@ The list getters now return unmodifiable copies, and no getter ever creates data
 super(id, category);                           // finite, cap = Float.MAX_VALUE
 super(id, category, Float.POSITIVE_INFINITY);  // opts in to infinite magnitudes
 ```
+
+**Scale.** If your condition's effect is a multiplier, override `getScale()` to return `ConditionMath.Scale.AMPLIFY` (effect × `1 + m`) or `ATTENUATE` (effect × `1 / (1 + m)`), so instances can be given as percentages of the effect. The default, `LINEAR`, treats the magnitude as a plain quantity. `AttributeCondition` picks the scale from its curve.
 
 **Hooks.** Rename and drop the `particles` argument:
 

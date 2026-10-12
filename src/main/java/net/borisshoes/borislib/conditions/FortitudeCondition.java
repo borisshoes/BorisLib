@@ -29,6 +29,11 @@ public class FortitudeCondition extends Condition {
    }
 
    @Override
+   public ConditionMath.Scale getScale(){
+      return ConditionMath.Scale.ATTENUATE;
+   }
+
+   @Override
    public ConditionParticles getDefaultParticles(){
       return PARTICLES;
    }
