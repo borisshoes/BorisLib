@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import net.minecraft.core.Holder;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.effect.MobEffectCategory;
@@ -85,6 +86,36 @@ class ConditionInstanceTest {
       for(int i = 0; i < 1000; i++){
          assertFalse(endless.tick());
       }
+   }
+
+   @Test
+   void withNameKeepsEverythingElse(){
+      Holder<Condition> holder = condition(INF);
+      ConditionInstance plain = new ConditionInstance(holder, ID, 40, 1.5f, Operation.ADD_MULTIPLIED_BASE);
+      assertNull(plain.getName());
+      plain.tick();
+
+      ConditionInstance named = plain.withName(Component.literal("Battle Cry"));
+      assertEquals(Component.literal("Battle Cry"), named.getName());
+      assertNull(plain.getName());
+      assertEquals(plain.getId(), named.getId());
+      assertEquals(plain.getValue(), named.getValue());
+      assertEquals(plain.getOperation(), named.getOperation());
+      assertEquals(plain.getDuration(), named.getDuration());
+      assertEquals(1, named.getTimer());
+   }
+
+   @Test
+   void remainingTicksCountDown(){
+      Holder<Condition> holder = condition(INF);
+      ConditionInstance timed = new ConditionInstance(holder, ID, 3, 1.0f);
+      assertEquals(3, timed.getRemainingTicks());
+      timed.tick();
+      assertEquals(2, timed.getRemainingTicks());
+
+      ConditionInstance endless = new ConditionInstance(holder, ID, ConditionInstance.INFINITE_DURATION, 1.0f);
+      endless.tick();
+      assertEquals(ConditionInstance.INFINITE_DURATION, endless.getRemainingTicks());
    }
 
    @Test

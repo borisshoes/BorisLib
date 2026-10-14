@@ -97,11 +97,17 @@ public class BorisLibCommands {
                                                                   .then(argument("persistent", bool())
                                                                         .then(argument("inflictedBy", entity())
                                                                               .then(argument("identifier", id())
-                                                                                    .executes(BorisLibCommands::conditionAddFullWithInflicter)))
+                                                                                    .executes(BorisLibCommands::conditionAddFullWithInflicter)
+                                                                                    .then(argument("name", greedyString())
+                                                                                          .executes(BorisLibCommands::conditionAddFullWithInflicter))))
                                                                         .then(argument("identifier", id())
-                                                                              .executes(BorisLibCommands::conditionAddFull)))))
+                                                                              .executes(BorisLibCommands::conditionAddFull)
+                                                                              .then(argument("name", greedyString())
+                                                                                    .executes(BorisLibCommands::conditionAddFull))))))
                                                       .then(argument("identifier", id())
-                                                            .executes(BorisLibCommands::conditionAddShort))))))))
+                                                            .executes(BorisLibCommands::conditionAddShort)
+                                                            .then(argument("name", greedyString())
+                                                                  .executes(BorisLibCommands::conditionAddShort)))))))))
                   .then(literal("remove")
                         .requires(Permissions.require(MOD_ID + ".condition.remove", PermissionLevel.GAMEMASTERS))
                         .then(argument("entity", entity())
@@ -244,6 +250,55 @@ public class BorisLibCommands {
       );
       
       dispatcher.register(BorisLib.CONFIG.generateCommand("borislib", "config"));
+
+      dispatcher.register(literal("conditions")
+            .requires(Permissions.require(MOD_ID + ".conditions", PermissionLevel.ALL))
+            .executes(BorisLibCommands::conditionsGui)
+            .then(literal("list")
+                  .requires(Permissions.require(MOD_ID + ".conditions.list", PermissionLevel.ALL))
+                  .executes(BorisLibCommands::conditionsList))
+            .then(literal("bars")
+                  .requires(Permissions.require(MOD_ID + ".conditions.bars", PermissionLevel.ALL))
+                  .executes(BorisLibCommands::conditionsBars)));
+   }
+
+   private static int conditionsGui(CommandContext<CommandSourceStack> context){
+      if(!context.getSource().isPlayer()){
+         context.getSource().sendFailure(Component.translatable("text.borislib.must_be_executed_by_player"));
+         return -1;
+      }
+      new ConditionGui(context.getSource().getPlayer()).open();
+      return 1;
+   }
+
+   private static int conditionsList(CommandContext<CommandSourceStack> context){
+      if(!context.getSource().isPlayer()){
+         context.getSource().sendFailure(Component.translatable("text.borislib.must_be_executed_by_player"));
+         return -1;
+      }
+      ServerPlayer player = context.getSource().getPlayer();
+      List<Component> lines = ConditionDisplay.listLines(player, ConditionDisplay.showsIcons(player));
+      if(lines.isEmpty()){
+         context.getSource().sendSuccess(() -> Component.translatable("command.borislib.conditions.list.none").withColor(TextColor.GRAY), false);
+         return 0;
+      }
+      context.getSource().sendSuccess(() -> Component.translatable("command.borislib.conditions.list.header").withColor(TextColor.GOLD), false);
+      for(Component line : lines){
+         context.getSource().sendSuccess(() -> line, false);
+      }
+      return lines.size();
+   }
+
+   private static int conditionsBars(CommandContext<CommandSourceStack> context){
+      if(!context.getSource().isPlayer()){
+         context.getSource().sendFailure(Component.translatable("text.borislib.must_be_executed_by_player"));
+         return -1;
+      }
+      ServerPlayer player = context.getSource().getPlayer();
+      boolean enabled = !ConditionBossBars.isEnabled(player);
+      ConditionBossBars.setEnabled(player, enabled);
+      context.getSource().sendSuccess(() -> Component.translatable(enabled ? "command.borislib.conditions.bars.enabled" : "command.borislib.conditions.bars.disabled").withColor(enabled ? TextColor.GREEN : TextColor.YELLOW), false);
+      return enabled ? 1 : 0;
    }
    
    private static int readTimestamp(CommandContext<CommandSourceStack> context){
@@ -568,6 +623,14 @@ public class BorisLibCommands {
       return value == Float.POSITIVE_INFINITY ? "\u221e" : String.valueOf(value);
    }
 
+   private static String optionalName(CommandContext<CommandSourceStack> context){
+      try{
+         return getString(context, "name");
+      }catch(IllegalArgumentException e){
+         return null;
+      }
+   }
+
    private static String describeParticles(ConditionInstance inst){
       if(inst.getParticles().isEmpty()) return "default";
       return inst.getParticles().get().isNone() ? "none" : "custom";
@@ -637,6 +700,9 @@ public class BorisLibCommands {
       UUID inflictedByUuid = inflicter != null ? inflicter.getUUID() : null;
       
       ConditionInstance instance = new ConditionInstance(holder, id, duration, value, stacking, particles, persistent, operation, inflictedByUuid);
+      // The name is optional, and shows as literal text unless it is a known translation key
+      String name = optionalName(context);
+      if(name != null) instance = instance.withName(Component.translatable(name));
       Conditions.AddResult result = Conditions.addCondition(context.getSource().getServer(), living, instance);
       if(result == Conditions.AddResult.REJECTED){
          context.getSource().sendFailure(Component.translatable("command.borislib.condition.add.rejected", holder.value().getName(), target.getDisplayName()));

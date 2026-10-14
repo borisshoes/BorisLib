@@ -44,6 +44,7 @@ public class DefaultPlayerData implements StorableData {
    private final ArrayList<String> knownUsernames = new ArrayList<>();
    private String username = "";
    private ResolvableProfile resProf;
+   private boolean conditionBars;
    
    /**
     * @param playerID the UUID of the player this data describes
@@ -55,6 +56,7 @@ public class DefaultPlayerData implements StorableData {
    @Override
    public void read(ValueInput view){
       this.username = view.getString("username").orElse("");
+      this.conditionBars = view.getBooleanOr("conditionBars", false);
       
       for(String s : view.listOrEmpty("knownUsernames", Codec.STRING)){
          if(!s.isEmpty() && !this.knownUsernames.contains(s)){
@@ -72,6 +74,7 @@ public class DefaultPlayerData implements StorableData {
    public void writeNbt(CompoundTag tag){
       tag.putString("playerID", playerID.toString());
       tag.putString("username", username != null ? username : "");
+      tag.putBoolean("conditionBars", conditionBars);
       ListTag usernameList = new ListTag();
       for(String name : knownUsernames){
          if(name != null && !name.isEmpty()){
@@ -183,5 +186,20 @@ public class DefaultPlayerData implements StorableData {
    /** @return the cached {@link ResolvableProfile} (skin / signature / name), or {@code null} if never resolved. */
    public ResolvableProfile getResolvableProfile(){
       return resProf;
+   }
+   
+   /** @return {@code true} if this player has switched on boss bars for their timed conditions. */
+   public boolean hasConditionBars(){
+      return conditionBars;
+   }
+   
+   /**
+    * Stores the player's choice only. Use
+    * {@link net.borisshoes.borislib.conditions.ConditionBossBars#setEnabled} to also show or hide the bars.
+    *
+    * @param conditionBars whether this player wants boss bars for their timed conditions
+    */
+   public void setConditionBars(boolean conditionBars){
+      this.conditionBars = conditionBars;
    }
 }

@@ -6,6 +6,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.borisshoes.borislib.BorisLib;
 import net.borisshoes.borislib.utils.CodecUtils;
 import net.minecraft.core.Holder;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 
@@ -55,17 +57,18 @@ public class ConditionInstance implements ConditionMath.Term {
          AttributeModifier.Operation.CODEC.fieldOf("operation").forGetter(Raw::operation),
          Codec.INT.fieldOf("timer").forGetter(Raw::timer),
          Codec.BOOL.fieldOf("persistent").forGetter(Raw::persistent),
-         CodecUtils.UUID_CODEC.optionalFieldOf("inflictedBy").forGetter(Raw::inflictedBy)
+         CodecUtils.UUID_CODEC.optionalFieldOf("inflictedBy").forGetter(Raw::inflictedBy),
+         ComponentSerialization.CODEC.optionalFieldOf("name").forGetter(Raw::name)
    ).apply(i, Raw::new)).flatXmap(Raw::toInstance, inst -> DataResult.success(Raw.of(inst))));
 
-   private record Raw(Holder<Condition> condition, Identifier id, int duration, float value, boolean stacking, Optional<ConditionParticles> particles, AttributeModifier.Operation operation, int timer, boolean persistent, Optional<UUID> inflictedBy) {
+   private record Raw(Holder<Condition> condition, Identifier id, int duration, float value, boolean stacking, Optional<ConditionParticles> particles, AttributeModifier.Operation operation, int timer, boolean persistent, Optional<UUID> inflictedBy, Optional<Component> name) {
       private static Raw of(ConditionInstance inst){
-         return new Raw(inst.condition, inst.id, inst.duration, inst.value, inst.stacking, inst.particles, inst.operation, inst.timer, inst.persistent, Optional.ofNullable(inst.inflictedBy));
+         return new Raw(inst.condition, inst.id, inst.duration, inst.value, inst.stacking, inst.particles, inst.operation, inst.timer, inst.persistent, Optional.ofNullable(inst.inflictedBy), Optional.ofNullable(inst.name));
       }
 
       private DataResult<ConditionInstance> toInstance(){
          try{
-            ConditionInstance inst = new ConditionInstance(condition, id, duration, value, stacking, particles, persistent, operation, inflictedBy.orElse(null));
+            ConditionInstance inst = new ConditionInstance(condition, id, duration, value, stacking, particles, persistent, operation, inflictedBy.orElse(null), name.orElse(null));
             inst.timer = timer;
             return DataResult.success(inst);
          }catch(IllegalArgumentException e){
@@ -83,6 +86,7 @@ public class ConditionInstance implements ConditionMath.Term {
    private final int duration;
    private final boolean persistent;
    private final UUID inflictedBy;
+   private final Component name;
    private int timer;
 
    /**
@@ -147,10 +151,39 @@ public class ConditionInstance implements ConditionMath.Term {
     * @param inflictedBy optional UUID of the entity that applied this condition; used to skip friendly fire
     *                    on harmful conditions
     * @throws IllegalArgumentException under the same rules as the
-    *                                  {@link #ConditionInstance(Holder, Identifier, int, float, boolean, Optional, boolean, AttributeModifier.Operation, UUID) full constructor}
+    *                                  {@link #ConditionInstance(Holder, Identifier, int, float, boolean, Optional, boolean, AttributeModifier.Operation, UUID, Component) full constructor}
     */
    public ConditionInstance(Holder<Condition> condition, Identifier id, int duration, float value, boolean stacking, boolean particles, boolean persistent, AttributeModifier.Operation operation, UUID inflictedBy){
       this(condition, id, duration, value, stacking, particles ? Optional.empty() : Optional.of(ConditionParticles.NONE), persistent, operation, inflictedBy);
+   }
+
+   /**
+    * Full constructor for an instance without a display name.
+    *
+    * @param condition   the registered condition type holder
+    * @param id          a per-source identifier used to distinguish this instance from others of the same
+    *                    type; identical {@code (condition, id)} pairs replace each other on add
+    * @param duration    number of entity ticks the instance lasts, or {@link #INFINITE_DURATION};
+    *                    {@link #tick()} returns {@code true} when the timer reaches this value
+    * @param value       this instance's value contribution
+    * @param stacking    if {@code true} this instance contributes to the stacked sum, otherwise it
+    *                    competes for the prevailing slot among non-stacking instances
+    * @param particles   this instance's particle spec: empty uses the condition's
+    *                    {@link Condition#getDefaultParticles() default}, {@link ConditionParticles#NONE}
+    *                    shows none, and any other value is this instance's own override
+    * @param persistent  if {@code true} the source reapplies this instance continuously (see
+    *                    {@link #isPersistent()})
+    * @param operation   what {@code value} means: {@code ADD_VALUE} adds magnitude, while
+    *                    {@code ADD_MULTIPLIED_BASE} (additive) and {@code ADD_MULTIPLIED_TOTAL}
+    *                    (compounding) are percentages of the condition's effect, see
+    *                    {@link ConditionMath.Scale}
+    * @param inflictedBy optional UUID of the entity that applied this condition; used to skip friendly fire
+    *                    on harmful conditions
+    * @throws IllegalArgumentException under the same rules as the
+    *                                  {@link #ConditionInstance(Holder, Identifier, int, float, boolean, Optional, boolean, AttributeModifier.Operation, UUID, Component) full constructor}
+    */
+   public ConditionInstance(Holder<Condition> condition, Identifier id, int duration, float value, boolean stacking, Optional<ConditionParticles> particles, boolean persistent, AttributeModifier.Operation operation, UUID inflictedBy){
+      this(condition, id, duration, value, stacking, particles, persistent, operation, inflictedBy, null);
    }
 
    /**
@@ -175,12 +208,14 @@ public class ConditionInstance implements ConditionMath.Term {
     *                    {@link ConditionMath.Scale}
     * @param inflictedBy optional UUID of the entity that applied this condition; used to skip friendly fire
     *                    on harmful conditions
+    * @param name        optional display name shown to players, either literal text or a translatable
+    *                    component; {@code null} for none (see {@link #getName()})
     * @throws IllegalArgumentException if {@code value} is {@code NaN} or {@code -∞}, if {@code duration} is
     *                                  0 or below {@link #INFINITE_DURATION}, or if a non-stacking instance
     *                                  of a {@link ConditionMath.Scale#LINEAR linear} condition uses an
     *                                  operation other than {@code ADD_VALUE} (it could only ever be 0)
     */
-   public ConditionInstance(Holder<Condition> condition, Identifier id, int duration, float value, boolean stacking, Optional<ConditionParticles> particles, boolean persistent, AttributeModifier.Operation operation, UUID inflictedBy){
+   public ConditionInstance(Holder<Condition> condition, Identifier id, int duration, float value, boolean stacking, Optional<ConditionParticles> particles, boolean persistent, AttributeModifier.Operation operation, UUID inflictedBy, Component name){
       if(Float.isNaN(value) || value == Float.NEGATIVE_INFINITY) throw new IllegalArgumentException("Condition value must not be NaN or -Infinity, got " + value);
       if(duration == 0 || duration < INFINITE_DURATION) throw new IllegalArgumentException("Condition duration must be positive or INFINITE_DURATION, got " + duration);
       if(!stacking && operation != AttributeModifier.Operation.ADD_VALUE && condition.value().getScale() == ConditionMath.Scale.LINEAR){
@@ -196,6 +231,7 @@ public class ConditionInstance implements ConditionMath.Term {
       this.timer = 0;
       this.persistent = persistent;
       this.inflictedBy = inflictedBy;
+      this.name = name;
    }
 
    /**
@@ -277,5 +313,29 @@ public class ConditionInstance implements ConditionMath.Term {
    /** @return the UUID of the entity that applied this condition, or {@code null} if not attributable. */
    public UUID getInflictedBy(){
       return inflictedBy;
+   }
+
+   /**
+    * @return the display name shown to players for this instance, or {@code null} if it has none. Named
+    *         instances that share a name are merged into one boss bar by {@link ConditionBossBars}; unnamed
+    *         instances never get a boss bar.
+    */
+   public Component getName(){
+      return name;
+   }
+
+   /**
+    * @param name the display name, either literal text or a translatable component; {@code null} for none
+    * @return a copy of this instance carrying the given name and this instance's elapsed timer
+    */
+   public ConditionInstance withName(Component name){
+      ConditionInstance copy = new ConditionInstance(condition, id, duration, value, stacking, particles, persistent, operation, inflictedBy, name);
+      copy.timer = timer;
+      return copy;
+   }
+
+   /** @return the ticks left before this instance expires, or {@link #INFINITE_DURATION} if it never does. */
+   public int getRemainingTicks(){
+      return duration == INFINITE_DURATION ? INFINITE_DURATION : Math.max(0, duration - timer);
    }
 }

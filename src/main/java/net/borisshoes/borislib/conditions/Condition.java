@@ -1,5 +1,7 @@
 package net.borisshoes.borislib.conditions;
 
+import net.borisshoes.borislib.BorisLib;
+import net.borisshoes.borislib.gui.GraphicalItem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
@@ -158,6 +160,17 @@ public abstract class Condition {
     */
    public boolean canApply(LivingEntity entity){
       return true;
+   }
+
+   /**
+    * The icon shown for this condition in GUIs and, as a sprite, in text. By default this is the
+    * {@link GraphicalItem.GraphicElement} registered in {@link BorisLib#GRAPHIC_ITEM_REGISTRY} under this
+    * condition's id, whose texture is {@code assets/<namespace>/textures/item/gui/<path>.png}.
+    *
+    * @return this condition's icon, or {@code null} if it has none
+    */
+   public GraphicalItem.GraphicElement getIcon(){
+      return BorisLib.GRAPHIC_ITEM_REGISTRY.getValue(id);
    }
 
    /** @return the unique namespaced identifier of this condition type. */

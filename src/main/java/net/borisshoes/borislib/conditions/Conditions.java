@@ -3,6 +3,7 @@ package net.borisshoes.borislib.conditions;
 import net.borisshoes.borislib.BorisLib;
 import net.borisshoes.borislib.datastorage.ConditionData;
 import net.borisshoes.borislib.datastorage.DataAccess;
+import net.borisshoes.borislib.gui.GraphicalItem;
 import net.minecraft.core.Holder;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.resources.Identifier;
@@ -16,6 +17,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.item.Items;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -109,6 +111,18 @@ public class Conditions {
    public static final Holder<Condition> OBSCURITY = registerPassive("obscurity", MobEffectCategory.BENEFICIAL, true, ConditionMath.Scale.ATTENUATE, 0x6A7BF5);
    /** Built-in harmful condition that amplifies the range at which mobs detect the entity. */
    public static final Holder<Condition> EXPOSURE = registerPassive("exposure", MobEffectCategory.HARMFUL, false, ConditionMath.Scale.AMPLIFY, 0x2E377A);
+
+   static {
+      // Every built-in condition has an icon at assets/borislib/textures/item/gui/<path>.png
+      for(Condition condition : BorisLib.CONDITIONS){
+         if(!condition.getId().getNamespace().equals(BorisLib.MOD_ID)) continue;
+         BorisLib.registerGraphicItem(new GraphicalItem.GraphicElement(condition.getId(), switch(condition.getCategory()){
+            case BENEFICIAL -> Items.DYE.lime();
+            case HARMFUL -> Items.DYE.red();
+            case NEUTRAL -> Items.DYE.yellow();
+         }, false));
+      }
+   }
 
    private static ConditionData data;
    private static boolean dirty;
@@ -570,13 +584,14 @@ public class Conditions {
    }
 
    /**
-    * Server-stop hook: drops the cached {@link ConditionData} reference.
+    * Server-stop hook: drops the cached {@link ConditionData} reference and every condition boss bar.
     *
     * @param server the server shutting down
     */
    public static void onServerStopped(MinecraftServer server){
       data = null;
       dirty = false;
+      ConditionBossBars.onServerStopped();
    }
 
    /**

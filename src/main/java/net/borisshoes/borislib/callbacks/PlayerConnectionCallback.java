@@ -1,6 +1,7 @@
 package net.borisshoes.borislib.callbacks;
 
 import net.borisshoes.borislib.BorisLib;
+import net.borisshoes.borislib.conditions.ConditionBossBars;
 import net.borisshoes.borislib.datastorage.DataAccess;
 import net.borisshoes.borislib.sequences.SequenceManager;
 import net.borisshoes.borislib.tracker.PlayerMovementEntry;
@@ -37,6 +38,7 @@ public class PlayerConnectionCallback {
    public static void onPlayerJoin(ServerGamePacketListenerImpl handler, PacketSender packetSender, MinecraftServer server){
       ServerPlayer player = handler.player;
       DataAccess.onPlayerJoin(player);
+      ConditionBossBars.onPlayerJoin(player);
       
       // Restore any state from a dangling sequence snapshot (crash / missed cleanup).
       SequenceManager.onPlayerJoin(player);
@@ -71,6 +73,7 @@ public class PlayerConnectionCallback {
    public static void onPlayerLeave(ServerGamePacketListenerImpl handler, MinecraftServer server){
       ServerPlayer player = handler.player;
       SequenceManager.onPlayerDisconnect(player);
+      ConditionBossBars.onPlayerLeave(player);
       DataAccess.onPlayerQuit(player);
    }
 }

@@ -263,6 +263,19 @@ The full `ConditionInstance` constructor also takes:
 - `persistent`: a flag for your own logic to read with `isPersistent()`, typically to mark effects that a cleanse should leave alone.
 - `operation`: how the value combines with other stacking instances.
 - `inflictedBy`: the UUID of the entity responsible. A harmful condition is rejected if that entity is allied with the target, or is a player who cannot harm the target player.
+- `name`: an optional display name shown to players, either `Component.literal(...)` or `Component.translatable(...)`. `instance.withName(name)` adds one to an instance built with a shorter constructor.
+
+Players can inspect their own conditions with three commands:
+
+| Command | Shows |
+|---|---|
+| `/conditions` | A paged GUI with one item per instance, and the player's head at the top listing the total of each active condition. It refreshes once a second while open |
+| `/conditions list` | The same information in chat: each condition's total with its instances beneath it |
+| `/conditions bars` | Toggles boss bars that count down timed instances. The choice is saved per player and is off by default |
+
+Only named instances get a boss bar, and persistent or infinite instances never do. Instances that share a name are merged into one bar, even across different conditions, and the bar follows whichever has the most time left, showing that time after the name. The permission nodes are `borislib.conditions`, `borislib.conditions.list` and `borislib.conditions.bars`, all granted to everyone by default.
+
+Each built-in condition has an icon. It is shown on the condition's items in the GUI and, for players with the server resource pack, as an inline sprite before the condition's name in chat, item tooltips and boss bars. To give a custom condition an icon, register a `GraphicalItem.GraphicElement` with the same id as the condition and add `assets/<namespace>/textures/item/gui/<path>.png` with matching `items/gui/<path>.json` and `models/item/gui/<path>.json` files, or override `Condition.getIcon()`. Conditions without an icon show as a dye in their category's color.
 
 `ConditionMath` converts everyday numbers into magnitudes: `reductionToMagnitude(0.5f)` is the magnitude that removes 50%, `amplifyToMagnitude(3f)` is the magnitude that triples, and `NearsightCondition.magnitudeForRadius(8f)` is the Nearsight that leaves 8 blocks of sight.
 

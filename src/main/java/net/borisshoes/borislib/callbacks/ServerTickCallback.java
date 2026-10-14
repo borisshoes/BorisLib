@@ -1,5 +1,6 @@
 package net.borisshoes.borislib.callbacks;
 
+import net.borisshoes.borislib.conditions.ConditionBossBars;
 import net.borisshoes.borislib.conditions.Conditions;
 import net.borisshoes.borislib.events.Event;
 import net.borisshoes.borislib.timers.TickTimerCallback;
@@ -31,6 +32,7 @@ public class ServerTickCallback {
     *    <li>Tick every {@link Event} in {@link Event#RECENT_EVENTS}.</li>
     *    <li>Mark condition storage dirty if any condition changed this tick, via
     *        {@link Conditions#flushDirty(MinecraftServer)}. Conditions themselves tick with their entity.</li>
+    *    <li>Refresh the condition boss bars of the players who switched them on.</li>
     *    <li>Drop expired events.</li>
     * </ol>
     *
@@ -48,6 +50,7 @@ public class ServerTickCallback {
          
          // Persist condition changes made this tick
          Conditions.flushDirty(server);
+         ConditionBossBars.tick(server);
          
          RECENT_EVENTS.removeIf(Event::isExpired);
       }catch(Exception e){
