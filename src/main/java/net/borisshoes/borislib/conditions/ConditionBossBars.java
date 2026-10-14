@@ -10,9 +10,12 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.effect.MobEffectCategory;
 
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 /**
@@ -21,9 +24,8 @@ import java.util.UUID;
  * <p>Only instances with a {@link ConditionInstance#getName() name} get a bar, and only if they are not
  * {@link ConditionInstance#isPersistent() persistent} and have a finite duration. Instances that share a
  * name, even across different condition types, are merged into one bar that tracks whichever of them has
- * the most time left. The bar's title is the shared name followed by that time left, with the condition's
- * icon in front when every merged instance belongs to the same condition and the player has the server
- * resource pack.</p>
+ * the most time left. The bar's title is the shared name followed by that time left, with the icon of every
+ * merged condition in front when the player has the server resource pack.</p>
  *
  * <p>The bars are off by default. Each player's choice is stored in {@link DefaultPlayerData}.</p>
  */
@@ -124,7 +126,7 @@ public final class ConditionBossBars {
       boolean icons = ConditionDisplay.showsIcons(player);
       for(var entry : groups.entrySet()){
          Group group = entry.getValue();
-         Component name = group.condition != null ? ConditionDisplay.withIcon(group.condition, entry.getKey(), icons) : entry.getKey();
+         Component name = ConditionDisplay.withIcons(group.conditions, entry.getKey(), icons);
          Component title = Component.translatable("text.borislib.conditions.bar_title", name, ConditionDisplay.timeLeft(group.remaining));
          ServerBossEvent bar = bars.get(entry.getKey());
          if(bar == null){
@@ -154,9 +156,8 @@ public final class ConditionBossBars {
       private int duration = 1;
       private boolean beneficial = true;
       private boolean harmful = true;
-      private boolean first = true;
-      /** The condition every instance belongs to, or {@code null} once they differ. */
-      private Condition condition;
+      /** Every condition the instances belong to, in id order so the title stays stable. */
+      private final Set<Condition> conditions = new TreeSet<>(Comparator.comparing(Condition::getId));
 
       void add(ConditionInstance instance, Condition condition){
          if(instance.getRemainingTicks() > remaining){
@@ -165,8 +166,7 @@ public final class ConditionBossBars {
          }
          beneficial &= condition.getCategory() == MobEffectCategory.BENEFICIAL;
          harmful &= condition.getCategory() == MobEffectCategory.HARMFUL;
-         this.condition = first || condition.equals(this.condition) ? condition : null;
-         first = false;
+         conditions.add(condition);
       }
 
       float progress(){

@@ -14,6 +14,7 @@ import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.entity.LivingEntity;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -76,8 +77,24 @@ public final class ConditionDisplay {
     * @return the text, preceded by the condition's icon and a space if {@code icons} is set and it has one
     */
    public static MutableComponent withIcon(Condition condition, Component text, boolean icons){
-      if(!icons || condition.getIcon() == null) return text.copy();
-      return Component.empty().append(icon(condition)).append(" ").append(text);
+      return withIcons(List.of(condition), text, icons);
+   }
+
+   /**
+    * @param conditions the condition types, in the order their icons should appear
+    * @param text       the text to label
+    * @param icons      whether to prepend the conditions' icons
+    * @return the text, preceded by the icon of each condition that has one and a space, if {@code icons}
+    *         is set and at least one has an icon
+    */
+   public static MutableComponent withIcons(Collection<Condition> conditions, Component text, boolean icons){
+      if(!icons) return text.copy();
+      MutableComponent labeled = Component.empty();
+      for(Condition condition : conditions){
+         if(condition.getIcon() != null) labeled.append(icon(condition));
+      }
+      if(labeled.getSiblings().isEmpty()) return text.copy();
+      return labeled.append(" ").append(text);
    }
 
    /**
