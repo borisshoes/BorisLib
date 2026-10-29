@@ -28,6 +28,8 @@
   "command.borislib.condition.unknown_operation": "Operación desconocida: %s",
   "command.borislib.condition_record_expiry_days.comment": "Días tras los cuales se borran al iniciar las condiciones de una entidad que no es jugador y que no se ha cargado. 0 nunca las borra. Los jugadores nunca se ven afectados.",
   "command.borislib.condition_record_expiry_days.getter_setter": "Días de caducidad de registros de condiciones: %s",
+  "command.borislib.config.default": "Predeterminado: %s",
+  "command.borislib.config.reset_all": "Se restablecieron todos los ajustes de %s a sus valores predeterminados",
   "command.borislib.reload.success": "¡Configuración de BorisLib recargada con éxito!",
   "command.borislib.testmod_features_enabled.comment": "Cuando sea verdadero, los comandos de prueba que muestran lo que BorisLib puede hacer estarán habilitados para los operadores.",
   "command.borislib.testmod_features_enabled.getter_setter": "Características del Testmod habilitadas: %s",

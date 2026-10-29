@@ -126,7 +126,30 @@ public abstract class ConfigValue<T> {
     * @return the string representation
     */
    public abstract String getValueString();
-   
+
+   /**
+    * Converts the default value to a string in the same format as {@link #getValueString()}.
+    *
+    * @return the string representation of the default value
+    */
+   public String getDefaultValueString(){
+      // Reuses each subclass's formatting by briefly swapping the value; onSet is not fired
+      T current = this.value;
+      this.value = this.defaultValue;
+      try{
+         return getValueString();
+      }finally{
+         this.value = current;
+      }
+   }
+
+   /**
+    * Resets the value to its default, triggering the onSet callback if one is registered.
+    */
+   public void resetValue(){
+      setValue(this.defaultValue);
+   }
+
    /**
     * Sets the value, triggering the onSet callback if one is registered.
     *

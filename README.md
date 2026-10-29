@@ -156,9 +156,9 @@ int maxPower = MyMod.CONFIG.getInt(MyMod.MAX_POWER);
 boolean enabled = MyMod.CONFIG.getBoolean(MyMod.ENABLE_FEATURE);
 ```
 
-- **The file** is `config/MyMod.properties`. It is created with defaults on first launch, and settings that are missing or fail to parse fall back to their default. `read()` and `save()` reload and rewrite it at any time.
+- **The file** is `config/MyMod.properties`. It is created with defaults on first launch, and settings that are missing or fail to parse fall back to their default. Each setting is written under its translated comment and a `# Default: <value>` line. `read()` and `save()` reload and rewrite it at any time.
 - **The user's text is never lost.** A value that fails to parse is written back as it was, under a comment saying the default is in use, until it is fixed or set by command. Settings the manager does not recognise (from another version, or a typo) are kept in a section at the end of the file. If the file exists but cannot be read, it is not overwritten. Saves go through a temporary file, so an interrupted save cannot truncate it.
-- **The command** from `generateCommand("mymod", "config")` gives `/mymod config` to list every setting, `/mymod config <name>` to read one and `/mymod config <name> <value>` to change one. Changes are saved straight away. Pass an empty second argument to put the settings directly under the first literal.
+- **The command** from `generateCommand("mymod", "config")` gives `/mymod config` to list every setting, `/mymod config <name>` to read one and `/mymod config <name> <value>` to change one, `/mymod config reset <name>` to put one back to its default and `/mymod config resetAll` to reset every setting. Changes are saved straight away. Pass an empty second argument to put the settings directly under the first literal.
 - **Permissions** are generated per setting. See [Config Commands](#config-commands).
 - **Translations.** The comment written above each setting in the file is the translation of `command.<modid>.<setting_name>.comment`, and command feedback uses `command.<modid>.<setting_name>.getter_setter` with the value as `%s`. The setting name is converted from camelCase to snake_case.
 
@@ -663,7 +663,8 @@ Config commands are generated dynamically for each mod that uses BorisLib's `Con
 |------|---------|-------------|
 | `<modid>.config` | `GAMEMASTERS` | List all config values |
 | `<modid>.config.<name>.get` | `GAMEMASTERS` | Read a specific config value |
-| `<modid>.config.<name>.set` | `GAMEMASTERS` | Change a specific config value |
+| `<modid>.config.<name>.set` | `GAMEMASTERS` | Change a specific config value, or reset it with `reset <name>` |
+| `<modid>.config.reset_all` | `GAMEMASTERS` | Reset every config value to its default via `resetAll` |
 
 ### Conditions
 | Node | Default | Description |

@@ -33,6 +33,8 @@
   "command.borislib.conditions.list.entry": " - %1$s: %2$s (%3$s)",
   "command.borislib.conditions.list.header": "Your Conditions:",
   "command.borislib.conditions.list.none": "You have no conditions",
+  "command.borislib.config.default": "Default: %s",
+  "command.borislib.config.reset_all": "Reset all %s settings to their defaults",
   "command.borislib.reload.success": "BorisLib configuration reloaded successfully!",
   "command.borislib.testmod_features_enabled.comment": "When true, the test commands showing what BorisLib can do will be enabled for operators.",
   "command.borislib.testmod_features_enabled.getter_setter": "Testmod Features Enabled: %s",

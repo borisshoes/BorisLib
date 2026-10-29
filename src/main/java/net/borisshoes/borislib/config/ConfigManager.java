@@ -195,6 +195,8 @@ public class ConfigManager {
                output.write("# " + Component.translatable(value.getComment(this.modId)).getString());
                output.newLine();
             }
+            output.write("# " + Component.translatable("command.borislib.config.default", value.getDefaultValueString()).getString());
+            output.newLine();
             String invalid = invalidValues.get(value.name);
             if(invalid != null){
                output.write("# Invalid value, using the default (" + value.getValueString() + ") until it is fixed");
@@ -237,6 +239,8 @@ public class ConfigManager {
     *   <li>Viewing all settings: {@code /<prefixA> [<prefixB>]}</li>
     *   <li>Viewing specific setting: {@code /<prefixA> [<prefixB>] <settingName>}</li>
     *   <li>Modifying setting: {@code /<prefixA> [<prefixB>] <settingName> <value>}</li>
+    *   <li>Resetting a setting to its default: {@code /<prefixA> [<prefixB>] reset <settingName>}</li>
+    *   <li>Resetting every setting to its default: {@code /<prefixA> [<prefixB>] resetAll}</li>
     *   <li>Tab completion for setting names and values</li>
     *   <li>Permission checks via Fabric Permissions API</li>
     * </ul>
@@ -247,6 +251,8 @@ public class ConfigManager {
     * // /mymod config              - List all settings
     * // /mymod config maxPower     - View maxPower value
     * // /mymod config maxPower 200 - Set maxPower to 200
+    * // /mymod config reset maxPower - Reset maxPower to its default
+    * // /mymod config resetAll     - Reset every setting to its default
     * dispatcher.register(config.generateCommand("mymod", "config"));
     * }</pre>
     *
@@ -292,12 +298,35 @@ public class ConfigManager {
                         this.save();
                         return 1;
                      }));
+         LiteralArgumentBuilder<CommandSourceStack> resetArg = literal("reset").then(literal(value.name)
+               .requires(Permissions.require(modId + ".config." + value.name.toLowerCase(Locale.ROOT) + ".set", PermissionLevel.GAMEMASTERS))
+               .executes(ctx -> {
+                  value.resetValue();
+                  invalidValues.remove(value.name);
+                  ctx.getSource().sendSuccess(() -> MutableComponent.create(new TranslatableContents(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), true);
+                  this.save();
+                  return 1;
+               }));
          if(!prefixB.isBlank()){
-            root.then(literal(prefixB).then(valueArg));
+            root.then(literal(prefixB).then(valueArg).then(resetArg));
          }else{
-            root.then(valueArg);
+            root.then(valueArg).then(resetArg);
          }
       });
+      LiteralArgumentBuilder<CommandSourceStack> resetAllArg = literal("resetAll")
+            .requires(Permissions.require(modId + ".config.reset_all", PermissionLevel.GAMEMASTERS))
+            .executes(ctx -> {
+               values.forEach(ConfigValue::resetValue);
+               invalidValues.clear();
+               ctx.getSource().sendSuccess(() -> Component.translatable("command.borislib.config.reset_all", this.modName), true);
+               this.save();
+               return values.size();
+            });
+      if(!prefixB.isBlank()){
+         root.then(literal(prefixB).then(resetAllArg));
+      }else{
+         root.then(resetAllArg);
+      }
       return root;
    }
    
