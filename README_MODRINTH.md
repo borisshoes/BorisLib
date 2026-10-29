@@ -13,6 +13,7 @@
 [![Docs](https://img.shields.io/badge/Docs-API_Guide-2D7FF9?style=for-the-badge&logo=bookstack&logoColor=white)](https://github.com/borisshoes/BorisLib#api-guide)
 [![Discord](https://img.shields.io/discord/1403978074550439966?style=for-the-badge&logo=discord&logoColor=white&label=Discord&color=5865F2)](https://discord.gg/dTKPeNEg6r)
 [![Source](https://img.shields.io/badge/Source-GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/borisshoes/BorisLib)
+[![Donate](https://img.shields.io/badge/Support-Donate-EA4AAA?style=for-the-badge)](https://borisshoes.net/donate)
 
 </div>
 
@@ -133,6 +134,9 @@ Admins can inspect and apply conditions with `/borislib condition`, and every co
 Questions go to the [Discord](https://discord.gg/dTKPeNEg6r), and bug reports and suggestions go to [GitHub Issues](https://github.com/borisshoes/BorisLib/issues).
 
 Translations: Russian by Reset1712 and Spanish by Llama303.
+
+## Support My Work
+BorisLib and every mod I build on it are free and will stay that way. I make them in my spare time, so if they have been useful to you or your server and you would like to help keep development going, you can chip in at [borisshoes.net/donate](https://borisshoes.net/donate). Supporters get access to special skins in [Arcana Novum](https://modrinth.com/mod/arcana-novum), along with a special role and channel on the [Discord](https://discord.gg/dTKPeNEg6r). Every bit is always appreciated.
 
 ### License Notice
 By using this project in any form, you hereby give your "express assent" for the terms of the license of this project, and acknowledge that I, BorisShoes, have fulfilled my obligation under the license to "make a reasonable effort under the circumstances to obtain the express assent of recipients to the terms of this License."

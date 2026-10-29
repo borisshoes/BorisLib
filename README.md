@@ -12,6 +12,7 @@
 [![Maven](https://img.shields.io/maven-metadata/v?metadataUrl=https%3A%2F%2Fmaven.borisshoes.net%2Freleases%2Fnet%2Fborisshoes%2FBorisLib%2Fmaven-metadata.xml&style=for-the-badge&label=Maven&color=2D7FF9)](#using-borislib-in-your-mod)
 
 [![Discord](https://img.shields.io/discord/1403978074550439966?style=for-the-badge&logo=discord&logoColor=white&label=Discord&color=5865F2)](https://discord.gg/dTKPeNEg6r)
+[![Donate](https://img.shields.io/badge/Support-Donate-EA4AAA?style=for-the-badge)](https://borisshoes.net/donate)
 [![Requires Fabric API](https://img.shields.io/badge/Requires-Fabric_API-DBD0B4?style=for-the-badge)](https://modrinth.com/mod/fabric-api)
 [![Server-side](https://img.shields.io/badge/Environment-Server--side-C65135?style=for-the-badge)](#installation)
 [![License](https://img.shields.io/badge/License-OSL--3.0-97CA00?style=for-the-badge)](LICENSE)
@@ -42,6 +43,7 @@ BorisLib is a Fabric library for mods that run entirely on the server. It collec
 - [Building from Source](#building-from-source)
 - [Mods Built with BorisLib](#mods-built-with-borislib)
 - [Support and Contributing](#support-and-contributing)
+- [Support My Work](#support-my-work)
 - [Translation Credits](#translation-credits)
 - [License](#license)
 
@@ -731,6 +733,9 @@ Made something with BorisLib? Tell me on [Discord](https://discord.gg/dTKPeNEg6r
 - Questions and discussion: [Discord](https://discord.gg/dTKPeNEg6r)
 - Bug reports and suggestions: [GitHub Issues](https://github.com/borisshoes/BorisLib/issues)
 - Pull requests are welcome. Please target the branch for the Minecraft version you are working on.
+
+## Support My Work
+BorisLib and every mod I build on it are free and will stay that way. I make them in my spare time, so if they have been useful to you or your server and you would like to help keep development going, you can chip in at [borisshoes.net/donate](https://borisshoes.net/donate). Supporters get access to special skins in [Arcana Novum](https://modrinth.com/mod/arcana-novum), along with a special role and channel on the [Discord](https://discord.gg/dTKPeNEg6r). Every bit is always appreciated.
 
 ## Translation Credits
 - Russian - Reset1712
