@@ -24,6 +24,8 @@ import java.util.ArrayList;
  * operations on horizontal coordinates.
  */
 public class SpawnPile {
+   /** Attempts per location used by the overloads without a {@code maxTries} parameter. */
+   public static final int DEFAULT_MAX_TRIES = 10000;
    /** Horizontal X coordinate. */
    double x;
    /** Horizontal Z coordinate. */
@@ -176,19 +178,44 @@ public class SpawnPile {
     * @return a list of found BlockPos
     */
    public static ArrayList<BlockPos> makeSpawnLocations(int num, int range, ServerLevel world, EntityType<?> entityType, BlockPos center){
+      return makeSpawnLocations(num, range, world, entityType, center, DEFAULT_MAX_TRIES, false);
+   }
+   
+   /**
+    * Like {@link #makeSpawnLocations(int, int, ServerLevel, EntityType, BlockPos)}, with control over how much work
+    * one call may do. Every attempt scans a full column, so many attempts over unloaded terrain load (or generate)
+    * many chunks on the main thread.
+    *
+    * @param num              number of locations to find
+    * @param range            maximum horizontal distance from center
+    * @param world            the level
+    * @param entityType       the entity type
+    * @param center           center point of the search area
+    * @param maxTries         attempts per location before the last candidate is used anyway
+    * @param loadedChunksOnly if {@code true}, candidates in unloaded chunks are skipped (they still count as
+    *                         attempts); if no candidate was checked, {@code center} is used
+    * @return a list of found BlockPos
+    */
+   public static ArrayList<BlockPos> makeSpawnLocations(int num, int range, ServerLevel world, EntityType<?> entityType, BlockPos center, int maxTries, boolean loadedChunksOnly){
       ArrayList<BlockPos> positions = new ArrayList<>();
       for(int i = 0; i < num; i++){
-         BlockPos entitySpawnPos;
+         BlockPos entitySpawnPos = null;
          int tries = 0;
          do{
-            int x = center.getX() + world.getRandom().nextInt(range * 2) - range;
-            int z = center.getZ() + world.getRandom().nextInt(range * 2) - range;
-            entitySpawnPos = getEntitySpawnPos(world, entityType, x, z, true);
+            int x = center.getX() + randomOffset(world, range);
+            int z = center.getZ() + randomOffset(world, range);
             tries++;
-         }while(Math.abs(entitySpawnPos.getY() - center.getY()) > range && tries < 10000);
-         positions.add(entitySpawnPos);
+            if(loadedChunksOnly && !world.hasChunk(x >> 4, z >> 4)) continue;
+            entitySpawnPos = getEntitySpawnPos(world, entityType, x, z, true);
+         }while((entitySpawnPos == null || Math.abs(entitySpawnPos.getY() - center.getY()) > range) && tries < maxTries);
+         positions.add(entitySpawnPos != null ? entitySpawnPos : center);
       }
       return positions;
+   }
+   
+   // A range of 0 or less keeps every candidate on the center column instead of throwing
+   private static int randomOffset(ServerLevel world, int range){
+      return range <= 0 ? 0 : world.getRandom().nextInt(range * 2) - range;
    }
    
    /**
@@ -229,7 +256,12 @@ public class SpawnPile {
     * @return {@code true} if position is considered safe
     */
    public boolean isSafe(BlockGetter world, int maxY){
-      BlockPos blockPos = BlockPos.containing(this.x, (double) (this.getY(world, maxY) - 1), this.z);
+      return isSafeAt(world, maxY, this.getY(world, maxY));
+   }
+   
+   // isSafe with the surface Y already known, so callers that also need the Y scan the column only once
+   private boolean isSafeAt(BlockGetter world, int maxY, int surfaceY){
+      BlockPos blockPos = BlockPos.containing(this.x, (double) (surfaceY - 1), this.z);
       BlockState blockState = world.getBlockState(blockPos);
       FluidState fluidState = world.getFluidState(blockPos);
       boolean invalid = blockState.is(Blocks.WITHER_ROSE) || blockState.is(Blocks.SWEET_BERRY_BUSH) || blockState.is(Blocks.CACTUS) || blockState.is(Blocks.POWDER_SNOW) || blockState.is(BlockTags.PREVENT_MOB_SPAWNING_INSIDE) || WalkNodeEvaluator.isBurningBlock(blockState);
@@ -276,17 +308,41 @@ public class SpawnPile {
     * @return valid spawn positions
     */
    public static ArrayList<BlockPos> makeSpawnLocations(int num, int range, int maxY, ServerLevel world, BlockPos center){
+      return makeSpawnLocations(num, range, maxY, world, center, DEFAULT_MAX_TRIES, false);
+   }
+   
+   /**
+    * Like {@link #makeSpawnLocations(int, int, int, ServerLevel, BlockPos)}, with control over how much work one
+    * call may do. Every attempt scans a full column, so many attempts over unloaded terrain load (or generate) many
+    * chunks on the main thread.
+    *
+    * @param num              number of locations to find
+    * @param range            horizontal range from center
+    * @param maxY             maximum allowed spawn height
+    * @param world            the level
+    * @param center           center point
+    * @param maxTries         attempts per location before the last candidate is used anyway
+    * @param loadedChunksOnly if {@code true}, candidates in unloaded chunks are skipped (they still count as
+    *                         attempts); if no candidate was checked, {@code center} is used
+    * @return valid spawn positions
+    */
+   public static ArrayList<BlockPos> makeSpawnLocations(int num, int range, int maxY, ServerLevel world, BlockPos center, int maxTries, boolean loadedChunksOnly){
       ArrayList<BlockPos> positions = new ArrayList<>();
       for(int i = 0; i < num; i++){
-         SpawnPile pile;
+         BlockPos found = null;
+         boolean safe = false;
          int tries = 0;
          do{
-            int x = center.getX() + world.getRandom().nextInt(range * 2) - range;
-            int z = center.getZ() + world.getRandom().nextInt(range * 2) - range;
-            pile = new SpawnPile(x, z);
+            int x = center.getX() + randomOffset(world, range);
+            int z = center.getZ() + randomOffset(world, range);
             tries++;
-         }while(!pile.isSafe(world, maxY) && tries < 10000);
-         positions.add(BlockPos.containing(pile.x, pile.getY(world, maxY), pile.z));
+            if(loadedChunksOnly && !world.hasChunk(x >> 4, z >> 4)) continue;
+            SpawnPile pile = new SpawnPile(x, z);
+            int y = pile.getY(world, maxY);
+            safe = pile.isSafeAt(world, maxY, y);
+            found = BlockPos.containing(pile.x, y, pile.z);
+         }while(!safe && tries < maxTries);
+         positions.add(found != null ? found : center);
       }
       return positions;
    }

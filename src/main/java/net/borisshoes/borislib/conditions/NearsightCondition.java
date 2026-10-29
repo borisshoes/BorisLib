@@ -82,6 +82,23 @@ public class NearsightCondition extends Condition {
       return REFERENCE_RADIUS / r - 1.0f;
    }
 
+   /**
+    * Whether a seeker's Nearsight keeps it from targeting an entity, i.e. the target is outside half the sight
+    * radius. Applied through {@code canAttack}, including the mobs that override it without calling super.
+    *
+    * @param seeker the entity trying to target
+    * @param target the entity being targeted
+    * @return {@code true} if Nearsight hides the target from the seeker
+    */
+   public static boolean hidesTarget(LivingEntity seeker, LivingEntity target){
+      EntityConditions conditions = ((ConditionHolder) seeker).borislib$getConditions();
+      if(conditions == null) return false;
+      float nearsight = conditions.getValue(Conditions.NEARSIGHT);
+      if(nearsight <= 0.0f || seeker.is(BorisLib.IGNORES_NEARSIGHT)) return false;
+      double range = radiusForMagnitude(nearsight) / 2.0;
+      return target.distanceToSqr(seeker) > range * range;
+   }
+
    @Override
    public boolean canApply(LivingEntity entity){
       return !entity.is(BorisLib.IGNORES_NEARSIGHT);
@@ -250,6 +267,15 @@ public class NearsightCondition extends Condition {
          holder.setAttachment(null);
          holder.destroy();
       }
+   }
+
+   /** Server-stop hook: destroys every overlay so none are carried into the next world. */
+   public static void onServerStopped(){
+      for(NearsightElementHolder holder : ACTIVE_HOLDERS.values()){
+         holder.setAttachment(null);
+         holder.destroy();
+      }
+      ACTIVE_HOLDERS.clear();
    }
 
    private double[] calculateBoxes(float radius){

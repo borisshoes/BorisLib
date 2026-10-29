@@ -14,6 +14,8 @@ import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.permissions.PermissionLevel;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -64,12 +66,18 @@ public class ConfigManager {
    private final File file;
    private final String modId;
    private final String modName;
-   
+   // Lines of the file this manager cannot interpret, kept so that saving never throws away what the user wrote:
+   // settings with unknown names (e.g. from another version) and the raw text of values that failed to parse
+   private final Map<String, String> unknownLines = new LinkedHashMap<>();
+   private final Map<String, String> invalidValues = new HashMap<>();
+   private boolean readFailed;
+
    /**
     * Creates a new config manager.
     *
     * <p>The manager immediately reads the config file (creating it with defaults if it doesn't exist)
-    * and saves it back to ensure the file is up-to-date with all registered settings.
+    * and saves it back to ensure the file is up-to-date with all registered settings. If the file exists but
+    * could not be read, it is left untouched rather than overwritten with defaults.
     *
     * @param modId the mod identifier (used for permissions and translations)
     * @param modName the display name of the mod (used in config file header)
@@ -98,18 +106,22 @@ public class ConfigManager {
     *
     * <p>Settings not found in the file are reset to their default values.
     * If the file doesn't exist, all settings are initialized with defaults.
-    * Parsing errors for individual settings are logged but don't prevent other settings from loading.
+    * Parsing errors for individual settings are logged but don't prevent other settings from loading; the
+    * unparseable text and any unknown settings are kept and written back by {@link #save()}.
     */
    public void read(){
+      unknownLines.clear();
+      invalidValues.clear();
+      readFailed = false;
       try(BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(file)))){
          LOGGER.debug("Reading {} config...", modName);
-         
+
          for(ConfigValue value : this.values){
             value.setValue(value.defaultValue);
          }
-         
-         while(input.ready()){
-            String configLine = input.readLine();
+
+         String configLine;
+         while((configLine = input.readLine()) != null){
             String trimmed = configLine.trim();
             if(trimmed.isEmpty()) continue;
             char firstChar = trimmed.charAt(0);
@@ -127,19 +139,28 @@ public class ConfigManager {
                try{
                   Object parsed = value.getFromString(valueValue);
                   value.setValue(parsed != null ? parsed : defaultValue);
+                  if(parsed == null) invalidValues.put(valueName, valueValue);
                }catch(Exception e){
                   value.setValue(defaultValue);
+                  invalidValues.put(valueName, valueValue);
                }
+               if(invalidValues.containsKey(valueName)){
+                  LOGGER.warn("{} config value '{}' for {} is invalid; using the default until it is fixed", modName, valueValue, valueName);
+               }
+            }else{
+               unknownLines.put(valueName, valueValue);
             }
          }
-         
+
       }catch(FileNotFoundException ignored){
          LOGGER.debug("Initialising {} config...", modName);
          this.values.forEach(value -> value.value = value.defaultValue);
       }catch(IOException e){
+         readFailed = true;
          LOGGER.fatal("Failed to load {} config file!", modName);
          LOGGER.fatal(e);
       }catch(Exception e){
+         readFailed = true;
          LOGGER.fatal("Failed to parse {} config", modName);
          LOGGER.fatal(e);
       }
@@ -151,24 +172,59 @@ public class ConfigManager {
     * <p>The file includes a timestamp header and comments (from translation keys) for each setting.
     * This method is automatically called after the config manager is created and whenever a
     * setting is modified via command.
+    *
+    * <p>A value that failed to parse is written back as the user wrote it, under a comment saying the default is
+    * in use, and settings this manager does not know are kept in a section at the end. The file is written to a
+    * temporary file first and then moved into place, so an interrupted save cannot leave it truncated.</p>
     */
    public void save(){
+      if(readFailed){
+         // Whatever is in memory is defaults, not the user's file; writing it would wipe their settings
+         LOGGER.error("Not saving {} config: the file could not be read, so saving would overwrite it", modName);
+         return;
+      }
       LOGGER.debug("Updating {} config...", modName);
-      try(BufferedWriter output = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))){
+      File temp = new File(file.getPath() + ".tmp");
+      try(BufferedWriter output = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(temp)))){
          output.write("# " + modName + " Configuration File" + " | " + new Date());
          output.newLine();
          output.newLine();
-         
+
          for(ConfigValue value : this.values){
             if(value.getComment(this.modId) != null){
                output.write("# " + Component.translatable(value.getComment(this.modId)).getString());
                output.newLine();
             }
-            output.write(value.name + " = " + value.getValueString());
+            String invalid = invalidValues.get(value.name);
+            if(invalid != null){
+               output.write("# Invalid value, using the default (" + value.getValueString() + ") until it is fixed");
+               output.newLine();
+               output.write(value.name + " = " + invalid);
+            }else{
+               output.write(value.name + " = " + value.getValueString());
+            }
             output.newLine();
+         }
+
+         if(!unknownLines.isEmpty()){
+            output.newLine();
+            output.write("# Unrecognized settings (kept by BorisLib, not used by this version)");
+            output.newLine();
+            for(Map.Entry<String, String> entry : unknownLines.entrySet()){
+               output.write(entry.getKey() + " = " + entry.getValue());
+               output.newLine();
+            }
          }
       }catch(IOException e){
          LOGGER.fatal("Failed to save {} config file!", modName);
+         LOGGER.fatal(e);
+         temp.delete();
+         return;
+      }
+      try{
+         Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+      }catch(IOException e){
+         LOGGER.fatal("Failed to replace {} config file!", modName);
          LOGGER.fatal(e);
       }
    }
@@ -225,10 +281,13 @@ public class ConfigManager {
                .then(argument(value.name, value.getArgumentType()).suggests(value::getSuggestions)
                      .requires(Permissions.require(modId + ".config." + value.name.toLowerCase(Locale.ROOT) + ".set", PermissionLevel.GAMEMASTERS))
                      .executes(ctx -> {
+                        // Parsed once: a value type that reports bad input itself returns null and nothing changes
                         Object parsed = value.parseArgumentValue(ctx);
-                        boolean pass = value.validate(value.parseArgumentValue(ctx), ctx);
+                        if(parsed == null) return 0;
+                        boolean pass = value.validate(parsed, ctx);
                         if(!pass) return 0;
                         value.setValue(parsed);
+                        invalidValues.remove(value.name);
                         ((CommandContext<CommandSourceStack>) ctx).getSource().sendSuccess(() -> MutableComponent.create(new TranslatableContents(ConfigValue.getTranslation(value.getName(), this.modId, "getter_setter"), null, new String[]{String.valueOf(value.getValueString())})), true);
                         this.save();
                         return 1;

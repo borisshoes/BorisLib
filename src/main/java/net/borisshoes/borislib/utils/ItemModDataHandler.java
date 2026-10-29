@@ -84,14 +84,18 @@ public class ItemModDataHandler {
     * @return the compound tag, or empty tag if no data exists
     */
    public CompoundTag getDataTag(ItemStack stack){
+      return readTag(stack).copy();
+   }
+   
+   /**
+    * The mod's sub-tag as stored in the item's component, without copying anything. Components are shared and
+    * immutable, so this must only ever be read; everything that hands a tag to callers copies it first.
+    */
+   private CompoundTag readTag(ItemStack stack){
       if(stack == null) return new CompoundTag();
       CustomData nbtComponent = stack.get(DataComponents.CUSTOM_DATA);
       if(nbtComponent == null) return new CompoundTag();
-      CompoundTag data = nbtComponent.copyTag();
-      if(data.contains(modKey)){
-         return data.getCompoundOrEmpty(modKey);
-      }
-      return new CompoundTag();
+      return nbtComponent.tag.getCompoundOrEmpty(modKey);
    }
    
    /**
@@ -102,7 +106,7 @@ public class ItemModDataHandler {
     * @return the integer value, or 0 if not present
     */
    public int getIntProperty(ItemStack stack, String key){
-      CompoundTag modTag = getDataTag(stack);
+      CompoundTag modTag = readTag(stack);
       return modTag == null || !modTag.contains(key) ? 0 : modTag.getIntOr(key, 0);
    }
    
@@ -114,7 +118,7 @@ public class ItemModDataHandler {
     * @return the string value, or empty string if not present
     */
    public String getStringProperty(ItemStack stack, String key){
-      CompoundTag modTag = getDataTag(stack);
+      CompoundTag modTag = readTag(stack);
       return modTag == null || !modTag.contains(key) ? "" : modTag.getStringOr(key, "");
    }
    
@@ -126,7 +130,7 @@ public class ItemModDataHandler {
     * @return the boolean value, or {@code false} if not present
     */
    public boolean getBooleanProperty(ItemStack stack, String key){
-      CompoundTag modTag = getDataTag(stack);
+      CompoundTag modTag = readTag(stack);
       return modTag != null && modTag.contains(key) && modTag.getBooleanOr(key, false);
    }
    
@@ -138,7 +142,7 @@ public class ItemModDataHandler {
     * @return the double value, or 0.0 if not present
     */
    public double getDoubleProperty(ItemStack stack, String key){
-      CompoundTag modTag = getDataTag(stack);
+      CompoundTag modTag = readTag(stack);
       return modTag == null || !modTag.contains(key) ? 0.0 : modTag.getDoubleOr(key, 0.0);
    }
    
@@ -150,7 +154,7 @@ public class ItemModDataHandler {
     * @return the float value, or 0.0f if not present
     */
    public float getFloatProperty(ItemStack stack, String key){
-      CompoundTag modTag = getDataTag(stack);
+      CompoundTag modTag = readTag(stack);
       return modTag == null || !modTag.contains(key) ? 0.0f : modTag.getFloatOr(key, 0f);
    }
    
@@ -162,7 +166,7 @@ public class ItemModDataHandler {
     * @return the long value, or 0L if not present
     */
    public long getLongProperty(ItemStack stack, String key){
-      CompoundTag modTag = getDataTag(stack);
+      CompoundTag modTag = readTag(stack);
       return modTag == null || !modTag.contains(key) ? 0 : modTag.getLongOr(key, 0L);
    }
    
@@ -272,7 +276,7 @@ public class ItemModDataHandler {
     * @return {@code true} if the property exists
     */
    public boolean hasProperty(ItemStack stack, String key){
-      CompoundTag modTag = getDataTag(stack);
+      CompoundTag modTag = readTag(stack);
       return modTag.contains(key);
    }
    

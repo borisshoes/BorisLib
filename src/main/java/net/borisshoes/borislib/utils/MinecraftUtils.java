@@ -453,7 +453,7 @@ public class MinecraftUtils {
       for(int i = 0; i < inv.getContainerSize(); i++){
          ItemStack stack = inv.getItem(i).copy();
          if(!stack.isEmpty()){
-            inv.setItem(0, ItemStack.EMPTY);
+            inv.setItem(i, ItemStack.EMPTY);
             
             ItemEntity itemEntity;
             boolean bl = player.getInventory().add(stack);
@@ -607,7 +607,7 @@ public class MinecraftUtils {
          if(nonEmpty == beltList.size()){ // No middle empty slots, append new slot to end
             beltList.add(stack.copyAndClear());
          }else{
-            for(int i = 0; i < nonEmpty; i++){ // Find middle empty slot to fill
+            for(int i = 0; i < beltList.size(); i++){ // Find the first empty slot to fill (trailing ones included)
                if(beltList.get(i).isEmpty()){
                   beltList.set(i, stack.copyAndClear());
                   break;

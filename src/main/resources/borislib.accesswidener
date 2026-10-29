@@ -1,4 +1,4 @@
 accessWidener v2 official
 
-accessible field  net/minecraft/server/level/ServerPlayer gameMode Lnet/minecraft/server/level/ServerPlayerGameMode;
-
+# Read-only access for ItemModDataHandler; 26.3 only offers a full copy of the tag
+accessible field net/minecraft/world/item/component/CustomData tag Lnet/minecraft/nbt/CompoundTag;

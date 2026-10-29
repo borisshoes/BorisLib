@@ -116,16 +116,17 @@ public final class WorldState extends SavedData {
                try{
                   if(value instanceof StorableData storable){
                      CompoundTag encoded = encode(storable, modId + ":" + key);
-                     if(encoded != null && !encoded.isEmpty()){
+                     // Empty from a successful writeNbt means empty (see GlobalState); only a throwing encoder falls back
+                     if(encoded != null){
                         modTag.put(key, encoded);
                      }else{
                         hadError = true;
                         CompoundTag prev = previousFor(modId, key);
                         if(prev != null && !prev.isEmpty()){
                            modTag.put(key, prev);
-                           BorisLib.LOGGER.warn("Encode for world key {}:{} was empty/invalid - kept last known good value", modId, key);
+                           BorisLib.LOGGER.warn("Encode for world key {}:{} failed - kept last known good value", modId, key);
                         }else{
-                           BorisLib.LOGGER.warn("Skipping save for world key {}:{} - encoded data is empty/invalid and no prior value exists", modId, key);
+                           BorisLib.LOGGER.warn("Skipping save for world key {}:{} - encoding failed and no prior value exists", modId, key);
                         }
                      }
                   }
@@ -244,6 +245,16 @@ public final class WorldState extends SavedData {
    }
    
    /**
+    * Runs the one-time backup heal if it has not happened yet. Called before each pre-save backup so an
+    * empty-loaded state is restored, rather than backed up over the good backup, when no mod has read it yet.
+    *
+    * @param worldKey the dimension this state belongs to
+    */
+   void ensureRestored(ResourceKey<Level> worldKey){
+      attemptBackupRestore(worldKey);
+   }
+
+   /**
     * Reads or lazily decodes the value for a WORLD-scoped {@link DataKey}, falling back to the key's
     * default factory when no stored value is available.
     *
@@ -278,6 +289,7 @@ public final class WorldState extends SavedData {
                return decoded;
             }
             // decode returned null (corrupted data), fall through to create default
+            PlayerObjectStore.stashUndecodable(modRaw, key, tag, "world " + worldKey.identifier());
             BorisLib.LOGGER.warn("Corrupted data for world key {} in world {}, using default value", key.id(), worldKey);
             BorisLib.LOGGER.warn("  NBT contents: {}", tag.isEmpty() ? "(empty)" : tag);
             if(modRaw.isEmpty()) data.remove(key.modId());

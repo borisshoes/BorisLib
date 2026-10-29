@@ -53,7 +53,8 @@ public class ConditionInstance implements ConditionMath.Term {
          Codec.INT.fieldOf("duration").forGetter(Raw::duration),
          Codec.FLOAT.fieldOf("value").forGetter(Raw::value),
          Codec.BOOL.fieldOf("stacking").forGetter(Raw::stacking),
-         ConditionParticles.CODEC.optionalFieldOf("particles").forGetter(Raw::particles),
+         // Lenient: a corrupt spec falls back to the condition's default particles instead of dropping the instance
+         ConditionParticles.CODEC.lenientOptionalFieldOf("particles").forGetter(Raw::particles),
          AttributeModifier.Operation.CODEC.fieldOf("operation").forGetter(Raw::operation),
          Codec.INT.fieldOf("timer").forGetter(Raw::timer),
          Codec.BOOL.fieldOf("persistent").forGetter(Raw::persistent),

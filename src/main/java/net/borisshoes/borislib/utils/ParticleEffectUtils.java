@@ -190,16 +190,19 @@ public class ParticleEffectUtils {
    }
    
    private static void animatedLightningBoltHelper(ServerLevel world, HashMap<Supplier<Vec3>, Integer> points, ParticleOptions type, int count, double delta, double speed, boolean longDist, int persistMod, int tick){
+      // Taken from every point up front, so the particle cap below cannot cut the animation short
       int highestTick = 0;
+      for(int pTick : points.values()){
+         if(pTick > highestTick) highestTick = pTick;
+      }
       int pCount = 0;
       for(Map.Entry<Supplier<Vec3>, Integer> entry : points.entrySet()){
          if(pCount >= 1000) break;
          int pTick = entry.getValue();
-         Vec3 point = entry.getKey().get();
-         if(pTick > highestTick) highestTick = pTick;
-         
          if(!(persistMod > 0 && tick % persistMod == 0 && pTick < tick) && pTick != tick) continue;
-         
+         // Only points emitted this tick are evaluated; the transformed variant does vector maths per point
+         Vec3 point = entry.getKey().get();
+
          if(longDist){
             spawnLongParticle(world, type, point.x, point.y, point.z, delta, delta, delta, speed, count);
          }else{

@@ -98,13 +98,13 @@ dependencies {
 }
 ```
 ```properties
-borislib_version=4.0.0+26.3
+borislib_version=4.0.1+26.3
 ```
 
 Then declare it in your `fabric.mod.json`:
 ```json
 "depends": {
-  "borislib": ">=4.0.0"
+  "borislib": ">=4.0.1"
 }
 ```
 
@@ -157,6 +157,7 @@ boolean enabled = MyMod.CONFIG.getBoolean(MyMod.ENABLE_FEATURE);
 ```
 
 - **The file** is `config/MyMod.properties`. It is created with defaults on first launch, and settings that are missing or fail to parse fall back to their default. `read()` and `save()` reload and rewrite it at any time.
+- **The user's text is never lost.** A value that fails to parse is written back as it was, under a comment saying the default is in use, until it is fixed or set by command. Settings the manager does not recognise (from another version, or a typo) are kept in a section at the end of the file. If the file exists but cannot be read, it is not overwritten. Saves go through a temporary file, so an interrupted save cannot truncate it.
 - **The command** from `generateCommand("mymod", "config")` gives `/mymod config` to list every setting, `/mymod config <name>` to read one and `/mymod config <name> <value>` to change one. Changes are saved straight away. Pass an empty second argument to put the settings directly under the first literal.
 - **Permissions** are generated per setting. See [Config Commands](#config-commands).
 - **Translations.** The comment written above each setting in the file is the translation of `command.<modid>.<setting_name>.comment`, and command feedback uses `command.<modid>.<setting_name>.getter_setter` with the value as `%s`. The setting name is converted from camelCase to snake_case.
@@ -168,7 +169,7 @@ boolean enabled = MyMod.CONFIG.getBoolean(MyMod.ENABLE_FEATURE);
 | `DoubleConfigValue` | `double` | Optional `DoubleLimits(min, max)` |
 | `FloatConfigValue` | `float` | Optional `FloatLimits(min, max)` |
 | `StringConfigValue` | `String` | Optional list of allowed options, used for suggestions |
-| `EnumConfigValue` | an enum implementing `StringRepresentable` | Suggests every constant |
+| `EnumConfigValue` | an enum implementing `StringRepresentable` | Suggests and saves each constant's serialized name; the Java constant name is also accepted, ignoring case |
 | `ListConfigValue` | a `List` of any of the above | Written as `a, b, c`; read with `getIntList`, `getDoubleList`, `getStringList` and so on |
 
 Every `ConfigValue` also accepts a `Validator` (a predicate plus a failure handler that receives the command context) through `setValidator`, and a callback that runs whenever the value is set through `setOnSet`.
@@ -207,13 +208,17 @@ DataAccess.setPlayer(player.getUUID(), Wallet.KEY, wallet);
 | World | `DataKey.ofWorld(id, Function<ResourceKey<Level>, T>)` | `getWorld(worldKey, key)`, `setWorld(level, key, value)` | dimension |
 | Player | `DataKey.ofPlayer(id, Function<UUID, T>)` | `getPlayer(uuid, key)`, `setPlayer(uuid, key, value)` | player UUID |
 
-- **Offline players.** `getPlayer` and `setPlayer` take a UUID and load the file on demand, so they work whether or not the player is online. `DataAccess.allPlayerDataFor(key)` returns the value for every player the server has ever stored, which is useful for leaderboards.
-- **Defaults.** The factory you pass to the key creates the object the first time it is requested.
+- **Offline players.** `getPlayer` and `setPlayer` take a UUID and load the file on demand, so they work whether or not the player is online. A player stays loaded for the rest of the session, so a reference you keep stays live and its changes are saved.
+- **Every player.** `DataAccess.allPlayerDataFor(key)` returns the live value for every player the server has ever stored, which is useful for leaderboards, and loads all of them. For a read-only report over many offline players, `snapshotAllPlayerData(key)` returns detached copies for players who are not already loaded, so they are not kept in memory (changes to those copies are not saved). `knownPlayerUuids()` lists every player BorisLib knows about.
+- **Defaults.** The factory you pass to the key creates the object the first time it is requested. `hasPlayerData(uuid, key)` checks whether a player has a value without creating one.
 - **Saving.** The `set` methods mark the data for saving. If you keep a reference and change it in place, either call `markPlayerDirty(uuid)`, `markGlobalDirty()` or `markWorldDirty(worldKey)`, or override `setDirtyCallback` and `markDirty` in your data class as shown in the `StorableData` Javadoc.
+- **When it is written.** Data is saved with the world: on autosave, `/save-all` and shutdown. Player files are written right after vanilla's own player files, after every other mod's `BEFORE_SAVE` handler, so changes you make there are included. A player's file is also written when they leave, and skipped when nothing in it changed.
+- **Writing right away.** When data must be on disk before something else happens, `savePlayerKeyNow(uuid, key)` writes one key immediately and leaves the rest of the file as it was at the last save, so it stays in step with vanilla's player file. `savePlayerNow(uuid)` writes everything for that player.
 - **Resilient reads.** `read` receives a `ValueInput`, so each field is read on its own and one bad field does not lose the rest.
+- **Failures do not lose data.** If `read` throws, the key starts from its default as usual, but the stored data is kept in the same file under `<key>$undecodable` (`DataKey.UNDECODABLE_SUFFIX`) for manual recovery. If `writeNbt` throws, the last saved value is written again instead of the key being dropped. A global or world value whose `writeNbt` writes nothing is saved as empty and loads back as the default.
 - **Other mods' data is preserved.** Data belonging to a mod that is not currently loaded is carried through each save untouched.
-- **On disk.** Player data is stored in `<world>/players/borislib/<uuid>.dat` with a `.dat_old` copy from the previous save. Global and world data use Minecraft's saved data, and BorisLib writes its own atomic backups of them to `<world>/data/borislib_backups/`, which are used automatically if the main file is lost or empty after a crash.
-- **Server only.** `DataAccess` throws if it is called where no server is running. Register keys during mod initialisation; registering the same id and scope twice throws.
+- **On disk.** Player data is stored in `<world>/players/borislib/<uuid>.dat` with a `.dat_old` copy from the previous save. Global and world data use Minecraft's saved data, and BorisLib writes its own atomic backups of them to `<world>/data/borislib_backups/` on a background thread. The backups are used automatically if the main file is lost or empty after a crash.
+- **Server only.** `DataAccess` throws if it is called where no server is running, including after the server has stopped, when BorisLib has already saved and closed its data. `BorisLib.SERVER` is `null` at those times too. Register keys during mod initialisation; registering the same id and scope twice throws.
 
 BorisLib stores a `DefaultPlayerData` for every player under `BorisLib.PLAYER_DATA_KEY`. It keeps their current username, every username they have been seen with, and a cached profile, and can produce a player head item, a `Mannequin` or a face text component for players who are offline.
 
@@ -280,7 +285,7 @@ Each built-in condition has an icon. It is shown on the condition's items in the
 `ConditionMath` converts everyday numbers into magnitudes: `reductionToMagnitude(0.5f)` is the magnitude that removes 50%, `amplifyToMagnitude(3f)` is the magnitude that triples, and `NearsightCondition.magnitudeForRadius(8f)` is the Nearsight that leaves 8 blocks of sight.
 
 Good to know:
-- An entity that is removed from the world or dies loses its conditions. An unloaded entity keeps them, with timers paused.
+- An entity that is removed from the world or dies loses its conditions. An unloaded entity keeps them, with timers paused. Server owners can have the conditions of mobs that never come back (e.g. in deleted chunks) cleaned up with the `conditionRecordExpiryDays` setting or `/borislib condition prune`; players are never affected. `Conditions.pruneRecords(server, days)` does the same from code.
 - Conditions tick with their entity, so they pause during `/tick freeze`.
 - Each entity shows at most 20 ambient condition particles per second across all of its conditions.
 - Always pass the `Holder` from `Conditions` or from `BorisLib.registerCondition`, not a copy made with `Holder.direct`.
@@ -476,7 +481,7 @@ SequenceManager.start(player, new CutsceneSequence(player.getUUID(), path, 200, 
 |---|---|
 | `CutsceneSequence` | Moves the player's camera along a `CameraPath` in spectator mode, with movement and look input locked. Can leave a `Mannequin` with the player's skin, equipment and pose where they were standing, and can play in another dimension by passing a target dimension. `CutsceneSequence.staticView(...)` holds one fixed shot |
 | `IFrameSequence` | An invincibility-frame animation for abilities. Options: damage and knockback immunity, frozen position, movement along a path, and a locked or free camera |
-| `RespawnGhostSequence` | A temporary spectator phase for respawn flows. The ghost can fly freely, optionally tethered within a range of an anchor point, and cannot spectate other entities |
+| `RespawnGhostSequence` | A temporary spectator phase for respawn flows. The ghost can fly freely, optionally tethered within a range of an anchor point, and cannot spectate other entities or use the spectator teleport menu. Pass the anchor's dimension too, and a ghost that ends up in another dimension is brought back to the anchor |
 
 Camera paths:
 - Keyframe times are normalised from 0 to 1 over the sequence's duration.
@@ -486,7 +491,9 @@ Camera paths:
 
 `SequenceManager.cancel(player)` ends a sequence early, `isInSequence(uuid)` and `isInSequence(uuid, type)` query it, and `getActiveSequence(uuid)` returns it. A player can be in one sequence at a time, and sequences never continue across a restart.
 
-To write your own, extend `PlayerSequence` and implement `onStart`, `onTick`, `onEnd` and `getDurationTicks`. Override `blocksMovement`, `blocksLook` and `restrictsSpectatorAbuse` to choose what is locked. Do not restore the player's game mode or position in `onEnd`, since the manager does that.
+To write your own, extend `PlayerSequence` and implement `onStart`, `onTick`, `onEnd` and `getDurationTicks`. Override `blocksMovement`, `blocksLook` and `restrictsSpectatorAbuse` to choose what is locked; `restrictsSpectatorAbuse` blocks spectating entities and the spectator teleport menu. Do not restore the player's game mode or position in `onEnd`, since the manager does that.
+
+If your sequence spawns an entity that is saved with the world (like the cutscene's mannequin), call `SequenceManager.trackCameraEntity(entity)` **before** adding it to the level, and `untrackCameraEntity(uuid)` after you discard it in `onEnd`. If the server crashes while it exists, BorisLib discards it on the next start, or as soon as its chunk loads. Tracked entities get the `borislib_sequence_entity` tag (`SequenceManager.SEQUENCE_ENTITY_TAG`), and a tagged entity that no running sequence owns is discarded when it loads.
 
 ### Timers
 *Package `timers`.* Timers count in ticks and pause during `/tick freeze`.
@@ -501,7 +508,9 @@ BorisLib.addTickTimerCallback(level, new RepeatTimer(20, 5, () -> pulse(level), 
 
 - `addTickTimerCallback(callback)` runs on the server tick, and `addTickTimerCallback(level, callback)` runs on that dimension's tick.
 - Extend `TickTimerCallback` for a timer that carries an item or a player, and override `onTimer`.
-- Timers live in memory and are not saved, so they do not survive a restart. Use a [login callback](#login-callbacks) or [data storage](#data-storage) for anything that must.
+- A delay of 0 or less fires the first time the timers tick. A timer scheduled from inside another timer's `onTimer` is ticked in the same pass, so a 0-delay one fires that same tick.
+- A timer that throws is logged and removed without affecting the others.
+- Timers live in memory and are not saved, so they do not survive a restart. They are also cleared when the server stops, so in singleplayer they never carry into the next world. Use a [login callback](#login-callbacks) or [data storage](#data-storage) for anything that must survive.
 
 ### Login Callbacks
 *Package `callbacks`.* A `LoginCallback` is work that runs the next time a specific player logs in. Callbacks are saved with the player's data, so they survive restarts and can be queued for players who are offline.
@@ -514,7 +523,13 @@ public static final LoginCallback REWARD_CALLBACK = BorisLib.registerCallback(ne
 BorisLib.addLoginCallback(new RewardLoginCallback(player, 250));
 ```
 
-Returning items is built in. `ItemReturnTimerCallback` gives a stack back to a player after a delay, retries while they are dead or their inventory is full, and becomes an `ItemReturnLoginCallback` if they have logged off:
+A callback that throws in `onLogin` is logged and kept for the next login. Callbacks that already ran are removed straight away, so they never run twice.
+
+Returning items is built in. `PendingItemReturns.queue` owes a stack to a player, online or offline. The items are kept in the player's data until they are actually in their inventory, so a restart or crash only delays them. Online, living players are retried once a second, the preferred slot first, and if their inventory stays full for 30 seconds the rest is dropped at their feet for them to pick up:
+```java
+PendingItemReturns.queue(player.getUUID(), stack, -1); // -1 for no preferred slot; the stack is copied
+```
+`ItemReturnTimerCallback` does the same after a delay, and `ItemReturnLoginCallback` the next time the player logs in. The timer's delay itself is held in memory, so call `queue` directly when the item must survive a restart from the start:
 ```java
 BorisLib.addTickTimerCallback(new ItemReturnTimerCallback(stack, player, 0));
 ```
@@ -538,7 +553,7 @@ Event.addEvent(new SpellCastEvent(player.getUUID()));
 boolean castRecently = Event.getEventsOfType(SpellCastEvent.class).stream().anyMatch(e -> e.caster.equals(player.getUUID()));
 ```
 
-Override `onExpiry` to run code when an event's lifespan ends, and call `markForRemoval` to drop one early.
+Override `onExpiry` to run code when an event's lifespan ends, and call `markForRemoval` to drop one early. An event that throws while ticking is logged and removed.
 
 ### Movement Tracker
 The server does not normally know a player's velocity, because players move themselves and only report positions. BorisLib records the movement from each position packet:
@@ -575,7 +590,7 @@ The entry also holds the position and a `System.nanoTime()` timestamp. It is res
 | `SoundUtils` | `playSound` at a position, `playSongToPlayer` for one player only, `getSound` by id, `soulSounds` |
 | `ItemModDataHandler` | Typed get and put methods for your mod's data on an item stack, stored under one namespaced key in the custom data component |
 | `ItemContainerContentsMutable` | A mutable view of a container component with slot limits, an insertion predicate and stacking-aware adding |
-| `SpawnPile` | `makeSpawnLocations` finds safe spawn positions spread around a centre |
+| `SpawnPile` | `makeSpawnLocations` finds safe spawn positions spread around a centre. Overloads take `maxTries` and `loadedChunksOnly` to limit how much terrain one call may load |
 | `CodecUtils` | `readBigInventory` and `writeBigInventory` for inventories with large stacks |
 | `TreeNode` | A generic tree with depth, leaf and descendant queries |
 
@@ -600,6 +615,7 @@ int charges = ITEM_DATA.getIntProperty(wand, "charges");
 * ```/borislib condition get <entity> <condition>``` Shows the prevailing value of a condition.
 * ```/borislib condition getInstance <entity> <condition> <identifier>``` Shows the details of one instance.
 * ```/borislib condition getInstances <entity> <condition>``` Lists every instance of a condition.
+* ```/borislib condition prune <days>``` Deletes the saved conditions of non-player entities that have not been loaded for that many in-game days. Players and loaded entities are never affected.
 
 Conditions from other mods can be used here by their id.
 
@@ -626,6 +642,7 @@ These commands demonstrate the library and only exist while `testmodFeaturesEnab
 BorisLib's own settings are in `config/BorisLib.properties`. Edit the file and run `/borislib reload`, or restart the server.
 
 * `testmodFeaturesEnabled` When true, the test commands showing what BorisLib can do are enabled for operators. (default: false)
+* `conditionRecordExpiryDays` Days after which the conditions of a non-player entity that has not been loaded are deleted on startup. 0 never deletes them. Players are never affected. (default: 0)
 
 Mods built on BorisLib have their own config files and commands, which are described in their own documentation.
 
@@ -658,6 +675,7 @@ Config commands are generated dynamically for each mod that uses BorisLib's `Con
 | `borislib.condition.get` | `GAMEMASTERS` | Get the prevailing value of a condition on an entity |
 | `borislib.condition.getinstance` | `GAMEMASTERS` | Get details of a specific condition instance by ID |
 | `borislib.condition.getinstances` | `GAMEMASTERS` | List all instances of a condition type on an entity |
+| `borislib.condition.prune` | `GAMEMASTERS` | Delete saved conditions of entities not loaded for a number of days |
 
 ### Testmod
 These nodes only matter while the `testmodFeaturesEnabled` config option is true.

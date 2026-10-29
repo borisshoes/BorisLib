@@ -25,9 +25,39 @@ public final class EntityConditions {
    private final Reference2ObjectOpenHashMap<Holder<Condition>, TypeState> types = new Reference2ObjectOpenHashMap<>();
    private final ConditionParticleEmitter emitter = new ConditionParticleEmitter();
    private Holder<?>[] scratch = NO_HOLDERS;
+   // Overworld game time when the entity was last loaded or unloaded, or -1 if unknown (older saves); used only
+   // by the opt-in pruning of records whose entity never comes back
+   private long lastSeen = -1L;
+   private boolean player;
 
    /** Creates an empty record. */
    public EntityConditions(){
+   }
+
+   /** @return the overworld game time the entity was last seen loaded, or {@code -1} if unknown */
+   public long getLastSeen(){
+      return lastSeen;
+   }
+
+   /** @return {@code true} if this record has ever belonged to a player; such records are never pruned */
+   public boolean isPlayer(){
+      return player;
+   }
+
+   void markSeen(long gameTime, boolean isPlayer){
+      this.lastSeen = gameTime;
+      this.player |= isPlayer;
+   }
+
+   /**
+    * Restores the last-seen bookkeeping from saved data.
+    *
+    * @param lastSeen overworld game time last seen, or {@code -1} if unknown
+    * @param player   whether the record belongs to a player
+    */
+   public void restoreSeen(long lastSeen, boolean player){
+      this.lastSeen = lastSeen;
+      this.player = player;
    }
 
    /**

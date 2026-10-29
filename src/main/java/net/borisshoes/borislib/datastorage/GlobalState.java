@@ -125,18 +125,21 @@ public final class GlobalState extends SavedData {
                try{
                   if(value instanceof StorableData storable){
                      CompoundTag encoded = encode(storable, modId + ":" + key);
-                     if(encoded != null && !encoded.isEmpty()){
+                     // An empty tag from a successful writeNbt is a legitimately empty value (e.g. a cleared
+                     // collection) and loads back as the default; only a throwing encoder falls back below,
+                     // otherwise cleared data would be resurrected from the last non-empty save
+                     if(encoded != null){
                         modTag.put(key, encoded);
                      }else{
-                        // Encoder produced nothing usable. Rather than drop the key (which loads
-                        // as a default next boot), fall back to the last bytes we persisted for it.
+                        // Encoder threw. Rather than drop the key (which loads as a default next boot),
+                        // fall back to the last bytes we persisted for it.
                         hadError = true;
                         CompoundTag prev = previousFor(modId, key);
                         if(prev != null && !prev.isEmpty()){
                            modTag.put(key, prev);
-                           BorisLib.LOGGER.warn("Encode for global key {}:{} was empty/invalid - kept last known good value", modId, key);
+                           BorisLib.LOGGER.warn("Encode for global key {}:{} failed - kept last known good value", modId, key);
                         }else{
-                           BorisLib.LOGGER.warn("Skipping save for global key {}:{} - encoded data is empty/invalid and no prior value exists", modId, key);
+                           BorisLib.LOGGER.warn("Skipping save for global key {}:{} - encoding failed and no prior value exists", modId, key);
                         }
                      }
                   }
@@ -254,6 +257,14 @@ public final class GlobalState extends SavedData {
    }
    
    /**
+    * Runs the one-time backup heal if it has not happened yet. Called before each pre-save backup so an
+    * empty-loaded state is restored, rather than backed up over the good backup, when no mod has read it yet.
+    */
+   void ensureRestored(){
+      attemptBackupRestore();
+   }
+
+   /**
     * Reads or lazily decodes the value for a GLOBAL-scoped {@link DataKey}, falling back to the key's
     * default factory when no stored value is available. Marks the state dirty so the value is persisted.
     *
@@ -287,6 +298,7 @@ public final class GlobalState extends SavedData {
                return decoded;
             }
             // decode returned null (corrupted data), fall through to create default
+            PlayerObjectStore.stashUndecodable(modRaw, key, tag, "global");
             BorisLib.LOGGER.warn("Corrupted data for global key {}, using default value", key.id());
             BorisLib.LOGGER.warn("  NBT contents: {}", tag.isEmpty() ? "(empty)" : tag);
             if(modRaw.isEmpty()) data.remove(key.modId());

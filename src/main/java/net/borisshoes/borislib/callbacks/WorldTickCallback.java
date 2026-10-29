@@ -3,12 +3,11 @@ package net.borisshoes.borislib.callbacks;
 import net.borisshoes.borislib.timers.TickTimerCallback;
 import net.minecraft.server.level.ServerLevel;
 import com.mojang.datafixers.util.Pair;
-import org.apache.logging.log4j.Level;
-import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
 
-import static net.borisshoes.borislib.BorisLib.LOGGER;
 import static net.borisshoes.borislib.BorisLib.WORLD_TIMER_CALLBACKS;
 
 /**
@@ -27,30 +26,16 @@ public class WorldTickCallback {
     * @param world the world being ticked
     */
    public static void onWorldTick(ServerLevel world){
-      try{
-         // Tick Timer Callbacks
-         if(world.getServer().tickRateManager().runsNormally())
-            WORLD_TIMER_CALLBACKS.removeIf(tickTimers(world)::contains);
-         
-      }catch(Exception e){
-         LOGGER.log(Level.ERROR, e);
-      }
-   }
-   
-   /** Decrements queued world timers for the given dimension and returns those that fired this tick (for removal). */
-   @NotNull
-   private static ArrayList<Pair<ServerLevel, TickTimerCallback>> tickTimers(ServerLevel serverWorld){
-      ArrayList<Pair<ServerLevel, TickTimerCallback>> toRemove = new ArrayList<>();
+      if(!world.getServer().tickRateManager().runsNormally()) return;
+      // Same live-list pass as ServerTickCallback: timers scheduled while firing are ticked in this pass too
+      Set<Pair<ServerLevel, TickTimerCallback>> fired = Collections.newSetFromMap(new IdentityHashMap<>());
       for(int i = 0; i < WORLD_TIMER_CALLBACKS.size(); i++){
          Pair<ServerLevel, TickTimerCallback> pair = WORLD_TIMER_CALLBACKS.get(i);
-         TickTimerCallback t = pair.getSecond();
-         if(pair.getFirst().dimension() == serverWorld.dimension()){
-            if(t.decreaseTimer() == 0){
-               t.onTimer();
-               toRemove.add(pair);
-            }
-         }
+         if(pair.getFirst().dimension() != world.dimension()) continue;
+         if(pair.getSecond().decreaseTimer() > 0) continue;
+         fired.add(pair);
+         ServerTickCallback.runTimer(pair.getSecond());
       }
-      return toRemove;
+      if(!fired.isEmpty()) WORLD_TIMER_CALLBACKS.removeIf(fired::contains);
    }
 }

@@ -15,10 +15,10 @@ import static net.borisshoes.borislib.BorisLib.MOD_ID;
 /**
  * {@link LoginCallback} that hands an {@link ItemStack} back to a player the next time they log in.
  *
- * <p>When the player joins, the stack is added to their inventory in the preferred slot if possible. If
- * the inventory is full or the player is in a state that prevents pickup, an
- * {@link ItemReturnTimerCallback} is scheduled to retry shortly. If the player never logs in, the
- * callback simply sits in their {@link LoginCallbackContainer} indefinitely.</p>
+ * <p>When the player joins, the stack is moved into their {@link PendingItemReturns} queue, which adds it to
+ * their inventory (preferred slot first) right away if it fits and keeps retrying, across restarts, if it does
+ * not. If the player never logs in, the callback simply sits in their {@link LoginCallbackContainer}
+ * indefinitely.</p>
  *
  * <p>Typically queued via {@link BorisLib#addLoginCallback(LoginCallback)}.</p>
  */
@@ -49,9 +49,8 @@ public class ItemReturnLoginCallback extends LoginCallback {
       // Double check that this is the correct player before running timer
       ServerPlayer player = netHandler.player;
       if(player.getStringUUID().equals(playerUUID)){
-         if(!player.isAlive() || !player.getInventory().add(item)){
-            BorisLib.addTickTimerCallback(new ItemReturnTimerCallback(item, player, 1, prefSlot));
-         }
+         // Hands the item over now if it fits; otherwise it stays owed in the player's data until it does
+         PendingItemReturns.queue(player.getUUID(), item, prefSlot);
       }
    }
    

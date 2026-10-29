@@ -35,9 +35,10 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li><b>Server restart</b> — sequences always cancel-and-restore; they never survive
  *       across restarts. Any dangling {@link PlayerSnapshot} found on the next login is
  *       applied immediately to correct the player's state.</li>
- *   <li><b>Crash recovery</b> — orphaned camera entities from crashed cutscenes are
- *       discovered on startup (via {@link #onServerStart}) and discarded as soon as
- *       their chunk loads (via {@link #onEntityLoad}).</li>
+ *   <li><b>Crash recovery</b> — saved stand-in entities (cutscene mannequins) are listed in
+ *       {@link TrackedCameraEntities}; anything still listed on startup is an orphan and is
+ *       discarded right away (via {@link #onServerStart}) or as soon as its chunk loads (via
+ *       {@link #onEntityLoad}).</li>
  *   <li><b>Exception safety</b> — every lifecycle callback is wrapped so a buggy
  *       sequence implementation cannot prevent state restoration.</li>
  * </ul>
@@ -64,10 +65,16 @@ public final class SequenceManager {
    private static final Map<UUID, PlayerSequence> ACTIVE = new ConcurrentHashMap<>();
    
    /**
-    * Camera-entity UUIDs that need to be discarded once their chunk loads.
-    * Populated during {@link #onServerStart} for crash-recovered cameras.
+    * Camera-entity UUIDs that need to be discarded once their chunk loads. An in-memory fast path for
+    * {@link #onEntityLoad}; the persisted record is {@link TrackedCameraEntities}.
     */
    private static final Set<UUID> PENDING_CAMERA_CLEANUP = ConcurrentHashMap.newKeySet();
+
+   /** Scoreboard tag put on saved entities spawned by a sequence, so orphans are recognised when they load. */
+   public static final String SEQUENCE_ENTITY_TAG = "borislib_sequence_entity";
+
+   /** Tracked entities owned by a sequence running in this session; tagged entities not listed here are orphans. */
+   private static final Set<UUID> ACTIVE_CAMERAS = ConcurrentHashMap.newKeySet();
    
    private SequenceManager(){
    }
@@ -253,49 +260,84 @@ public final class SequenceManager {
    }
    
    /**
-    * Called once after the server has fully started and player data is available.
-    * Scans all stored snapshots for orphaned camera entities (from crashed cutscenes)
-    * and discards them if their chunk is already loaded, or queues them for cleanup
-    * via {@link #onEntityLoad} once their chunk loads.
+    * Called once after the server has fully started. Sequences never survive a restart, so every entity still in
+    * {@link TrackedCameraEntities} is an orphan from a crash: it is discarded now if its chunk is loaded, or queued
+    * for {@link #onEntityLoad} otherwise.
     */
    public static void onServerStart(MinecraftServer server){
       try{
-         Map<UUID, PlayerSnapshot> allSnapshots = DataAccess.allPlayerDataFor(PlayerSnapshot.KEY);
-         int found = 0;
-         for(PlayerSnapshot snapshot : allSnapshots.values()){
-            if(!snapshot.isActive()) continue;
-            
-            String camUUIDStr = snapshot.getCameraEntityUUID();
-            if(camUUIDStr == null || camUUIDStr.isEmpty()) continue;
-            
-            try{
-               UUID camUUID = UUID.fromString(camUUIDStr);
-               boolean discarded = tryDiscardEntity(server, camUUID);
-               if(!discarded){
-                  PENDING_CAMERA_CLEANUP.add(camUUID);
-               }
-               found++;
-            }catch(IllegalArgumentException e){
-               LOGGER.warn("Invalid camera entity UUID in snapshot: '{}'", camUUIDStr);
-            }
+         TrackedCameraEntities tracked = DataAccess.getGlobal(TrackedCameraEntities.KEY);
+         List<UUID> orphans = tracked.getAll();
+         for(UUID camUUID : orphans){
+            discardCamera(server, camUUID);
          }
-         if(found > 0){
-            LOGGER.info("SequenceManager: found {} orphaned camera entity/entities from crashed sequences.", found);
+         if(!orphans.isEmpty()){
+            LOGGER.info("SequenceManager: found {} orphaned camera entity/entities from crashed sequences.", orphans.size());
          }
       }catch(Exception e){
          LOGGER.error("SequenceManager.onServerStart error: {}", e.getMessage());
       }
    }
    
+   /** Server-stop hook: forgets active sequences and pending cleanups. The persisted tracking survives. */
+   public static void onServerStopped(){
+      ACTIVE.clear();
+      PENDING_CAMERA_CLEANUP.clear();
+      ACTIVE_CAMERAS.clear();
+   }
+   
+   /**
+    * Records a saved entity a sequence spawned (e.g. a cutscene mannequin) so it is cleaned up after a crash. Call
+    * {@link #untrackCameraEntity} once the sequence has discarded it.
+    *
+    * @param entityUUID the spawned entity
+    */
+   public static void trackCameraEntity(UUID entityUUID){
+      ACTIVE_CAMERAS.add(entityUUID);
+      DataAccess.getGlobal(TrackedCameraEntities.KEY).add(entityUUID);
+   }
+
+   /**
+    * Like {@link #trackCameraEntity(UUID)}, and also tags the entity with {@link #SEQUENCE_ENTITY_TAG}. The tag is
+    * saved with the entity in its own chunk, so it can never fall out of step with it the way the global record
+    * can after a crash. Call before adding the entity to the level.
+    *
+    * @param entity the spawned entity, not yet added to its level
+    */
+   public static void trackCameraEntity(Entity entity){
+      entity.addTag(SEQUENCE_ENTITY_TAG);
+      trackCameraEntity(entity.getUUID());
+   }
+
+   /**
+    * Stops tracking an entity registered with {@link #trackCameraEntity}, normally right after discarding it.
+    *
+    * @param entityUUID the entity
+    */
+   public static void untrackCameraEntity(UUID entityUUID){
+      ACTIVE_CAMERAS.remove(entityUUID);
+      PENDING_CAMERA_CLEANUP.remove(entityUUID);
+      // Also reached from the entity-load hook, which must never throw into chunk loading
+      try{
+         DataAccess.getGlobal(TrackedCameraEntities.KEY).remove(entityUUID);
+      }catch(Exception e){
+         LOGGER.warn("SequenceManager: could not untrack camera entity {}: {}", entityUUID, e.getMessage());
+      }
+   }
+
    /**
     * Called whenever any entity loads into a {@link ServerLevel}.
-    * Discards entities whose UUID is in the pending camera cleanup set.
+    * Discards entities whose UUID is in the pending camera cleanup set, and entities tagged with
+    * {@link #SEQUENCE_ENTITY_TAG} that no running sequence owns (sequences never survive a restart).
     */
    public static void onEntityLoad(Entity entity, ServerLevel level){
-      if(!PENDING_CAMERA_CLEANUP.isEmpty()
-            && PENDING_CAMERA_CLEANUP.contains(entity.getUUID())){
+      boolean orphan = !PENDING_CAMERA_CLEANUP.isEmpty() && PENDING_CAMERA_CLEANUP.contains(entity.getUUID());
+      if(!orphan && entity.entityTags().contains(SEQUENCE_ENTITY_TAG) && !ACTIVE_CAMERAS.contains(entity.getUUID())){
+         orphan = true;
+      }
+      if(orphan){
          entity.discard();
-         PENDING_CAMERA_CLEANUP.remove(entity.getUUID());
+         untrackCameraEntity(entity.getUUID());
          LOGGER.info("SequenceManager: discarded orphaned camera entity {} on chunk load.", entity.getUUID());
       }
    }
@@ -359,7 +401,9 @@ public final class SequenceManager {
       snapshot.setWasAllowFlying(player.getAbilities().mayfly);
       snapshot.setWasFlying(player.getAbilities().flying);
       snapshot.setCameraEntityUUID("");
-      DataAccess.markPlayerDirty(uuid);
+      // Written now rather than at the next save: if the server dies after the player has been moved, vanilla may
+      // already have saved them mid-sequence, and only an on-disk snapshot can put them back. Clearing stays lazy.
+      DataAccess.savePlayerKeyNow(uuid, PlayerSnapshot.KEY);
    }
    
    /**
@@ -386,10 +430,7 @@ public final class SequenceManager {
       String camUUIDStr = snapshot.getCameraEntityUUID();
       if(camUUIDStr != null && !camUUIDStr.isEmpty()){
          try{
-            UUID camUUID = UUID.fromString(camUUIDStr);
-            if(!tryDiscardEntity(BorisLib.SERVER, camUUID)){
-               PENDING_CAMERA_CLEANUP.add(camUUID);
-            }
+            discardCamera(BorisLib.SERVER, UUID.fromString(camUUIDStr));
          }catch(Exception e){
             LOGGER.warn("Failed to discard camera entity '{}': {}", camUUIDStr, e.getMessage());
          }
@@ -451,10 +492,7 @@ public final class SequenceManager {
       String camUUIDStr = snapshot.getCameraEntityUUID();
       if(camUUIDStr != null && !camUUIDStr.isEmpty()){
          try{
-            UUID camUUID = UUID.fromString(camUUIDStr);
-            if(!tryDiscardEntity(BorisLib.SERVER, camUUID)){
-               PENDING_CAMERA_CLEANUP.add(camUUID);
-            }
+            discardCamera(BorisLib.SERVER, UUID.fromString(camUUIDStr));
          }catch(Exception e){
             LOGGER.warn("Failed to discard camera entity on death '{}': {}", camUUIDStr, e.getMessage());
          }
@@ -489,6 +527,17 @@ public final class SequenceManager {
    }
    
    // ─────────────────────── utility ─────────────────────────────────────────
+   
+   /** Discards a camera entity now if it is loaded, otherwise once its chunk loads; tracking ends on discard. */
+   private static void discardCamera(MinecraftServer server, UUID camUUID){
+      if(tryDiscardEntity(server, camUUID)){
+         untrackCameraEntity(camUUID);
+      }else{
+         PENDING_CAMERA_CLEANUP.add(camUUID);
+         // A camera that was never tracked (e.g. from an older version) must still survive restarts until found
+         DataAccess.getGlobal(TrackedCameraEntities.KEY).add(camUUID);
+      }
+   }
    
    /**
     * Attempts to find and discard an entity with the given UUID across all loaded levels.

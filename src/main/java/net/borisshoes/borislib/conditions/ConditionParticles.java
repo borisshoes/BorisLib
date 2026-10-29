@@ -1,6 +1,7 @@
 package net.borisshoes.borislib.conditions;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
@@ -20,13 +21,26 @@ public record ConditionParticles(ParticleOptions particle, float perSecond, int 
    /** A spec that shows no particles at all. */
    public static final ConditionParticles NONE = new ConditionParticles(ParticleTypes.POOF, 0.0f, 0, 0.0f);
 
-   /** Codec for persisting a spec; the particle is encoded with {@link ParticleTypes#CODEC}. */
-   public static final Codec<ConditionParticles> CODEC = RecordCodecBuilder.create(i -> i.group(
-         ParticleTypes.CODEC.fieldOf("particle").forGetter(ConditionParticles::particle),
-         Codec.FLOAT.fieldOf("perSecond").forGetter(ConditionParticles::perSecond),
-         Codec.INT.fieldOf("burst").forGetter(ConditionParticles::burst),
-         Codec.FLOAT.fieldOf("speed").forGetter(ConditionParticles::speed)
-   ).apply(i, ConditionParticles::new));
+   /**
+    * Codec for persisting a spec; the particle is encoded with {@link ParticleTypes#CODEC}. Values that fail the
+    * constructor's validation decode to an error instead of throwing, so callers can drop just this spec.
+    */
+   public static final Codec<ConditionParticles> CODEC = RecordCodecBuilder.<Raw>create(i -> i.group(
+         ParticleTypes.CODEC.fieldOf("particle").forGetter(Raw::particle),
+         Codec.FLOAT.fieldOf("perSecond").forGetter(Raw::perSecond),
+         Codec.INT.fieldOf("burst").forGetter(Raw::burst),
+         Codec.FLOAT.fieldOf("speed").forGetter(Raw::speed)
+   ).apply(i, Raw::new)).flatXmap(Raw::toParticles, spec -> DataResult.success(new Raw(spec.particle, spec.perSecond, spec.burst, spec.speed)));
+
+   private record Raw(ParticleOptions particle, float perSecond, int burst, float speed) {
+      private DataResult<ConditionParticles> toParticles(){
+         try{
+            return DataResult.success(new ConditionParticles(particle, perSecond, burst, speed));
+         }catch(IllegalArgumentException e){
+            return DataResult.error(() -> "Invalid condition particles: " + e.getMessage());
+         }
+      }
+   }
 
    /**
     * @throws IllegalArgumentException if {@code perSecond} is negative or not finite, or if {@code burst}

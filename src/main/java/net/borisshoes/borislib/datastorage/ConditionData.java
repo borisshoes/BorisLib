@@ -70,7 +70,10 @@ public class ConditionData implements StorableData {
                }
             }
             if(!conditions.isEmpty()){
-               entityConditions.put(uuid, EntityConditions.fromInstances(conditions));
+               EntityConditions record = EntityConditions.fromInstances(conditions);
+               // Optional fields, absent in older saves: an unknown last-seen time starts counting from now
+               record.restoreSeen(entry.getLongOr("lastSeen", -1L), entry.getBooleanOr("player", false));
+               entityConditions.put(uuid, record);
             }
          }catch(Exception e){
             BorisLib.LOGGER.warn("Failed to decode condition data entry: {}", e.getMessage());
@@ -94,6 +97,8 @@ public class ConditionData implements StorableData {
                      .ifPresent(condList::add);
             }
             entryTag.put("conditions", condList);
+            if(entry.getValue().getLastSeen() >= 0) entryTag.putLong("lastSeen", entry.getValue().getLastSeen());
+            if(entry.getValue().isPlayer()) entryTag.putBoolean("player", true);
             entitiesList.add(entryTag);
          }catch(Exception e){
             BorisLib.LOGGER.error("Failed to encode condition data for entity {}: {}", entry.getKey(), e.getMessage());

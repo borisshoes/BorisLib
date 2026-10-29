@@ -133,6 +133,10 @@ public class ItemContainerContentsMutable {
     * <p>The predicate receives the item being added and the current list of items.
     * Return {@code true} to allow the addition, {@code false} to reject it.
     *
+    * <p>It is only consulted when an item would need a slot of its own (via {@link #setItem},
+    * {@link #addItem}, or the empty/new-slot step of {@link #tryAddStackToContainerComp}). Topping up an
+    * existing identical stack is always allowed, so rules such as "at most 3 distinct items" keep working.
+    *
     * <h3>Example:</h3>
     * <pre>{@code
     * // Only allow diamonds
@@ -308,8 +312,8 @@ public class ItemContainerContentsMutable {
     *
     * <p>This method implements smart item insertion:
     * <ol>
-    *   <li>First, fills up existing partial stacks of the same item type</li>
-    *   <li>Then, fills empty slots with the remaining items</li>
+    *   <li>First, fills up existing partial stacks of the same item type (the predicate is not consulted)</li>
+    *   <li>Then, fills empty slots with the remaining items, if the predicate allows it</li>
     *   <li>Finally, adds new slots if under the max slot limit</li>
     * </ol>
     *
@@ -357,7 +361,8 @@ public class ItemContainerContentsMutable {
     *   <li>Existing partial stacks that can be filled</li>
     *   <li>Empty slots available</li>
     *   <li>Max slot limits</li>
-    *   <li>Validation predicates</li>
+    *   <li>Validation predicates (only when a slot of its own is needed, as in
+    *       {@link #tryAddStackToContainerComp})</li>
     * </ul>
     *
     * @param stack the stack to test

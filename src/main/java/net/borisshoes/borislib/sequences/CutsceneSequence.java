@@ -239,12 +239,15 @@ public class CutsceneSequence extends PlayerSequence {
                   }
                }
             }
+            // Persist UUID for crash-recovery cleanup in SequenceManager. The mannequin is saved with its chunk,
+            // so it is tagged (saved with it) and tracked globally as well as in the snapshot, which is written to
+            // disk right away. Tracking must come first: the entity-load hook discards tagged, untracked entities.
+            SequenceManager.trackCameraEntity(mannequin);
             level.addFreshEntity(mannequin);
-            
-            // Persist UUID for crash-recovery cleanup in SequenceManager.
+
             PlayerSnapshot snapshot = DataAccess.getPlayer(player.getUUID(), PlayerSnapshot.KEY);
             snapshot.setCameraEntityUUID(mannequin.getUUID().toString());
-            DataAccess.markPlayerDirty(player.getUUID());
+            DataAccess.savePlayerKeyNow(player.getUUID(), PlayerSnapshot.KEY);
          }
       }
       
@@ -295,8 +298,9 @@ public class CutsceneSequence extends PlayerSequence {
    @Override
    public void onEnd(ServerPlayer player, boolean cancelled){
       // Discard the optional mannequin.
-      if(mannequin != null && !mannequin.isRemoved()){
-         mannequin.discard();
+      if(mannequin != null){
+         if(!mannequin.isRemoved()) mannequin.discard();
+         SequenceManager.untrackCameraEntity(mannequin.getUUID());
       }
       mannequin = null;
       

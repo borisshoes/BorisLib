@@ -19,6 +19,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class DataAccess {
    private static volatile PlayerObjectStore playerStore;
+   // The server the store was opened for; the early mixin hook and SERVER_STARTED both call onServerStarted
+   private static volatile MinecraftServer storeServer;
+   // Set when a server stops and cleared when the next one starts, so late calls get an error that says so
+   private static volatile boolean stopped;
    private static final Set<UUID> DIRTY_PLAYERS = ConcurrentHashMap.newKeySet();
    
    // Legacy dimension folder names used in Minecraft 1.21.x and earlier
@@ -30,11 +34,15 @@ public final class DataAccess {
    
    /**
     * Server startup hook: migrates any legacy on-disk locations and opens the per-player store.
-    * Must run before any other {@code DataAccess} call.
+    * Must run before any other {@code DataAccess} call. Runs from the early {@code initServer} mixin hook and
+    * again on {@code SERVER_STARTED}; only the first call per server does anything, so player data touched while
+    * the world loads is not thrown away.
     *
     * @param server the freshly started server
     */
    public static void onServerStarted(MinecraftServer server){
+      if(playerStore != null && storeServer == server) return;
+      stopped = false;
       try{
          Path root = server.getWorldPath(LevelResource.ROOT);
          
@@ -43,6 +51,7 @@ public final class DataAccess {
          migrateLegacySavedData(root);
          
          playerStore = new PlayerObjectStore(root);
+         storeServer = server;
          DataBackups.init(root);
          BorisLib.LOGGER.info("BorisLib data storage initialized at {}", root);
       }catch(Exception e){
@@ -108,13 +117,17 @@ public final class DataAccess {
    }
    
    /**
-    * Server shutdown hook: flushes every cached player to disk.
+    * Server shutdown hook: flushes every cached player to disk, then closes the store so a later world (in
+    * singleplayer) opens its own. Registered in BorisLib's late {@code SERVER_STOPPED} phase so data other mods
+    * write in their own stop handlers is still flushed.
     *
     * @param s the server shutting down
     */
    public static void onServerStop(MinecraftServer s){
       if(playerStore == null){
          BorisLib.LOGGER.warn("PlayerStore is null during server stop, skipping data save");
+         DataBackups.flush();
+         stopped = true;
          return;
       }
       // Flush everything we currently have cached
@@ -129,6 +142,11 @@ public final class DataAccess {
          BorisLib.LOGGER.error("Error during server stop data save: {}", e.getMessage());
       }
       DIRTY_PLAYERS.clear();
+      // The final save queued global/world backups on the backup thread; finish them before the process can exit
+      DataBackups.flush();
+      playerStore = null;
+      storeServer = null;
+      stopped = true;
    }
    
    /**
@@ -156,16 +174,19 @@ public final class DataAccess {
          if(overworld != null){
             GlobalState g = overworld.getDataStorage().get(GlobalState.TYPE);
             if(g != null){
+               // Heal an empty-loaded state first, or its emptiness would be backed up over the good backup
+               g.ensureRestored();
                g.setDirty();
-               DataBackups.write(DataBackups.globalName(), g.save());
+               DataBackups.writeAsync(DataBackups.globalName(), g.save());
             }
          }
          for(ServerLevel w : s.getAllLevels()){
             try{
                WorldState ws = w.getDataStorage().get(WorldState.TYPE);
                if(ws != null){
+                  ws.ensureRestored(w.dimension());
                   ws.setDirty();
-                  DataBackups.write(DataBackups.worldName(w.dimension()), ws.save());
+                  DataBackups.writeAsync(DataBackups.worldName(w.dimension()), ws.save());
                }
             }catch(Exception e){
                BorisLib.LOGGER.error("Failed to back up world data for dimension {}: {}", w.dimension().identifier(), e.getMessage());
@@ -178,6 +199,11 @@ public final class DataAccess {
    
    /**
     * Server-save hook: saves every online player plus any players marked dirty since the last save.
+    *
+    * <p>Registered in BorisLib's late {@code BEFORE_SAVE} phase: vanilla saves its player files immediately before
+    * that event, so writing BorisLib's player files here keeps the two in step instead of leaving the whole chunk
+    * save between them for a crash to land in, and changes other mods make in their own {@code BEFORE_SAVE}
+    * handlers are included.</p>
     *
     * @param s     the server
     * @param flush forwarded from the save event (currently unused by this method)
@@ -214,7 +240,8 @@ public final class DataAccess {
    }
    
    /**
-    * Player-leave hook: writes the player's data to disk and removes them from the dirty set.
+    * Player-leave hook: writes the player's data to disk and removes them from the dirty set. The player stays
+    * cached for the rest of the session, so references to their data objects remain live while they are offline.
     *
     * @param p the disconnecting player
     */
@@ -261,6 +288,40 @@ public final class DataAccess {
       DIRTY_PLAYERS.add(u);
    }
    
+   /**
+    * Writes the given player's data to disk right away instead of waiting for the next save. Use it when the
+    * data must be on disk before something else happens. To write just one key, use {@link #savePlayerKeyNow}.
+    *
+    * @param u the player's UUID
+    */
+   public static void savePlayerNow(UUID u){
+      ensureServerSide("savePlayerNow");
+      try{
+         playerStore.save(u);
+         DIRTY_PLAYERS.remove(u);
+      }catch(Exception e){
+         BorisLib.LOGGER.error("Failed to save data immediately for player {}: {}", u, e.getMessage());
+      }
+   }
+
+   /**
+    * Writes one of the player's keys to disk right away, leaving every other key in the file as it was at the last
+    * save. Prefer this over {@link #savePlayerNow} when only that key must be on disk early: other mods' data then
+    * stays in step with vanilla's player file, which is only written on a save. The player's other changes are still
+    * written by the next save.
+    *
+    * @param u   the player's UUID
+    * @param key the registered player key to write
+    */
+   public static void savePlayerKeyNow(UUID u, DataKey<?> key){
+      ensureServerSide("savePlayerKeyNow");
+      try{
+         playerStore.saveKey(u, key);
+      }catch(Exception e){
+         BorisLib.LOGGER.error("Failed to save key {} immediately for player {}: {}", key.id(), u, e.getMessage());
+      }
+   }
+
    /**
     * Explicitly marks global state as dirty so it is flushed on the next autosave.
     * <p>
@@ -349,6 +410,19 @@ public final class DataAccess {
    }
    
    /**
+    * Whether a player has a value stored or loaded for a key, without creating a default the way
+    * {@link #getPlayer} does.
+    *
+    * @param u   the player's UUID (online or offline)
+    * @param key the registered player key
+    * @return {@code true} if the player has data for the key
+    */
+   public static boolean hasPlayerData(UUID u, DataKey<?> key){
+      ensureServerSide("hasPlayerData");
+      return playerStore.has(u, key);
+   }
+
+   /**
     * Overwrites the GLOBAL-scoped value for the given key. Passing {@code null} resets to the default.
     *
     * @param key   the registered global key
@@ -397,6 +471,10 @@ public final class DataAccess {
    
    private static void ensureServerSide(String methodName){
       if(BorisLib.SERVER == null || playerStore == null){
+         if(stopped){
+            throw new IllegalStateException("DataAccess." + methodName + "() was called after the server stopped. " +
+                  "BorisLib has already saved and closed its data, so anything written now would not be saved.");
+         }
          throw new IllegalStateException("DataAccess." + methodName + "() must be called from server-side code. " +
                "Server or playerStore is null - this usually means you're calling from a client that isn't hosting the world.");
       }
@@ -406,7 +484,9 @@ public final class DataAccess {
     * Collects the value of one PLAYER-scoped key across every known player (online, cached, and on disk).
     *
     * <p>Useful for cross-player reports such as leaderboards. Files that fail to decode are skipped with
-    * a warning rather than aborting the entire query.</p>
+    * a warning rather than aborting the entire query. Every player read is loaded into the cache for the rest of
+    * the session, so the values are live; use {@link #snapshotAllPlayerData} for a read-only report that does
+    * not keep every player in memory.</p>
     *
     * @param key the registered player key
     * @param <T> the data type
@@ -414,6 +494,36 @@ public final class DataAccess {
     */
    public static <T extends StorableData> Map<UUID, T> allPlayerDataFor(DataKey<T> key){
       ensureServerSide("allPlayerDataFor");
+      return collectAllPlayerData(key, true);
+   }
+
+   /**
+    * Like {@link #allPlayerDataFor}, but players that are not already cached are read without being cached.
+    * Their values are detached copies, so changes to them are <b>not</b> saved; cached (e.g. online) players
+    * still return their live value. Use it for read-only reports over many offline players.
+    *
+    * @param key the registered player key
+    * @param <T> the data type
+    * @return a map from each known player's UUID to their value (may be empty, never {@code null})
+    */
+   public static <T extends StorableData> Map<UUID, T> snapshotAllPlayerData(DataKey<T> key){
+      ensureServerSide("snapshotAllPlayerData");
+      return collectAllPlayerData(key, false);
+   }
+
+   /**
+    * @return a new, mutable set of every player UUID BorisLib knows: online, cached, or with a data file on disk
+    */
+   public static Set<UUID> knownPlayerUuids(){
+      ensureServerSide("knownPlayerUuids");
+      Set<UUID> uuids = playerStore.listAllStoredUuids();
+      for(ServerPlayer sp : BorisLib.SERVER.getPlayerList().getPlayers()){
+         uuids.add(sp.getUUID());
+      }
+      return uuids;
+   }
+
+   private static <T extends StorableData> Map<UUID, T> collectAllPlayerData(DataKey<T> key, boolean cache){
       Map<UUID, T> out = new HashMap<>();
       
       // Discover ALL player UUIDs: online players + cached + on-disk files
@@ -425,7 +535,7 @@ public final class DataAccess {
       // Load data for every known player
       for(UUID uuid : allUuids){
          try{
-            T value = playerStore.getLive(uuid, key);
+            T value = cache ? playerStore.getLive(uuid, key) : playerStore.peek(uuid, key);
             if(value != null){
                out.put(uuid, value);
             }

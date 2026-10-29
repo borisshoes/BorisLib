@@ -3,7 +3,6 @@ package net.borisshoes.borislib.mixins;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import net.borisshoes.borislib.BorisLib;
 import net.borisshoes.borislib.conditions.ConditionHolder;
 import net.borisshoes.borislib.conditions.ConditionMath;
 import net.borisshoes.borislib.conditions.Conditions;
@@ -50,16 +49,7 @@ public class LivingEntityMixin {
 
    @ModifyReturnValue(method = "canAttack(Lnet/minecraft/world/entity/LivingEntity;)Z", at = @At("RETURN"))
    private boolean borislib$canTarget(boolean original, LivingEntity target){
-      EntityConditions conditions = ((ConditionHolder) this).borislib$getConditions();
-      if(conditions == null) return original;
-      float nearsight = conditions.getValue(Conditions.NEARSIGHT);
-      if(nearsight <= 0.0f) return original;
-      LivingEntity livingEntity = (LivingEntity) (Object) this;
-      double range = NearsightCondition.radiusForMagnitude(nearsight) / 2.0;
-      if(target.distanceToSqr(livingEntity) > range * range && !livingEntity.is(BorisLib.IGNORES_NEARSIGHT)){
-         return false;
-      }
-      return original;
+      return original && !NearsightCondition.hidesTarget((LivingEntity) (Object) this, target);
    }
 
    // Falter: multiplication commutes with vanilla's knockback resistance scaling, so order does not matter

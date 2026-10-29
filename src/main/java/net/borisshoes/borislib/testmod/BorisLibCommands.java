@@ -134,7 +134,11 @@ public class BorisLibCommands {
                         .requires(Permissions.require(MOD_ID + ".condition.getinstances", PermissionLevel.GAMEMASTERS))
                         .then(argument("entity", entity())
                               .then(argument("condition", id()).suggests(BorisLibCommands::suggestConditions)
-                                    .executes(BorisLibCommands::conditionGetInstances)))))
+                                    .executes(BorisLibCommands::conditionGetInstances))))
+                  .then(literal("prune")
+                        .requires(Permissions.require(MOD_ID + ".condition.prune", PermissionLevel.GAMEMASTERS))
+                        .then(argument("days", integer(1))
+                              .executes(BorisLibCommands::conditionPrune))))
             .then(literal("testmod").requires(source -> Permissions.require(MOD_ID + ".testmod", PermissionLevel.GAMEMASTERS).test(source)
                         && BorisLib.CONFIG != null && BorisLib.CONFIG.getBoolean(BorisLib.TESTMOD_FEATURES_ENABLED))
                   .then(literal("worldcallback")
@@ -759,6 +763,13 @@ public class BorisLibCommands {
          context.getSource().sendFailure(Component.translatable("command.borislib.condition.error", e.getMessage()));
          return 0;
       }
+   }
+   
+   private static int conditionPrune(CommandContext<CommandSourceStack> context){
+      int days = getInteger(context, "days");
+      int pruned = Conditions.pruneRecords(context.getSource().getServer(), days);
+      context.getSource().sendSuccess(() -> Component.translatable("command.borislib.condition.prune.success", pruned, days), true);
+      return pruned;
    }
    
    private static int conditionClear(CommandContext<CommandSourceStack> context){

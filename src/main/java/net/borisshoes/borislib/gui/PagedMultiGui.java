@@ -51,6 +51,7 @@ public class PagedMultiGui extends PagedGuiBase {
    
    /** Rebuilds the current page using the active mode's item list and rendering logic. */
    public void buildPage(){
+      if(modes.isEmpty()) return;
       getCurrentMode().buildPage(this);
    }
    
@@ -116,8 +117,9 @@ public class PagedMultiGui extends PagedGuiBase {
    /** @return the number of pages required to fit all filtered items in the active mode. */
    @Override
    public int numPages(){
+      if(modes.isEmpty()) return 1;
       GuiMode<?> curMode = getCurrentMode();
-      return Math.max(1, (int) (Math.ceil((float) curMode.getFilteredItems().size() / (this.paneWidth * this.paneHeight))));
+      return Math.max(1, (int) (Math.ceil((float) curMode.pageSource().size() / (this.paneWidth * this.paneHeight))));
    }
    
    /** @return a builder for the sort button reflecting the active mode's current sort. */
@@ -207,6 +209,8 @@ public class PagedMultiGui extends PagedGuiBase {
       private final BiFunction<T, Integer, GuiElementBuilder> elemBuilder;
       private List<T> items;
       private List<T> filteredSortedList;
+      // True while buildPage runs, so the several page counts it needs reuse one filtered/sorted list
+      private boolean building;
       private GuiSort<T> curSort;
       private GuiFilter<T> curFilter;
       private int pageNum = 1;
@@ -235,6 +239,16 @@ public class PagedMultiGui extends PagedGuiBase {
        * @param gui the owning {@link PagedMultiGui}
        */
       public void buildPage(PagedMultiGui gui){
+         updateFilteredSorted();
+         building = true;
+         try{
+            buildPageFromList(gui);
+         }finally{
+            building = false;
+         }
+      }
+      
+      private void buildPageFromList(PagedMultiGui gui){
          int numPages = gui.numPages();
          this.pageNum = Math.clamp(this.pageNum, 1, Math.max(1, numPages));
          gui.pageNum = this.pageNum;
@@ -244,7 +258,7 @@ public class PagedMultiGui extends PagedGuiBase {
          if(gui.nextInd >= 0 && numPages > 1) gui.setSlot(gui.nextInd, gui.createNextPageItem());
          if(gui.prevInd >= 0 && numPages > 1) gui.setSlot(gui.prevInd, gui.createPrevPageItem());
          
-         List<T> pageItems = AlgoUtils.listToPage(getFilteredItems(), pageNum, gui.pageSize());
+         List<T> pageItems = AlgoUtils.listToPage(filteredSortedList, pageNum, gui.pageSize());
          int pageIndex = 0;
          for(int paneY = 0; paneY < gui.paneHeight; paneY++){
             for(int paneX = 0; paneX < gui.paneWidth; paneX++){
@@ -294,6 +308,11 @@ public class PagedMultiGui extends PagedGuiBase {
       public List<T> getFilteredItems(){
          updateFilteredSorted();
          return this.filteredSortedList;
+      }
+      
+      /** The list being rendered during {@link #buildPage}, otherwise a freshly computed one. */
+      List<T> pageSource(){
+         return building ? filteredSortedList : getFilteredItems();
       }
       
       /** @return the element builder function for this mode. */

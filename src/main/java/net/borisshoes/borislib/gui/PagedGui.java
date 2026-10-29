@@ -63,6 +63,7 @@ public class PagedGui<T> extends PagedGuiBase {
    }
    
    public int numPages(){
+      if(filteredSortedList == null) updateFilteredSorted();
       return Math.max(1, (int) (Math.ceil((float) filteredSortedList.size() / (this.paneWidth * this.paneHeight))));
    }
    

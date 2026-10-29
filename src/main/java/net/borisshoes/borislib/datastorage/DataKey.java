@@ -39,6 +39,13 @@ import java.util.function.Supplier;
 public record DataKey<T extends StorableData>(Identifier id, StorageScope scope, Supplier<T> globalDef,
                                               Function<ResourceKey<Level>, T> worldDef, Function<UUID, T> playerDef) {
    /**
+    * Suffix of the raw entry ({@code <key>$undecodable}) under which stored data that failed to decode is kept, in
+    * the same mod namespace and file, for manual recovery. '$' is not valid in an identifier path, so it cannot
+    * collide with a real key.
+    */
+   public static final String UNDECODABLE_SUFFIX = "$undecodable";
+   
+   /**
     * Validates that exactly one factory matches the chosen {@link #scope()}.
     *
     * @throws NullPointerException     if {@code id}, {@code scope} or the scope-appropriate factory is null

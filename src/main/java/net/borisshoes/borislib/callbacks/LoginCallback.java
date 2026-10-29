@@ -42,7 +42,16 @@ public abstract class LoginCallback {
       public <T> DataResult<T> encode(LoginCallback input, DynamicOps<T> ops, T prefix){
          Identifier id = input.getId();
          String uuid = input.getPlayer() == null ? "" : input.getPlayer();
-         CompoundTag data = input.getData() == null ? new CompoundTag() : input.getData();
+         CompoundTag data;
+         try{
+            data = input.getData();
+         }catch(Exception e){
+            // A throwing payload would otherwise drop every callback in the player's container, so fall back to
+            // the payload this callback was last loaded or saved with
+            BorisLib.LOGGER.error("Failed to encode login callback {} for player {}, keeping its last saved data: {}", id, uuid, e.getMessage());
+            data = input.data;
+         }
+         if(data == null) data = new CompoundTag();
          var mb = ops.mapBuilder();
          mb.add("id", ops.createString(id.toString()));
          mb.add("uuid", ops.createString(uuid));

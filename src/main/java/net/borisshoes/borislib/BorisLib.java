@@ -6,10 +6,12 @@ import eu.pb4.polymer.resourcepack.api.PolymerResourcePackUtils;
 import net.borisshoes.borislib.callbacks.*;
 import net.borisshoes.borislib.conditions.Condition;
 import net.borisshoes.borislib.conditions.Conditions;
+import net.borisshoes.borislib.conditions.NearsightCondition;
 import net.borisshoes.borislib.config.ConfigManager;
 import net.borisshoes.borislib.config.ConfigSetting;
 import net.borisshoes.borislib.config.IConfigSetting;
 import net.borisshoes.borislib.config.values.BooleanConfigValue;
+import net.borisshoes.borislib.config.values.IntConfigValue;
 import net.borisshoes.borislib.datastorage.DataAccess;
 import net.borisshoes.borislib.datastorage.DataKey;
 import net.borisshoes.borislib.datastorage.DataRegistry;
@@ -24,12 +26,15 @@ import net.borisshoes.borislib.utils.AlgoUtils;
 import net.borisshoes.borislib.utils.ItemModDataHandler;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
+import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.Holder;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
@@ -48,6 +53,7 @@ import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.item.Item;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.spongepowered.asm.mixin.MixinEnvironment;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -62,9 +68,11 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
    public static final ArrayList<Pair<ServerLevel, TickTimerCallback>> WORLD_TIMER_CALLBACKS = new ArrayList<>();
    public static final String MOD_ID = "borislib";
    private static final String CONFIG_NAME = "BorisLib.properties";
+   private static final Identifier LATE_PHASE = Identifier.fromNamespaceAndPath(MOD_ID, "late");
    public static final String BLANK_UUID = "00000000-0000-4000-8000-000000000000";
    public static final HashMap<ServerPlayer, PlayerMovementEntry> PLAYER_MOVEMENT_TRACKER = new HashMap<>();
    
+   /** The running server, or {@code null} before it starts and after it stops (e.g. between singleplayer worlds). */
    public static MinecraftServer SERVER = null;
    public static ConfigManager CONFIG;
    
@@ -99,6 +107,9 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
    public static final IConfigSetting<?> TESTMOD_FEATURES_ENABLED = registerConfigSetting(new ConfigSetting<>(
          new BooleanConfigValue("testmodFeaturesEnabled", false)));
    
+   public static final IConfigSetting<?> CONDITION_RECORD_EXPIRY_DAYS = registerConfigSetting(new ConfigSetting<>(
+         new IntConfigValue("conditionRecordExpiryDays", 0, new IntConfigValue.IntLimits(0))));
+   
    @Override
    public void onInitialize(){
       CONFIG = new ConfigManager(MOD_ID, "Boris Lib", CONFIG_NAME, BorisLib.CONFIG_SETTINGS);
@@ -110,13 +121,20 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
       ServerTickEvents.END_SERVER_TICK.register(ServerTickCallback::onTick);
       ServerPlayConnectionEvents.JOIN.register(PlayerConnectionCallback::onPlayerJoin);
       ServerPlayConnectionEvents.DISCONNECT.register(PlayerConnectionCallback::onPlayerLeave);
+      ServerPlayerEvents.AFTER_RESPAWN.register(PlayerConnectionCallback::onPlayerRespawn);
       ServerLifecycleEvents.SERVER_STARTED.register(DataAccess::onServerStarted);
       ServerLifecycleEvents.SERVER_STARTED.register(Conditions::onServerStarted);
       ServerLifecycleEvents.SERVER_STARTED.register(SequenceManager::onServerStart);
-      ServerLifecycleEvents.SERVER_STOPPED.register(DataAccess::onServerStop);
       ServerLifecycleEvents.SERVER_STOPPED.register(Conditions::onServerStopped);
-      ServerLifecycleEvents.BEFORE_SAVE.register(DataAccess::onServerPreSave);
-      ServerLifecycleEvents.AFTER_SAVE.register(DataAccess::onServerSave);
+      // Flushing and clearing static state run after every other mod's stop handler, which may still write data
+      ServerLifecycleEvents.SERVER_STOPPED.addPhaseOrdering(Event.DEFAULT_PHASE, LATE_PHASE);
+      ServerLifecycleEvents.SERVER_STOPPED.register(LATE_PHASE, DataAccess::onServerStop);
+      ServerLifecycleEvents.SERVER_STOPPED.register(LATE_PHASE, BorisLib::onServerStopped);
+      // Saving runs after every other mod's BEFORE_SAVE handler, so data they change there is in the same save. It is
+      // still before the chunk save, right after vanilla writes its player files.
+      ServerLifecycleEvents.BEFORE_SAVE.addPhaseOrdering(Event.DEFAULT_PHASE, LATE_PHASE);
+      ServerLifecycleEvents.BEFORE_SAVE.register(LATE_PHASE, DataAccess::onServerPreSave);
+      ServerLifecycleEvents.BEFORE_SAVE.register(LATE_PHASE, DataAccess::onServerSave);
       ServerLivingEntityEvents.AFTER_DEATH.register(Conditions::entityDied);
       ServerLivingEntityEvents.AFTER_DEATH.register(SequenceManager::onPlayerDeath);
       ServerTickEvents.END_SERVER_TICK.register(SequenceManager::tick);
@@ -124,6 +142,12 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
       ServerEntityEvents.ENTITY_LOAD.register(Conditions::onEntityLoad);
       ServerEntityEvents.ENTITY_UNLOAD.register(Conditions::onEntityUnload);
       CommandRegistrationCallback.EVENT.register(BorisLibCommands::register);
+      
+      if(FabricLoader.getInstance().isDevelopmentEnvironment()){
+         // Mixins otherwise apply when their target first loads, so a broken one could stay hidden until e.g. the
+         // first explosion. Auditing once the server is up applies them all, surfacing failures at dev startup.
+         ServerLifecycleEvents.SERVER_STARTED.register(server -> MixinEnvironment.getCurrentEnvironment().audit());
+      }
       
       LOGGER.info("BorisLib ready and waiting!");
    }
@@ -133,14 +157,29 @@ public class BorisLib implements ModInitializer, ClientModInitializer {
       LOGGER.info("BorisLib Client loaded and ready!");
    }
    
+   /**
+    * Late {@code SERVER_STOPPED} hook: clears every piece of static, per-server state so nothing leaks into the
+    * next world opened in the same game session (singleplayer), then forgets the server.
+    *
+    * @param server the server that stopped
+    */
+   private static void onServerStopped(MinecraftServer server){
+      SERVER_TIMER_CALLBACKS.clear();
+      WORLD_TIMER_CALLBACKS.clear();
+      net.borisshoes.borislib.events.Event.RECENT_EVENTS.clear();
+      PLAYER_MOVEMENT_TRACKER.clear();
+      SequenceManager.onServerStopped();
+      NearsightCondition.onServerStopped();
+      PendingItemReturns.onServerStopped();
+      if(SERVER == server) SERVER = null;
+   }
+   
    public static boolean addTickTimerCallback(TickTimerCallback callback){
       return SERVER_TIMER_CALLBACKS.add(callback);
-      // TODO serialize on world stop?
    }
    
    public static boolean addTickTimerCallback(ServerLevel world, TickTimerCallback callback){
       return WORLD_TIMER_CALLBACKS.add(Pair.of(world, callback));
-      // TODO serialize on world stop?
    }
    
    public static boolean addLoginCallback(LoginCallback callback){

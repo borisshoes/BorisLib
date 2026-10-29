@@ -2,13 +2,13 @@
   "required": true,
   "minVersion": "0.8",
   "package": "net.borisshoes.borislib.mixins",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "JAVA_25",
   "mixins": [
+    "CanAttackOverrideMixin",
     "ConditionHolderMixin",
     "DedicatedServerMixin",
     "DimensionStorageFileFixMixin",
     "EntityAccessor",
-    "IntegratedServerMixin",
     "InventoryAccessor",
     "LivingEntityMixin",
     "ServerExplosionMixin",
@@ -16,6 +16,7 @@
     "ServerPlayerMixin"
   ],
   "client": [
+    "IntegratedServerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

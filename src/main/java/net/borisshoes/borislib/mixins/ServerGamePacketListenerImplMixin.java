@@ -7,6 +7,7 @@ import net.borisshoes.borislib.tracker.PlayerMovementEntry;
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
 import net.minecraft.network.protocol.game.ServerboundInteractPacket;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.network.protocol.game.ServerboundTeleportToEntityPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.entity.PositionMoveRotation;
@@ -51,48 +52,51 @@ public class ServerGamePacketListenerImplMixin {
    /**
     * <b>Arcana-style position lock — override the {@code x} local.</b>
     *
-    * <p>When an active sequence blocks movement, the first {@code double} local
-    * stored in {@code handlePlayerPositionChange} (i.e. the x-coordinate read from the packet)
+    * <p>When an active sequence blocks movement, the {@code targetX} local of
+    * {@code handlePlayerPositionChange} (the clamped x-coordinate read from the packet)
     * is replaced with the server's authoritative x.  The packet is never cancelled,
     * so all other vanilla processing — on-ground flag, rotation, etc. — continues
     * to run normally.
+    *
+    * <p>Locals are matched by name, never by ordinal: if Mojang renames or reorders them the
+    * injection fails at startup instead of silently modifying a different variable.
     */
-   @ModifyVariable(method = "handlePlayerPositionChange", at = @At("STORE"), ordinal = 3)
+   @ModifyVariable(method = "handlePlayerPositionChange", at = @At("STORE"), name = "targetX")
    private double borislib$lockX(double x){
       PlayerSequence seq = SequenceManager.getActiveSequence(player.getUUID());
       return (seq != null && seq.blocksMovement()) ? player.getX() : x;
    }
 
    /** Arcana-style position lock — override the {@code y} local. */
-   @ModifyVariable(method = "handlePlayerPositionChange", at = @At("STORE"), ordinal = 4)
+   @ModifyVariable(method = "handlePlayerPositionChange", at = @At("STORE"), name = "targetY")
    private double borislib$lockY(double y){
       PlayerSequence seq = SequenceManager.getActiveSequence(player.getUUID());
       return (seq != null && seq.blocksMovement()) ? player.getY() : y;
    }
 
    /** Arcana-style position lock — override the {@code z} local. */
-   @ModifyVariable(method = "handlePlayerPositionChange", at = @At("STORE"), ordinal = 5)
+   @ModifyVariable(method = "handlePlayerPositionChange", at = @At("STORE"), name = "targetZ")
    private double borislib$lockZ(double z){
       PlayerSequence seq = SequenceManager.getActiveSequence(player.getUUID());
       return (seq != null && seq.blocksMovement()) ? player.getZ() : z;
    }
 
    /**
-    * Arcana-style rotation lock — override the {@code yaw} (first float) local.
+    * Arcana-style rotation lock — override the {@code requestedYRot} local.
     *
     * <p>When {@link PlayerSequence#blocksLook()} is {@code true}, the server-side
     * yaw is substituted for whatever the client sent.  Combined with the correction
     * packet below (which uses absolute yaw/pitch), this gives float-precision camera
     * rotation without the ~1.4° byte-quantisation of entity-rotation packets.
     */
-   @ModifyVariable(method = "handleMovePlayer", at = @At("STORE"), ordinal = 0)
+   @ModifyVariable(method = "handleMovePlayer", at = @At("STORE"), name = "requestedYRot")
    private float borislib$lockYaw(float yaw){
       PlayerSequence seq = SequenceManager.getActiveSequence(player.getUUID());
       return (seq != null && seq.blocksLook()) ? player.getYRot() : yaw;
    }
 
-   /** Arcana-style rotation lock — override the {@code pitch} (second float) local. */
-   @ModifyVariable(method = "handleMovePlayer", at = @At("STORE"), ordinal = 1)
+   /** Arcana-style rotation lock — override the {@code requestedXRot} local. */
+   @ModifyVariable(method = "handleMovePlayer", at = @At("STORE"), name = "requestedXRot")
    private float borislib$lockPitch(float pitch){
       PlayerSequence seq = SequenceManager.getActiveSequence(player.getUUID());
       return (seq != null && seq.blocksLook()) ? player.getXRot() : pitch;
@@ -161,12 +165,24 @@ public class ServerGamePacketListenerImplMixin {
       }
    }
 
+   /**
+    * Blocks the spectator "teleport to player" menu for the same sequences, which would otherwise let a ghost or
+    * cutscene viewer jump anywhere, including into other dimensions.
+    */
+   @Inject(method = "handleTeleportToEntityPacket", at = @At("HEAD"), cancellable = true)
+   private void borislib$blockSpectatorTeleport(ServerboundTeleportToEntityPacket packet, CallbackInfo ci){
+      PlayerSequence seq = SequenceManager.getActiveSequence(player.getUUID());
+      if(seq != null && seq.restrictsSpectatorAbuse()){
+         ci.cancel();
+      }
+   }
+   
    // ─────────────────────── velocity tracker (existing) ──────────────────────
 
    @Inject(method = "handlePlayerPositionChange",
          at = @At(value = "INVOKE",
                target = "Lnet/minecraft/server/level/ServerPlayer;setOnGroundWithMovement(ZZLnet/minecraft/world/phys/Vec3;)V"))
-   private void borislib$updateVelocityTracker(double requestedX, double requestedY, double requestedZ, float requestedYRot, float requestedXRot, boolean isOnGround, boolean horizontalCollision, CallbackInfo ci, @Local Vec3 velocity){
+   private void borislib$updateVelocityTracker(double requestedX, double requestedY, double requestedZ, float requestedYRot, float requestedXRot, boolean isOnGround, boolean horizontalCollision, CallbackInfo ci, @Local(name = "clientDeltaMovement") Vec3 velocity){
       if(PLAYER_MOVEMENT_TRACKER.containsKey(player) && !player.isDeadOrDying()){
          PlayerMovementEntry newEntry = new PlayerMovementEntry(player, player.position(), velocity, System.nanoTime());
          PLAYER_MOVEMENT_TRACKER.put(player, newEntry);

@@ -4,6 +4,7 @@ import net.borisshoes.borislib.BorisLib;
 import net.borisshoes.borislib.datastorage.ConditionData;
 import net.borisshoes.borislib.datastorage.DataAccess;
 import net.borisshoes.borislib.gui.GraphicalItem;
+import net.borisshoes.borislib.utils.MinecraftUtils;
 import net.minecraft.core.Holder;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.resources.Identifier;
@@ -17,11 +18,16 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.storage.LevelResource;
 
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 
@@ -333,6 +339,7 @@ public class Conditions {
 
       if(record == null){
          record = store.getOrCreate(entity.getUUID());
+         record.markSeen(level.getGameTime(), entity instanceof Player);
          ((ConditionHolder) entity).borislib$setConditions(record);
       }
       EntityConditions.TypeState state = record.getOrCreateState(holder);
@@ -581,6 +588,71 @@ public class Conditions {
             onEntityLoad(entity, level);
          }
       }
+      int days = BorisLib.CONFIG == null ? 0 : BorisLib.CONFIG.getInt(BorisLib.CONDITION_RECORD_EXPIRY_DAYS);
+      if(days > 0){
+         int pruned = pruneRecords(server, days);
+         if(pruned > 0) BorisLib.LOGGER.info("Pruned condition records of {} entities not seen for {} days", pruned, days);
+      }
+   }
+
+   /**
+    * Drops the condition records of non-player entities that have not been loaded for at least {@code days}
+    * (in game time, which every dimension shares), e.g. mobs in chunks that were deleted. Off by default because such an entity, if it
+    * ever came back, would otherwise resume its paused timers.
+    *
+    * <p>Player records are never removed. A record is kept if it has ever been bound to a player, if its UUID
+    * belongs to anyone with BorisLib or vanilla player data, or if its entity is currently loaded. Records saved
+    * before last-seen tracking existed start counting from now. No hooks fire, as for any destroyed entity.</p>
+    *
+    * @param server the server
+    * @param days   minimum age in in-game days (24000 ticks); 0 or less does nothing
+    * @return the number of records removed
+    */
+   public static int pruneRecords(MinecraftServer server, int days){
+      if(days <= 0) return 0;
+      ConditionData store = getConditionData();
+      long now = server.overworld().getGameTime();
+      long maxAge = days * 24000L;
+      Set<UUID> players = DataAccess.knownPlayerUuids();
+      players.addAll(vanillaPlayerUuids(server));
+
+      List<UUID> expired = new ArrayList<>();
+      for(var entry : store.getAllConditions().entrySet()){
+         UUID uuid = entry.getKey();
+         EntityConditions record = entry.getValue();
+         if(record.isPlayer() || players.contains(uuid)) continue;
+         if(record.getLastSeen() < 0){
+            // Saved before last-seen tracking existed: start the clock now
+            record.markSeen(now, false);
+            dirty = true;
+            continue;
+         }
+         if(now - record.getLastSeen() < maxAge) continue;
+         if(MinecraftUtils.findLivingEntity(server, uuid) != null) continue;
+         expired.add(uuid);
+      }
+      for(UUID uuid : expired){
+         store.removeEntity(uuid);
+      }
+      if(!expired.isEmpty()) dirty = true;
+      return expired.size();
+   }
+
+   private static Set<UUID> vanillaPlayerUuids(MinecraftServer server){
+      Set<UUID> uuids = new HashSet<>();
+      try(var files = Files.list(server.getWorldPath(LevelResource.PLAYER_DATA_DIR))){
+         files.forEach(path -> {
+            String name = path.getFileName().toString();
+            int dot = name.indexOf('.');
+            try{
+               uuids.add(UUID.fromString(dot < 0 ? name : name.substring(0, dot)));
+            }catch(IllegalArgumentException ignored){
+            }
+         });
+      }catch(Exception e){
+         BorisLib.LOGGER.warn("Could not list vanilla player data while pruning condition records: {}", e.getMessage());
+      }
+      return uuids;
    }
 
    /**
@@ -616,9 +688,10 @@ public class Conditions {
       if(data == null || !(entity instanceof LivingEntity living)) return;
       EntityConditions record = data.get(entity.getUUID());
       if(record == null) return;
-      ((ConditionHolder) living).borislib$setConditions(record);
-      record.emitter().markChanged();
       MinecraftServer server = level.getServer();
+      ((ConditionHolder) living).borislib$setConditions(record);
+      record.markSeen(level.getGameTime(), living instanceof Player);
+      record.emitter().markChanged();
       for(Holder<Condition> holder : record.getTypes()){
          EntityConditions.TypeState state = record.getState(holder);
          if(state == null || !state.isActive()) continue;
@@ -643,6 +716,7 @@ public class Conditions {
       ConditionHolder bound = (ConditionHolder) living;
       EntityConditions record = bound.borislib$getConditions();
       if(record == null) return;
+      record.markSeen(level.getGameTime(), living instanceof Player);
       bound.borislib$setConditions(null);
       Entity.RemovalReason reason = entity.getRemovalReason();
       if(reason != null && reason.shouldDestroy() && data != null && data.get(entity.getUUID()) == record){

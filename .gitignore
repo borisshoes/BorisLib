@@ -120,3 +120,6 @@ runs/
 
 
 external-resources
+# Local agent audit notes
+code_audit_log.md
+AGENTS.md

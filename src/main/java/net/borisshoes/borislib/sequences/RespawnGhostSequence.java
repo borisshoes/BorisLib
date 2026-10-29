@@ -1,7 +1,10 @@
 package net.borisshoes.borislib.sequences;
 
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.portal.TeleportTransition;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
@@ -49,6 +52,12 @@ public class RespawnGhostSequence extends PlayerSequence {
     * {@code -1} disables the range limit entirely.
     */
    private final double maxRange;
+   /**
+    * Dimension the anchor is in, or {@code null} for no dimension check (the original behaviour, kept for the
+    * constructor without one).
+    */
+   @Nullable
+   private final ResourceKey<Level> anchorDimension;
    
    /**
     * @param playerUUID     UUID of the player.
@@ -58,9 +67,23 @@ public class RespawnGhostSequence extends PlayerSequence {
     */
    public RespawnGhostSequence(UUID playerUUID, int durationTicks,
                                @Nullable Vec3 anchorPosition, double maxRange){
+      this(playerUUID, durationTicks, anchorPosition, null, maxRange);
+   }
+   
+   /**
+    * @param playerUUID      UUID of the player.
+    * @param durationTicks   Duration in server ticks. {@code -1} = indefinite.
+    * @param anchorPosition  Optional position the ghost is tethered near.
+    * @param anchorDimension Dimension of the anchor; a ghost found in any other dimension is moved back to the
+    *                        anchor. {@code null} skips the check, like the constructor without it.
+    * @param maxRange        Maximum distance from anchor ({@code -1} = unlimited).
+    */
+   public RespawnGhostSequence(UUID playerUUID, int durationTicks,
+                               @Nullable Vec3 anchorPosition, @Nullable ResourceKey<Level> anchorDimension, double maxRange){
       super(playerUUID);
       this.durationTicks = durationTicks;
       this.anchorPosition = anchorPosition;
+      this.anchorDimension = anchorDimension;
       this.maxRange = maxRange;
    }
    
@@ -75,6 +98,16 @@ public class RespawnGhostSequence extends PlayerSequence {
    public void onTick(ServerPlayer player, int tick){
       if(anchorPosition == null || maxRange <= 0) return;
       
+      // A ghost that left the anchor's dimension is brought straight back to the anchor
+      if(anchorDimension != null && player.level().dimension() != anchorDimension){
+         ServerLevel anchorLevel = player.level().getServer().getLevel(anchorDimension);
+         if(anchorLevel != null){
+            player.teleport(new TeleportTransition(anchorLevel, anchorPosition, Vec3.ZERO, player.getYRot(), player.getXRot(), entity -> {
+            }));
+            return;
+         }
+      }
+      
       Vec3 current = player.position();
       double dist = current.distanceTo(anchorPosition);
       
@@ -86,7 +119,7 @@ public class RespawnGhostSequence extends PlayerSequence {
          
          // Push player back inside the range boundary via a proper TeleportTransition.
          player.teleport(new TeleportTransition(
-               (net.minecraft.server.level.ServerLevel) player.level(),
+               player.level(),
                clamped, Vec3.ZERO,
                player.getYRot(), player.getXRot(),
                entity -> {
@@ -128,6 +161,12 @@ public class RespawnGhostSequence extends PlayerSequence {
    }
    
    // ─────────────────────────────── accessors ───────────────────────────────
+   
+   /** @return the anchor's dimension, or {@code null} if none was given */
+   @Nullable
+   public ResourceKey<Level> getAnchorDimension(){
+      return anchorDimension;
+   }
    
    @Nullable
    public Vec3 getAnchorPosition(){

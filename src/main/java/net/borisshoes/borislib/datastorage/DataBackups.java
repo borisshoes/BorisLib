@@ -14,6 +14,11 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -28,14 +33,18 @@ import static net.borisshoes.borislib.BorisLib.MOD_ID;
  * unrecoverable data loss — which is exactly what player data avoids via its {@code .dat_old}
  * rotation. This class gives GLOBAL/WORLD the same protection.</p>
  *
- * <p>Backups live under {@code <worldRoot>/data/<modid>_backups/} and are written from the main
+ * <p>Backups live under {@code <worldRoot>/data/<modid>_backups/}. They are encoded on the main
  * thread inside the {@code BEFORE_SAVE} hook, straight from the live in-memory state, so they are
- * never stale relative to what the server believes it saved. Each write is atomic
- * (temp file + rotate previous to {@code .dat_old} + rename) so an interrupted write can always
- * fall back to the previous good copy.</p>
+ * never stale relative to what the server believes it saved; compressing and writing happens on a
+ * single background thread ({@link #writeAsync}) so it keeps the order of saves without stalling the
+ * tick. Each write is atomic (temp file + rotate previous to {@code .dat_old} + rename) so an
+ * interrupted write can always fall back to the previous good copy.</p>
  */
 public final class DataBackups {
    private static volatile Path dir;
+   private static volatile ExecutorService writer;
+   // Last tag queued per backup name, so a save that changed nothing does not rotate away the older copy
+   private static final Map<String, CompoundTag> LAST_QUEUED = new ConcurrentHashMap<>();
    
    private DataBackups(){
    }
@@ -50,7 +59,15 @@ public final class DataBackups {
       try{
          Path d = worldRoot.resolve("data").resolve(MOD_ID + "_backups");
          Files.createDirectories(d);
+         if(!d.equals(dir)) LAST_QUEUED.clear();
          dir = d;
+         if(writer == null){
+            writer = Executors.newSingleThreadExecutor(runnable -> {
+               Thread thread = new Thread(runnable, "BorisLib Data Backups");
+               thread.setDaemon(true);
+               return thread;
+            });
+         }
          BorisLib.LOGGER.info("BorisLib global/world data backups initialized at {}", d);
       }catch(Exception e){
          BorisLib.LOGGER.error("Failed to initialize BorisLib data backup directory: {}", e.getMessage());
@@ -79,6 +96,55 @@ public final class DataBackups {
    }
    
    /**
+    * Queues {@link #write} on the backup thread. Skipped when {@code root} equals the last tag queued under this
+    * name. The tag is copied first: a mod's {@code writeNbt} may have put a tag it keeps mutating, which must not
+    * change while the backup thread serializes it. Falls back to writing immediately if the backup thread is not
+    * running.
+    *
+    * @param name base file name (without extension)
+    * @param root the encoded namespaced tag to persist
+    */
+   public static void writeAsync(String name, @Nullable CompoundTag root){
+      if(dir == null || root == null) return;
+      if(root.equals(LAST_QUEUED.get(name))) return;
+      CompoundTag snapshot = root.copy();
+      LAST_QUEUED.put(name, snapshot);
+      ExecutorService w = writer;
+      if(w == null){
+         writeOrForget(name, snapshot);
+         return;
+      }
+      try{
+         w.execute(() -> writeOrForget(name, snapshot));
+      }catch(Exception e){
+         writeOrForget(name, snapshot);
+      }
+   }
+
+   // A failed write must not count as queued, or the same data would never be retried
+   private static void writeOrForget(String name, CompoundTag root){
+      if(!writeInternal(name, root)) LAST_QUEUED.remove(name, root);
+   }
+
+   /**
+    * Waits for every queued backup to be written, then stops the backup thread. Called when the server stops;
+    * {@link #init} starts a new thread for the next world.
+    */
+   public static void flush(){
+      ExecutorService w = writer;
+      writer = null;
+      if(w == null) return;
+      w.shutdown();
+      try{
+         if(!w.awaitTermination(30, TimeUnit.SECONDS)){
+            BorisLib.LOGGER.error("Timed out waiting for BorisLib data backups to finish writing");
+         }
+      }catch(InterruptedException e){
+         Thread.currentThread().interrupt();
+      }
+   }
+
+   /**
     * Atomically writes {@code root} to {@code <dir>/<name>.dat}, rotating any existing file to
     * {@code .dat_old} first. Writing an empty tag is allowed and meaningful — it records that the
     * live state is legitimately empty, which lets {@link #read(String)}-based restore distinguish
@@ -88,8 +154,13 @@ public final class DataBackups {
     * @param root the encoded namespaced tag to persist (may be empty, must be non-null)
     */
    public static void write(String name, @Nullable CompoundTag root){
+      writeInternal(name, root);
+   }
+
+   /** {@link #write}, reporting whether the backup was written. */
+   private static boolean writeInternal(String name, @Nullable CompoundTag root){
       Path d = dir;
-      if(d == null || root == null) return;
+      if(d == null || root == null) return false;
       Path main = d.resolve(name + ".dat");
       Path backup = d.resolve(name + ".dat_old");
       Path temp = d.resolve(name + ".dat_tmp");
@@ -105,12 +176,14 @@ public final class DataBackups {
             }
          }
          Files.move(temp, main, StandardCopyOption.REPLACE_EXISTING);
+         return true;
       }catch(Exception e){
          BorisLib.LOGGER.error("Failed to write data backup {}: {}", name, e.getMessage());
          try{
             Files.deleteIfExists(temp);
          }catch(Exception ignored){
          }
+         return false;
       }
    }
    

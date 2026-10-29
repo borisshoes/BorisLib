@@ -24,7 +24,8 @@ import static net.borisshoes.borislib.BorisLib.PLAYER_MOVEMENT_TRACKER;
  * player's UUID exactly once before removing it.</p>
  *
  * <p>On leave: notifies the {@link SequenceManager} so cleanup can happen, then calls
- * {@link DataAccess#onPlayerQuit(ServerPlayer)} to flush player state to disk.</p>
+ * {@link DataAccess#onPlayerQuit(ServerPlayer)} to flush player state to disk and drops the player's movement
+ * tracker entry.</p>
  */
 public class PlayerConnectionCallback {
    
@@ -47,18 +48,25 @@ public class PlayerConnectionCallback {
          PLAYER_MOVEMENT_TRACKER.put(player, PlayerMovementEntry.blankEntry(player));
       }
       
+      PendingItemReturns.onPlayerJoin(player);
+
       UUID playerId = player.getUUID();
       LoginCallbackContainer container = DataAccess.getPlayer(playerId, BorisLib.LOGIN_CALLBACKS_KEY);
-      
-      ArrayList<LoginCallback> toBeRemoved = new ArrayList<>();
-      for(LoginCallback callback : container.getCallbacks()){
-         if(callback.getPlayer().equals(player.getStringUUID())){
+
+      // Iterate a copy so callbacks may queue new login callbacks, and remove each one as soon as it has run so a
+      // later failure cannot make it run (and e.g. hand out its item) a second time on the next login
+      boolean changed = false;
+      for(LoginCallback callback : new ArrayList<>(container.getCallbacks())){
+         if(!player.getStringUUID().equals(callback.getPlayer())) continue;
+         try{
             callback.onLogin(handler, server);
-            toBeRemoved.add(callback);
+            container.removeCallback(callback);
+            changed = true;
+         }catch(Exception e){
+            BorisLib.LOGGER.error("Login callback {} failed for player {}, keeping it for the next login", callback.getId(), playerId, e);
          }
       }
-      for(LoginCallback callback : toBeRemoved){
-         container.removeCallback(callback);
+      if(changed){
          DataAccess.setPlayer(playerId, BorisLib.LOGIN_CALLBACKS_KEY, container);
       }
    }
@@ -74,6 +82,22 @@ public class PlayerConnectionCallback {
       ServerPlayer player = handler.player;
       SequenceManager.onPlayerDisconnect(player);
       ConditionBossBars.onPlayerLeave(player);
+      PendingItemReturns.onPlayerLeave(player);
       DataAccess.onPlayerQuit(player);
+      PLAYER_MOVEMENT_TRACKER.remove(player);
+   }
+
+   /**
+    * Called by Fabric's respawn event. A respawn replaces the player object, so the old object's movement
+    * tracker entry is moved over to the new one instead of being kept alive forever.
+    *
+    * @param oldPlayer the player object being replaced
+    * @param newPlayer the player object that replaces it
+    * @param alive     {@code true} if the player left the End rather than dying
+    */
+   public static void onPlayerRespawn(ServerPlayer oldPlayer, ServerPlayer newPlayer, boolean alive){
+      if(PLAYER_MOVEMENT_TRACKER.remove(oldPlayer) != null){
+         PLAYER_MOVEMENT_TRACKER.put(newPlayer, PlayerMovementEntry.blankEntry(newPlayer));
+      }
    }
 }

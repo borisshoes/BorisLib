@@ -19,7 +19,7 @@ public class ServerExplosionMixin {
    // Rupture: explosion knockback is applied straight to velocity and never reaches LivingEntity.knockback,
    // so it is scaled where the knockback vector is built. The same vector is what gets sent to hit players.
    @ModifyExpressionValue(method = "hurtEntities", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/phys/Vec3;scale(D)Lnet/minecraft/world/phys/Vec3;"))
-   private Vec3 borislib$ruptureKnockback(Vec3 knockback, @Local Entity entity){
+   private Vec3 borislib$ruptureKnockback(Vec3 knockback, @Local(name = "entity") Entity entity){
       if(!(entity instanceof LivingEntity living)) return knockback;
       EntityConditions conditions = ((ConditionHolder) living).borislib$getConditions();
       if(conditions == null) return knockback;

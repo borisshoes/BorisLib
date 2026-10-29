@@ -59,6 +59,8 @@ public final class PlayerObjectStore {
    private static final class Entry {
       final Map<String, Map<String, Object>> objects = new ConcurrentHashMap<>();
       final Map<String, Map<String, CompoundTag>> raw = new ConcurrentHashMap<>();
+      // Root tag of the last file read or written, used as the fallback for a key that fails to encode
+      volatile CompoundTag lastSaved = null;
       // Backup raw data loaded lazily for recovery purposes
       Map<String, Map<String, CompoundTag>> backupRaw = null;
       boolean backupLoaded = false;
@@ -168,6 +170,18 @@ public final class PlayerObjectStore {
       return null;
    }
    
+   /** Reads only the main file, returning null (quietly) if it is missing or unreadable. */
+   @Nullable
+   private CompoundTag readMainOnly(UUID u){
+      Path main = file(u);
+      if(!Files.exists(main)) return null;
+      try(DataInputStream in = new DataInputStream(new GZIPInputStream(Files.newInputStream(main)))){
+         return NbtIo.read(in);
+      }catch(Exception e){
+         return null;
+      }
+   }
+
    /**
     * Reads only the backup file NBT without affecting the main data.
     * Returns null if backup doesn't exist or is corrupted.
@@ -249,7 +263,13 @@ public final class PlayerObjectStore {
    private Entry getEntry(UUID u){
       return cache.computeIfAbsent(u, id -> {
          Entry e = new Entry();
-         CompoundTag root = readWithBackup(id);
+         CompoundTag root = readMainOnly(id);
+         // Data recovered from the backup leaves lastSaved null, so the first save rewrites the broken main file
+         if(root != null){
+            e.lastSaved = root;
+         }else{
+            root = readWithBackup(id);
+         }
          if(root == null) return e;
          try{
             Map<String, Map<String, CompoundTag>> decoded = parseNamespacedMap(root);
@@ -289,9 +309,10 @@ public final class PlayerObjectStore {
                if(modRaw.isEmpty()) e.raw.remove(key.modId());
                return decoded;
             }
-            // decode returned null (corrupted data), try to recover from backup
+            // decode returned null (corrupted data). Stash the stored bytes before anything replaces them, then try
+            // to recover from backup
             BorisLib.LOGGER.warn("Corrupted data for key {} player {}, attempting recovery from backup", key.id(), u);
-            if(modRaw.isEmpty()) e.raw.remove(key.modId());
+            stashUndecodable(modRaw, key, n, "player " + u);
             
             T recovered = tryRecoverFromBackup(u, e, key);
             if(recovered != null) return recovered;
@@ -323,6 +344,42 @@ public final class PlayerObjectStore {
       }
    }
    
+   /**
+    * @param u   the player's UUID
+    * @param key the registered player key
+    * @return {@code true} if the player has a live value or stored NBT for the key; never creates a default
+    */
+   public boolean has(UUID u, DataKey<?> key){
+      Entry e = getEntry(u);
+      Map<String, Object> modObjs = e.objects.get(key.modId());
+      if(modObjs != null && modObjs.containsKey(key.key())) return true;
+      Map<String, CompoundTag> modRaw = e.raw.get(key.modId());
+      return modRaw != null && modRaw.containsKey(key.key());
+   }
+
+   /**
+    * Reads one key without adding the player to the cache. Cached players return their live value; for anyone
+    * else the file is read and the value decoded into a detached object, so changes to it are not saved.
+    * Used by {@link DataAccess#snapshotAllPlayerData}.
+    *
+    * @param u   the player's UUID
+    * @param key the registered player key
+    * @param <T> the data type
+    * @return the value, or a fresh default if the player has none stored
+    */
+   public <T extends StorableData> T peek(UUID u, DataKey<T> key){
+      if(cache.containsKey(u)) return getLive(u, key);
+      CompoundTag root = readWithBackup(u);
+      if(root != null){
+         CompoundTag tag = root.getCompoundOrEmpty(key.modId()).getCompoundOrEmpty(key.key());
+         if(!tag.isEmpty()){
+            T decoded = decode(key, tag, u, key.id().toString());
+            if(decoded != null) return decoded;
+         }
+      }
+      return key.makeDefaultPlayer(u);
+   }
+
    /**
     * Ensures the player's data file is loaded and its raw NBT parsed. Called by
     * {@link DataAccess#onPlayerJoin(ServerPlayer)} so subsequent {@link #getLive} calls during the same
@@ -369,8 +426,17 @@ public final class PlayerObjectStore {
                try{
                   if(value instanceof StorableData storable){
                      CompoundTag encoded = encode(storable, modId + ":" + key);
+                     if(encoded == null){
+                        // The encoder threw. Keep the last saved bytes rather than dropping the key from the file.
+                        CompoundTag prev = previousFor(e, modId, key);
+                        if(prev != null){
+                           modTag.put(key, prev);
+                           BorisLib.LOGGER.warn("Encode for key {}:{} player {} failed - kept last saved value", modId, key, u);
+                        }
+                        continue;
+                     }
                      // Validate: skip empty compounds to avoid saving uninitialized data
-                     if(encoded == null || encoded.isEmpty()){
+                     if(encoded.isEmpty()){
                         BorisLib.LOGGER.warn("Skipping save for key {}:{} player {} - encoded data is empty/invalid", modId, key, u);
                         continue;
                      }
@@ -378,6 +444,8 @@ public final class PlayerObjectStore {
                   }
                }catch(Exception ex){
                   BorisLib.LOGGER.error("Failed to encode key {}:{} for player {}: {}", modId, key, u, ex.getMessage());
+                  CompoundTag prev = previousFor(e, modId, key);
+                  if(prev != null) modTag.put(key, prev);
                }
             }
          }catch(Exception ex){
@@ -404,6 +472,56 @@ public final class PlayerObjectStore {
          }
       }
       
+      // Nothing changed since the last read or write: skip the write so .dat_old stays a genuinely older copy
+      if(out.equals(e.lastSaved)){
+         BorisLib.LOGGER.debug("Player data for {} unchanged, skipping write", u);
+         return;
+      }
+      writeFile(u, e, out);
+   }
+
+   /**
+    * Writes only one key's current value to disk; every other key is written exactly as it was in the last file read
+    * or written, so other mods' on-disk data stays in step with vanilla's last save. The player stays dirty, so the
+    * next normal save writes everything. Does a full {@link #save} instead when there is no such file to build on
+    * (no file yet, or the main file was unreadable and data came from the backup), since a partial file would
+    * otherwise replace the only good copy.
+    *
+    * @param u   the player's UUID
+    * @param key the registered player key to write
+    */
+   public void saveKey(UUID u, DataKey<?> key){
+      Entry e = cache.get(u);
+      if(e == null){
+         BorisLib.LOGGER.debug("No cache entry for player {} during key save, skipping", u);
+         return;
+      }
+      CompoundTag last = e.lastSaved;
+      if(last == null){
+         save(u);
+         return;
+      }
+      Map<String, Object> modObjs = e.objects.get(key.modId());
+      // Not decoded this session, so what is on disk is already current
+      if(modObjs == null || !(modObjs.get(key.key()) instanceof StorableData storable)) return;
+      CompoundTag encoded = encode(storable, key.id().toString());
+      if(encoded == null || encoded.isEmpty()){
+         BorisLib.LOGGER.warn("Skipping immediate save for key {} player {} - encoded data is empty/invalid", key.id(), u);
+         return;
+      }
+      CompoundTag out = last.copy();
+      CompoundTag modTag = out.getCompoundOrEmpty(key.modId());
+      if(modTag.isEmpty()){
+         modTag = new CompoundTag();
+         out.put(key.modId(), modTag);
+      }
+      modTag.put(key.key(), encoded);
+      if(out.equals(last)) return;
+      writeFile(u, e, out);
+   }
+
+   /** Atomically writes {@code out} as the player's file and records it as the last saved copy. */
+   private void writeFile(UUID u, Entry e, CompoundTag out){
       // Write file with backup rotation:
       // 1. Write to temp file
       // 2. Move existing main -> backup (if main exists)
@@ -429,6 +547,9 @@ public final class PlayerObjectStore {
          
          // Move temp -> main
          Files.move(temp, main, StandardCopyOption.REPLACE_EXISTING);
+         // Copied: out holds tags that mods' writeNbt may keep and mutate later, which would make a changed save
+         // compare equal and be skipped
+         e.lastSaved = out.copy();
          BorisLib.LOGGER.debug("Successfully saved player data for {}", u);
       }catch(Exception ex){
          BorisLib.LOGGER.error("Failed to save player data for {}: {}", u, ex.getMessage());
@@ -440,6 +561,32 @@ public final class PlayerObjectStore {
       }
    }
    
+   /** Last-persisted NBT for a key, from the last file this store read or wrote for the player. */
+   @Nullable
+   private static CompoundTag previousFor(Entry e, String modId, String key){
+      CompoundTag last = e.lastSaved;
+      if(last == null) return null;
+      CompoundTag prevKey = last.getCompoundOrEmpty(modId).getCompoundOrEmpty(key);
+      return prevKey.isEmpty() ? null : prevKey;
+   }
+
+   /**
+    * Keeps stored NBT that failed to decode under {@code <key>$undecodable} in the same mod's raw map. '$' can never
+    * appear in an {@link net.minecraft.resources.Identifier} path, so no {@link DataKey} claims it: it is passed
+    * through untouched on every save while the key itself carries on with its default value as before. Only the
+    * first failure is kept, so a later failure of the replacement data cannot overwrite the original.
+    *
+    * <p>Shared by {@link GlobalState} and {@link WorldState}.</p>
+    */
+   static void stashUndecodable(Map<String, CompoundTag> modRaw, DataKey<?> key, CompoundTag tag, String where){
+      String stashKey = key.key() + DataKey.UNDECODABLE_SUFFIX;
+      if(modRaw.putIfAbsent(stashKey, tag) == null){
+         BorisLib.LOGGER.error("Data for key {} ({}) could not be decoded; the original is kept on disk as {}:{} for recovery", key.id(), where, key.modId(), stashKey);
+      }else{
+         BorisLib.LOGGER.error("Data for key {} ({}) could not be decoded; an earlier undecodable copy is already kept as {}:{}", key.id(), where, key.modId(), stashKey);
+      }
+   }
+
    /**
     * @return a deep snapshot of every cached player's mod → key → object map. Used by
     *         {@link DataAccess#onServerStop(MinecraftServer)} to iterate every loaded player exactly once.
